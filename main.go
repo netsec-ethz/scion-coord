@@ -17,6 +17,7 @@ func main() {
 	registrationController := api.RegistrationController{}
 	loginController := api.LoginController{}
 	asController := api.ASController{}
+	adminController := api.AdminController{}
 
 	// router
 	router := mux.NewRouter()
@@ -33,6 +34,15 @@ func main() {
 
 	// index page for registration and login
 	router.Handle("/", xsrfChain.ThenFunc(controllers.Index))
+
+	// login page
+	router.Handle("/login", xsrfChain.ThenFunc(loginController.LoginPage))
+
+	// register page
+	router.Handle("/register", xsrfChain.ThenFunc(registrationController.RegisterPage))
+
+	// admin page
+	router.Handle("/admin", xsrfChain.ThenFunc(adminController.Index))
 
 	// regitration
 	router.Handle("/api/register", xsrfChain.ThenFunc(registrationController.Register))

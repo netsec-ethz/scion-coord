@@ -3,6 +3,7 @@ package controllers
 
 import (
 	"encoding/json"
+	"html/template"
 	"net/http"
 )
 
@@ -17,6 +18,8 @@ type output interface {
 	NotFound(err error, w http.ResponseWriter, r *http.Request)
 
 	Forbidden(err error, w http.ResponseWriter, r *http.Request)
+
+	Render(tpl *template.Template, data interface{}, w http.ResponseWriter, r *http.Request)
 }
 
 type HTTPController struct {
@@ -62,4 +65,9 @@ func (c HTTPController) NotFound(err string, w http.ResponseWriter, r *http.Requ
 
 func (c HTTPController) Forbidden(err error, w http.ResponseWriter, r *http.Request) {
 	http.Error(w, err.Error(), http.StatusNotFound)
+}
+
+func (C HTTPController) Render(tpl *template.Template, data interface{}, w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
+	tpl.Execute(w, nil)
 }

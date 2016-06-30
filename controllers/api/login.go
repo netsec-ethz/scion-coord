@@ -5,6 +5,7 @@ import (
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/models"
+	"html/template"
 	"log"
 	"net/http"
 )
@@ -27,6 +28,16 @@ type user struct {
 	Organisation string
 	Key          string
 	Secret       string
+}
+
+// TODO: cache the templates
+func (c *LoginController) LoginPage(w http.ResponseWriter, r *http.Request) {
+	t, err := template.ParseFiles("templates/layout.html", "templates/login.html")
+	if err != nil {
+		c.Error500(err, w, r)
+		return
+	}
+	c.Render(t, nil, w, r)
 }
 
 func (c *LoginController) Me(w http.ResponseWriter, r *http.Request) {
@@ -130,7 +141,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 	// otherwise redirect to the home page
 	dbUser, err := models.FindUserByEmail(email)
 	if err != nil || dbUser == nil {
-		http.Error(w, err.Error(), http.StatusForbidden)
+		c.BadRequest(err, w, r)
 		return
 	}
 
