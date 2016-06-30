@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/models"
@@ -32,30 +33,41 @@ func (c *RegistrationController) RegisterPage(w http.ResponseWriter, r *http.Req
 		c.Error500(err, w, r)
 		return
 	}
-	c.Render(t, nil, w, r)
+
+	_, userSession, err := middleware.GetUserSession(r)
+	if err != nil || userSession == nil {
+		c.Error500(err, w, r)
+		return
+	}
+
+	c.Render(t, userSession, w, r)
 }
 
 // Method used to validate the registration request
-func (r *registrationRequest) isValid() bool {
+func (r *registrationRequest) isValid() (bool, error) {
 	// check if any of this is empty
 	if r.Email == "" || r.Organisation == "" || r.Password == "" || r.PasswordConfirmation == "" ||
 		r.First == "" || r.Last == "" || r.Account == "" {
-		return false
+		return false, fmt.Errorf("%s\n", "Email, Organisation, Password, Password confirmation, Firts and Last name and Account are all mandatory fields")
 	}
 
 	// check if the password match and that the length is at least 8 chars
-	if len(r.Password) < 8 || r.Password != r.PasswordConfirmation {
+	if len(r.Password) < 8 {
 
-		return false
+		return false, fmt.Errorf("%s\n", "Password length invalid. Use at leats 8 chars")
 	}
 
-	return true
+	if r.Password != r.PasswordConfirmation {
+		return false, fmt.Errorf("%s\n", "Password mismatch")
+	}
+
+	return true, nil
 }
 
 // This method is used to register a new account via the standard form
 func (c *RegistrationController) RegisterPost(w http.ResponseWriter, r *http.Request) {
 
-	_, userSession, err := middleware.GetUserSession(r)
+	session, userSession, err := middleware.GetUserSession(r)
 
 	if err != nil || userSession == nil {
 		c.Error500(err, w, r)
@@ -65,7 +77,9 @@ func (c *RegistrationController) RegisterPost(w http.ResponseWriter, r *http.Req
 	// parse the form value
 	if err := r.ParseForm(); err != nil {
 		log.Println(err)
-		http.Error(w, "{}", http.StatusInternalServerError)
+		userSession.Error = "Could not parse the input data. Try again."
+		session.Save(r, w)
+		c.Redirect(302, "/register", w, r)
 		return
 	}
 
@@ -75,13 +89,17 @@ func (c *RegistrationController) RegisterPost(w http.ResponseWriter, r *http.Req
 
 	// check if the parsing succeeded
 	if err := decoder.Decode(&regRequest); err != nil {
-		c.Error500(err, w, r)
+		userSession.Error = "Could not parse the input data. Try again."
+		session.Save(r, w)
+		c.Redirect(302, "/register", w, r)
 		return
 	}
 
 	// validate the data
-	if !regRequest.isValid() {
-		c.Error500(errors.New("{}"), w, r)
+	if valid, err := regRequest.isValid(); !valid {
+		userSession.Error = err.Error()
+		session.Save(r, w)
+		c.Redirect(302, "/register", w, r)
 		return
 	}
 
@@ -111,20 +129,23 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 
 	// check if the parsing succeeded
 	if err := decoder.Decode(&regRequest); err != nil {
+		log.Println(err)
 		c.Error500(err, w, r)
 		return
 	}
 
 	// validate the data
-	if !regRequest.isValid() {
-		c.Error500(errors.New("{}"), w, r)
+	if valid, err := regRequest.isValid(); !valid {
+		log.Println(err)
+		c.Error500(err, w, r)
 		return
 	}
 
 	// register the user
 	if user, err := models.RegisterUser(regRequest.Account, regRequest.Organisation,
 		regRequest.Email, regRequest.Password, regRequest.First, regRequest.Last); err != nil {
-		c.Error500(errors.New("{}"), w, r)
+		log.Println(err)
+		c.Error500(err, w, r)
 		return
 	} else {
 		c.JSON(&user, w, r)

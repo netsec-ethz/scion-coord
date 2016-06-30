@@ -13,11 +13,11 @@ angular.module('scionApp')
                     function(data) {                    
                         //$scope.message = "Registration completed successfully.\nYou will be soon redirected to the home page.";
                         $scope.user = data;
-                        $location.path('/admin');
+                        $location.path('/login');
                         
                     },
                     function(response) {
-                        $scope.error = "Registration error. Please try again.";
+                        $scope.error = response.data;
                         console.log(response);
                     });  
             };

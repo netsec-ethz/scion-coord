@@ -6,7 +6,16 @@
   <div class="register-box-body">
     <p class="login-box-msg">Register a new membership</p>
 
-    <ng-form name="registration" ng-submit="submit()">
+
+    {{if .Error}}
+        <div class="alert alert-danger alert-dismissible">                
+            {{.Error}}        
+          </div>
+    {{end}}
+      
+
+    <form name="registration" method="POST" action="/register">
+    <input type="hidden" class="form-control" name="xsrf" value="{{.XSRFToken}}" />
       <div class="form-group has-feedback">
         <input type="text" class="form-control" ng-model="user.first" name="first" placeholder="First name" ng-required="true">
         <span class="glyphicon glyphicon-user form-control-feedback"></span>
@@ -39,7 +48,7 @@
         <!-- /.col -->
         <div class="col-xs-12">
           <!-- <button ng-click="register(user)" ng-disabled="registration.$invalid" type="button" class="btn btn-primary btn-block btn-flat">Register</button> -->
-          <button ng-click="register(user)" type="button" class="btn btn-primary btn-block btn-flat">Register</button>
+          <input type="submit" value="Register" class="btn btn-primary btn-block btn-flat"/>
         </div>
         <!-- /.col -->
       </div>

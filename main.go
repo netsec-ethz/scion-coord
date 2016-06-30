@@ -22,6 +22,8 @@ func main() {
 	// router
 	router := mux.NewRouter()
 
+	loggingChain := middleware.New(middleware.LoggingHandler)
+
 	// public chain does not require authentication but serves back the XSRF Token
 	xsrfChain := middleware.New(middleware.LoggingHandler, middleware.XSRFHandler)
 
@@ -40,18 +42,19 @@ func main() {
 
 	// register page
 	router.Handle("/register", xsrfChain.ThenFunc(registrationController.RegisterPage))
+	router.Handle("/register", xsrfChain.ThenFunc(registrationController.RegisterPost)).Methods("POST")
 
 	// admin page
-	router.Handle("/admin", xsrfChain.ThenFunc(adminController.Index))
+	router.Handle("/admin", loggingChain.ThenFunc(adminController.Index))
 
 	// regitration
-	router.Handle("/api/register", xsrfChain.ThenFunc(registrationController.Register))
+	router.Handle("/api/register", loggingChain.ThenFunc(registrationController.Register))
 	// login
-	router.Handle("/api/login", xsrfChain.ThenFunc(loginController.Login))
+	router.Handle("/api/login", loggingChain.ThenFunc(loginController.Login))
 	// Logout
-	router.Handle("/api/logout", xsrfChain.ThenFunc(loginController.Logout))
+	router.Handle("/api/logout", loggingChain.ThenFunc(loginController.Logout))
 	// Me
-	router.Handle("/api/me", xsrfChain.ThenFunc(loginController.Me))
+	router.Handle("/api/me", loggingChain.ThenFunc(loginController.Me))
 
 	// ==========================================================
 	// API

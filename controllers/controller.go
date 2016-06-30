@@ -20,6 +20,8 @@ type output interface {
 	Forbidden(err error, w http.ResponseWriter, r *http.Request)
 
 	Render(tpl *template.Template, data interface{}, w http.ResponseWriter, r *http.Request)
+
+	Redirect(code int, url string, w http.ResponseWriter, r *http.Request)
 }
 
 type HTTPController struct {
@@ -52,22 +54,30 @@ func (c HTTPController) JSON(data interface{}, w http.ResponseWriter, r *http.Re
 }
 
 func (c HTTPController) Error500(err error, w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 
 func (c HTTPController) BadRequest(err error, w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
 	http.Error(w, err.Error(), http.StatusBadRequest)
 }
 
 func (c HTTPController) NotFound(err string, w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
 	http.Error(w, err, http.StatusNotFound)
 }
 
 func (c HTTPController) Forbidden(err error, w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
 	http.Error(w, err.Error(), http.StatusNotFound)
 }
 
 func (C HTTPController) Render(tpl *template.Template, data interface{}, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
-	tpl.Execute(w, nil)
+	tpl.Execute(w, data)
+}
+
+func (C HTTPController) Redirect(code int, url string, w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, url, code)
 }

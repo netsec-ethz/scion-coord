@@ -12,6 +12,7 @@ type Session struct {
 	Organisation string
 	XSRFToken    string
 	HasLoggedIn  bool
+	Error        string // erros to display while rendering the template
 }
 
 type M map[string]interface{}
