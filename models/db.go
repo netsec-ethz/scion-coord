@@ -21,7 +21,9 @@ func init() {
 	orm.Debug = false
 
 	// register the models
-	orm.RegisterModel(new(user), new(account), new(As))
+	orm.RegisterModel(new(user), new(Account), new(As),
+		new(JoinRequest), new(JoinRequestMapping), new(ConnRequest),
+		new(ConnRequestMapping), new(JoinReply), new(ConnReply))
 
 	// priont verbose logs when generating the tables
 	verbose := true
