@@ -20,7 +20,7 @@ const (
 	SECRET_LENGHT = 32
 )
 
-type account struct {
+type Account struct {
 	Id           uint64
 	Name         string
 	Organisation string
@@ -40,7 +40,7 @@ type user struct {
 	FirstName string
 	LastName  string
 	Verified  bool     // whether the user verified the email
-	Account   *account `orm:"rel(fk);index"`
+	Account   *Account `orm:"rel(fk);index"`
 	Created   time.Time
 	Updated   time.Time
 	// TODO: add the 2 factor authentication
@@ -105,7 +105,7 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 				return nil, apiSecretError
 			}
 
-			a = new(account)
+			a = new(Account)
 			a.Organisation = organisation
 			a.Name = accountName
 			a.Created = time.Now().UTC()
@@ -145,7 +145,7 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 	return nil, errors.New("Unknown error while registering a new user")
 }
 
-func (a *account) Upsert() error {
+func (a *Account) Upsert() error {
 	storedAccount, err := FindAccount(a.Name)
 	if err == nil && storedAccount != nil && storedAccount.Id > 0 {
 		a.Id = storedAccount.Id
@@ -158,8 +158,8 @@ func (a *account) Upsert() error {
 	return err
 }
 
-func FindAccount(name string) (*account, error) {
-	a := new(account)
+func FindAccount(name string) (*Account, error) {
+	a := new(Account)
 	err := o.QueryTable(a).Filter("Name", name).RelatedSel().One(a)
 	return a, err
 }
@@ -188,14 +188,14 @@ func FindUserById(id string) (*user, error) {
 	return u, err
 }
 
-func FindUserByKeySecret(key, secret string) (*account, error) {
-	u := new(account)
+func FindUserByKeySecret(key, secret string) (*Account, error) {
+	u := new(Account)
 	err := o.QueryTable(u).Filter("Key", key).Filter("Secret", secret).One(u)
 	return u, err
 }
 
-func FindAccountByKey(key string) (*account, error) {
-	u := new(account)
+func FindAccountByKey(key string) (*Account, error) {
+	u := new(Account)
 	err := o.QueryTable(u).Filter("Key", key).One(u)
 	return u, err
 }
@@ -205,7 +205,7 @@ func (u *user) Delete() error {
 	return err
 }
 
-func (a *account) Delete() error {
+func (a *Account) Delete() error {
 	_, err := o.Delete(a)
 	return err
 }

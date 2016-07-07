@@ -1,23 +1,28 @@
 package models
 
 import (
-	"crypto/x509"
-	"encoding/pem"
+	"strconv"
+	"strings"
 	"time"
 )
 
 type As struct {
-	Id          uint64
-	AsId        uint64   `orm:"index"`
-	Certificate string   `orm:"type(text)"`
-	Account     *account `orm:"rel(fk);index"`
-	Created     time.Time
-	Updated     time.Time
+	IsdAs   string   `orm:"index;pk"`
+	Isd     uint64   `orm:"index"`
+	Core    uint64   `orm:"default(0)"`
+	Account *Account `orm:"rel(fk);index"`
+	Created time.Time
 }
 
-func FindAsById(id uint64) (*As, error) {
+func FindCoreAsByIsd(isd uint64) ([]As, error) {
+	var ases []As
+	_, err := o.QueryTable("as").Filter("Isd", isd).Filter("Core", 1).All(&ases)
+	return ases, err
+}
+
+func FindAsByIsdAs(isd_as string) (*As, error) {
 	as := new(As)
-	err := o.QueryTable(as).Filter("Id", id).RelatedSel().One(as)
+	err := o.QueryTable(as).Filter("IsdAs", isd_as).RelatedSel().One(as)
 	return as, err
 }
 
@@ -26,46 +31,15 @@ func (as *As) deleteAs() error {
 	return err
 }
 
-func (as *As) Upsert() error {
-	storedAs, err := FindAsById(as.Id)
-	if err == nil && storedAs != nil && storedAs.Id > 0 {
-		storedAs.Id = as.Id
-		storedAs.Certificate = as.Certificate
-		as.Updated = time.Now().UTC()
-		_, err := o.Update(as)
-		return err
-	}
-
-	_, err = o.Insert(as)
+func (as *As) Insert() error {
+	_, err := o.Insert(as)
 	return err
 }
 
-// This function is a placeholder for verifying that the certificate contains the correct AS id
-func (as *As) verifyCertificate() {
-	// First, create the set of root certificates. For this example we only
-	// have one. It's also possible to omit this in order to use the
-	// default root set of the current operating system.
-	roots := x509.NewCertPool()
-	// ok := roots.AppendCertsFromPEM([]byte(rootPEM))
-	// if !ok {
-	// 	panic("failed to parse root certificate")
-	// }
+func IsdAsToIsd(isdas string) (uint64, error) {
+	return strconv.ParseUint(strings.Split(isdas, "-")[0], 10, 64)
+}
 
-	block, _ := pem.Decode([]byte(as.Certificate))
-	if block == nil {
-		panic("failed to parse certificate PEM")
-	}
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		panic("failed to parse certificate: " + err.Error())
-	}
-
-	opts := x509.VerifyOptions{
-		DNSName: "mail.google.com",
-		Roots:   roots,
-	}
-
-	if _, err := cert.Verify(opts); err != nil {
-		panic("failed to verify certificate: " + err.Error())
-	}
+func FindNumAsInIsd(isd uint64) (int64, error) {
+	return o.QueryTable("as").Filter("Isd", isd).Count()
 }
