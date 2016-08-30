@@ -47,13 +47,14 @@ func main() {
 	// admin page
 	router.Handle("/admin", loggingChain.ThenFunc(adminController.Index))
 
-	// regitration
+	// registration
 	router.Handle("/api/register", loggingChain.ThenFunc(registrationController.Register))
 	// login
 	router.Handle("/api/login", loggingChain.ThenFunc(loginController.Login))
 	// Logout
 	router.Handle("/api/logout", loggingChain.ThenFunc(loginController.Logout))
 	// Me
+
 	router.Handle("/api/me", loggingChain.ThenFunc(loginController.Me))
 
 	// ==========================================================
