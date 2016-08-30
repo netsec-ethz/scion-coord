@@ -20,6 +20,12 @@ func FindCoreAsByIsd(isd uint64) ([]As, error) {
 	return ases, err
 }
 
+func FindCoreAsByIsdAs(isd uint64, isd_as string) (*As, error) {
+	as := new(As)
+	err := o.QueryTable("as").Filter("Isd", isd).Filter("IsdAs", isd_as).Filter("Core", true).RelatedSel().One(as)
+	return as, err
+}
+
 func FindAsByIsdAs(isd_as string) (*As, error) {
 	as := new(As)
 	err := o.QueryTable(as).Filter("IsdAs", isd_as).RelatedSel().One(as)
