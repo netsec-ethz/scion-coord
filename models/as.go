@@ -9,14 +9,14 @@ import (
 type As struct {
 	IsdAs   string   `orm:"index;pk"`
 	Isd     uint64   `orm:"index"`
-	Core    uint64   `orm:"default(0)"`
+	Core    bool     `orm:"default(false)"`
 	Account *Account `orm:"rel(fk);index"`
 	Created time.Time
 }
 
 func FindCoreAsByIsd(isd uint64) ([]As, error) {
 	var ases []As
-	_, err := o.QueryTable("as").Filter("Isd", isd).Filter("Core", 1).All(&ases)
+	_, err := o.QueryTable("as").Filter("Isd", isd).Filter("Core", true).All(&ases)
 	return ases, err
 }
 
@@ -26,10 +26,10 @@ func FindAsByIsdAs(isd_as string) (*As, error) {
 	return as, err
 }
 
-func AllAses() ([]As, error) {
-	var ases []As
-	_, err := o.QueryTable("as").All(&ases)
-	return ases, err
+func AllASes() ([]As, error) {
+	var ASes []As
+	_, err := o.QueryTable("as").All(&ASes)
+	return ASes, err
 }
 
 func (as *As) deleteAs() error {

@@ -58,7 +58,7 @@ func (c *ASController) Insert(w http.ResponseWriter, r *http.Request) {
 
 	var as struct {
 		IsdAs string `json:"isdas"`
-		Core  uint64 `json:"core"`
+		Core  bool `json:"core"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -269,7 +269,7 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 	finalAs := models.As{
 		IsdAs:   joinReply.IsdAs,
 		Isd:     isd,
-		Core:    0,
+		Core:    false,
 		Account: account,
 		Created: time.Now().UTC(),
 	}
