@@ -102,6 +102,7 @@ func (c *ASController) UploadJoinRequest(w http.ResponseWriter, r *http.Request)
 
 	type JoinRequest struct {
 		IsdToJoin uint64 `json:"isd_to_join"`
+		AsToQuery string `json:"as_to_query"`
 		SigKey    string `json:"sigkey"`
 		EncKey    string `json:"enckey"`
 	}
@@ -113,19 +114,15 @@ func (c *ASController) UploadJoinRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	// find core AS in the ISD to join
-	core_ases, err := models.FindCoreAsByIsd(request.IsdToJoin)
+	core_as, err := models.FindCoreAsByIsdAs(request.IsdToJoin, request.AsToQuery)
 	if err != nil {
 		c.BadRequest(err, w, r)
 		return
 	}
-	if len(core_ases) == 0 {
-		c.BadRequest(err, w, r)
-		return
-	}
-	core_as := core_ases[0]
 
 	join_request := models.JoinRequest{
 		IsdAs:  core_as.IsdAs,
+		AsToQuery: request.AsToQuery,
 		SigKey: request.SigKey,
 		EncKey: request.EncKey,
 	}

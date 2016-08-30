@@ -1,10 +1,11 @@
 package models
 
 type JoinRequest struct {
-	Id     uint64 `json:"id"`
-	IsdAs  string `json:"isdas"`
-	SigKey string `json:"sigkey"`
-	EncKey string `json:"enckey"`
+	Id        uint64 `json:"id"`
+	IsdAs     string `json:"isdas"`
+	AsToQuery string `json:"isdas"`
+	SigKey    string `json:"sigkey"`
+	EncKey    string `json:"enckey"`
 }
 
 func FindJoinRequestsByIsdAs(isdas string) ([]JoinRequest, error) {
