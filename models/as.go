@@ -26,6 +26,12 @@ func FindAsByIsdAs(isd_as string) (*As, error) {
 	return as, err
 }
 
+func AllAses() ([]As, error) {
+	var ases []As
+	_, err := o.QueryTable("as").All(&ases)
+	return ases, err
+}
+
 func (as *As) deleteAs() error {
 	_, err := o.Delete(as)
 	return err
