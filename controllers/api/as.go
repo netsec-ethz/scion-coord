@@ -245,21 +245,6 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 		c.BadRequest(errors.New("No reply"), w, r)
 		return
 	}
-	err = joinReply.Delete()
-	if err != nil {
-		c.Error500(err, w, r)
-		return
-	}
-	err = jrm.Delete()
-	if err != nil {
-		c.Error500(err, w, r)
-		return
-	}
-	err = models.DeleteJoinRequestById(request.RequestId)
-	if err != nil {
-		c.Error500(err, w, r)
-		return
-	}
 
 	isd, err := models.IsdAsToIsd(joinReply.IsdAs)
 	if err != nil {
@@ -454,23 +439,7 @@ func (c *ASController) PollConnReplies(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "{}")
 		return
 	}
-	for _, reply := range replies {
-		err := models.DeleteConnReplyById(reply.RequestId) 
-		if err != nil {
-			c.BadRequest(err, w, r)
-			return
-		}
-		err = models.DeleteConnMappingById(reply.RequestId)
-		if err != nil {
-			c.Error500(err, w, r)
-			return
-		}
-	    err = models.DeleteConnRequestById(reply.RequestId)
-	    if err != nil {
-	    	c.Error500(err ,w ,r)
-	    	return
-	    } 
-	}
+
 	var reply struct {
 		Replies []models.ConnReply `json:"replies"`
 	}
