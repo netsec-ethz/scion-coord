@@ -279,9 +279,5 @@ func validUserPassword(storedPassHex, storedSaltHex, password string) bool {
 	userInputPassHash := sha256.Sum256(derivedPass)
 	storedPassHash := sha256.Sum256(storedPass)
 
-	// cast to string
-	userInputPassHashString := hex.EncodeToString(userInputPassHash[:])
-	storedPassHashString := hex.EncodeToString(storedPassHash[:])
-
-	return userInputPassHashString == storedPassHashString
+	return userInputPassHash == storedPassHash
 }
