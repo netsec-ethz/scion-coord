@@ -14,7 +14,7 @@ type As struct {
 	Created time.Time
 }
 
-func FindCoreAsByIsd(isd uint64) ([]As, error) {
+func FindCoreASesByIsd(isd uint64) ([]As, error) {
 	var ases []As
 	_, err := o.QueryTable("as").Filter("Isd", isd).Filter("Core", true).All(&ases)
 	return ases, err

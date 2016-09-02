@@ -12,6 +12,7 @@ import (
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/crypto/scrypt"
 	"time"
+	"bytes"
 )
 
 const (
@@ -273,11 +274,5 @@ func validUserPassword(storedPassHex, storedSaltHex, password string) bool {
 		return false
 	}
 
-	// NOW CALCULATE THE SHA256 of BOTH ! and compare
-	// prevents timing attacks.
-
-	userInputPassHash := sha256.Sum256(derivedPass)
-	storedPassHash := sha256.Sum256(storedPass)
-
-	return userInputPassHash == storedPassHash
+	return bytes.Equal(derivedPass, storedPass)
 }
