@@ -201,6 +201,12 @@ func FindAccountByKey(key string) (*Account, error) {
 	return u, err
 }
 
+func FindRequestsByAccountID(accountID uint64) ([]JoinRequestMapping, error) {
+	var requests []JoinRequestMapping
+	_, err := o.QueryTable("join_request_mapping").Filter("account_id", accountID).All(&requests)
+	return requests, err
+}
+
 func (u *user) Delete() error {
 	_, err := o.Delete(u)
 	return err

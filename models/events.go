@@ -74,6 +74,7 @@ type ConnRequest struct {
 	IsdAs                string `json:"isdas"`
 	RequesterIsdAs       string `json:"requester_isdas"`
 	RequesterCertificate string `json:"requester_certificate" orm:"size(1000)"`
+	Info                 string `json:"info"` // free form text motivation for the request
 	IP                   string `json:"ip"`
 	Port                 uint64 `json:"port"`
 	MTU                  uint64 `json:"mtu"`

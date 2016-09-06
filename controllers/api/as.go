@@ -253,6 +253,38 @@ func (c *ASController) QueryCoreASes(w http.ResponseWriter, r *http.Request) {
 }
 
 
+func (c *ASController) PollJoinReplies(w http.ResponseWriter, r *http.Request) {
+
+	account, err := FindAccountByRequest(r)
+	if err != nil {
+		c.BadRequest(err, w, r)
+		return
+	}
+
+	requests, err := models.FindRequestsByAccountID(account.Id)
+
+	var joinReplies []models.JoinReply
+
+	for _, request := range requests {
+		joinReply, err := models.FindJoinReplyByRequestId(request.Id)
+		if err == nil {
+			joinReplies = append(joinReplies, *joinReply)
+		}
+	}
+
+	reply := struct {
+		JoinReplies []models.JoinReply `json:"join_replies"`
+	}{joinReplies}
+
+	b, err := json.Marshal(reply)
+	if err != nil {
+		c.Error500(err, w, r)
+		return
+	}
+	fmt.Fprintln(w, string(b))
+}
+
+
 func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 
 	var request struct {
@@ -319,6 +351,7 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 func (c *ASController) UploadConnRequests(w http.ResponseWriter, r *http.Request) {
 
 	type ConnRequestInfo struct {
+		Info      string `json:"info"` // free form text motivation for the request
 		IsdAs     string `json:"isdas"`
 		IP        string `json:"ip"`
 		Port      uint64 `json:"port"`
@@ -361,6 +394,7 @@ func (c *ASController) UploadConnRequests(w http.ResponseWriter, r *http.Request
 			IsdAs:                cri.IsdAs,
 			RequesterIsdAs:       request.IsdAs,
 			RequesterCertificate: request.Certificate,
+			Info:                 cri.Info,
 			IP:                   cri.IP,
 			Port:                 cri.Port,
 			MTU:                  cri.MTU,
