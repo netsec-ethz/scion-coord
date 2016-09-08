@@ -348,7 +348,7 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, string(b))
 }
 
-func (c *ASController) UploadConnRequests(w http.ResponseWriter, r *http.Request) {
+func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request) {
 
 	type ConnRequestInfo struct {
 		Info      string `json:"info"` // free form text motivation for the request
@@ -358,12 +358,14 @@ func (c *ASController) UploadConnRequests(w http.ResponseWriter, r *http.Request
 		MTU       uint64 `json:"mtu"`
 		Bandwidth uint64 `json:"bandwidth"`
 		Linktype  string `json:"linktype"`
+		Timestamp string `json:"timestamp"`  // UTC ISO 8601 format string
 	}
 
 	var request struct {
 		IsdAs            string            `json:"isdas"`
+		ConnRequestInfos ConnRequestInfo   `json:"request"`
+		Signature        string            `json:"signature"` // signature is over IsdAs and ConnRequestInfos
 		Certificate      string            `json:"certificate" orm:"size(1000)"`
-		ConnRequestInfos []ConnRequestInfo `json:"requests"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -389,34 +391,35 @@ func (c *ASController) UploadConnRequests(w http.ResponseWriter, r *http.Request
 
 	var ids []uint64
 
-	for _, cri := range request.ConnRequestInfos {
-		connRequest := models.ConnRequest{
-			IsdAs:                cri.IsdAs,
-			RequesterIsdAs:       request.IsdAs,
-			RequesterCertificate: request.Certificate,
-			Info:                 cri.Info,
-			IP:                   cri.IP,
-			Port:                 cri.Port,
-			MTU:                  cri.MTU,
-			Bandwidth:            cri.Bandwidth,
-			Linktype:             cri.Linktype,
-		}
+	cri := request.ConnRequestInfos
 
-		// upsert it
-		if err := connRequest.Insert(); err != nil {
-			c.Error500(err, w, r)
-			return
-		}
-		ids = append(ids, connRequest.Id)
-		crm := &models.ConnRequestMapping{
-			RequestId:      connRequest.Id,
-			RequesterIsdAs: request.IsdAs,
-			ServerIsdAs:    cri.IsdAs,
-		}
-		if err := crm.Insert(); err != nil {
-			c.BadRequest(err, w, r)
-			return
-		}
+	connRequest := models.ConnRequest{
+		IsdAs:                cri.IsdAs,
+		RequesterIsdAs:       request.IsdAs,
+		Info:                 cri.Info,
+		IP:                   cri.IP,
+		Port:                 cri.Port,
+		MTU:                  cri.MTU,
+		Bandwidth:            cri.Bandwidth,
+		Linktype:             cri.Linktype,
+		Signature:            request.Signature,
+		RequesterCertificate: request.Certificate,
+	}
+
+	// upsert it
+	if err := connRequest.Insert(); err != nil {
+		c.Error500(err, w, r)
+		return
+	}
+	ids = append(ids, connRequest.Id)
+	crm := &models.ConnRequestMapping{
+		RequestId:      connRequest.Id,
+		RequesterIsdAs: request.IsdAs,
+		ServerIsdAs:    cri.IsdAs,
+	}
+	if err := crm.Insert(); err != nil {
+		c.BadRequest(err, w, r)
+		return
 	}
 
 	// return join_request_id

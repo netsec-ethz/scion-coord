@@ -80,6 +80,8 @@ type ConnRequest struct {
 	MTU                  uint64 `json:"mtu"`
 	Bandwidth            uint64 `json:"bandwidth"`
 	Linktype             string `json:"linktype"`
+	Timestamp            string `json:"timestamp"`  // UTC ISO 8601 format string
+	Signature            string `json:"signature"`
 }
 
 func FindConnRequestsByIsdAs(isdas string) ([]ConnRequest, error) {
