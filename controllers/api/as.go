@@ -336,7 +336,7 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 
 	reply := struct {
 		IsdAs       string `json:"isdas"`
-		Certificate string `json:"certificate" orm:"size(1000)"`
+		Certificate string `json:"certificate"`
 		TRC         string `json:"trc"`
 	}{joinReply.IsdAs, joinReply.Certificate, joinReply.TRC}
 
@@ -365,7 +365,7 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 		IsdAs            string            `json:"isdas"`
 		ConnRequestInfos ConnRequestInfo   `json:"request"`
 		Signature        string            `json:"signature"` // signature is over IsdAs and ConnRequestInfos
-		Certificate      string            `json:"certificate" orm:"size(1000)"`
+		Certificate      string            `json:"certificate"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -436,10 +436,18 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 }
 
 func (c *ASController) UploadConnReplies(w http.ResponseWriter, r *http.Request) {
+	type ConnReplyInfo struct {
+		RequestId      uint64 `json:"request_id" orm:"pk"`
+		RequesterIsdAs string `json:"requester_isdas"`
+		IP             string `json:"ip"`
+		Port           uint64 `json:"port"`
+		MTU            uint64 `json:"mtu"`
+		Bandwidth      uint64 `json:"bandwidth"`
+	}
 	var request struct {
 		IsdAs       string             `json:"isdas"`
-		Certificate string             `json:"certificate" orm:"size(1000)"`
-		Replies     []models.ConnReply `json:"replies"`
+		Certificate string             `json:"certificate"`
+		Replies     []ConnReplyInfo    `json:"replies"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&request); err != nil {
@@ -461,7 +469,16 @@ func (c *ASController) UploadConnReplies(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	for _, reply := range request.Replies {
-		reply.Certificate = request.Certificate
+
+		connReply := models.ConnReply{
+			RequestId:     reply.RequestId,
+			RequesterIsdAs: reply.RequesterIsdAs,
+			Certificate:    request.Certificate, // cert of the replying AS, from the request
+			IP:             reply.IP,
+			Port:           reply.Port,
+			MTU:            reply.MTU,
+			Bandwidth:      reply.Bandwidth,
+		}
 
 		crm, err := models.FindConnMappingByRequestId(reply.RequestId)
 		if err != nil {
@@ -473,7 +490,7 @@ func (c *ASController) UploadConnReplies(w http.ResponseWriter, r *http.Request)
 			c.BadRequest(errors.New("IsdAs and request ID do not match"), w, r)
 			return
 		}
-		if err := reply.Insert(); err != nil {
+		if err := connReply.Insert(); err != nil {
 			c.BadRequest(err, w, r)
 			return
 		}
