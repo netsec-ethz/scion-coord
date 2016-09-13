@@ -1,0 +1,46 @@
+1) UploadJoinRequest 
+--------------------
+Send: which ISD to join, sigkey; json = {"isd_to_join": numeric, "sigkey": string, "enckey":string}
+Get back: request id; json = {"id":numeric}
+database: find core AS in that ISD, add to join requests, and join request mapping
+
+2) PollJoinReply
+----------------
+Send: request id; json = {"request_id" : numeric}
+Get back: ISDAS, certificate, trc; json = {"isdas":string, "certificate":string, "trc":string}
+database: remove from join replies, remove join request and mapping
+
+3) UploadConnRequest
+--------------------
+Send: requester ISDAS, [Connection Info {ISDAS, ip, port, mtu, bandwidth, linktype}]; 
+						json = {"isdas": numeric, "certificate":string,
+						"requests": [ {"isdas": numeric, "ip":string, "mtu":numeric, "port":numeric, "bandwidth":numeric, "linktype": string,}]}
+Get back: [request id]; json = {"ids":[numeric]}
+database: add requester ISDAS, ER info to that ISDAS
+
+4) PollConnReplies
+------------------
+Send: [ids]; json = {"request_ids": [int]}
+Get back: [{request id, ER info}]; json = {"replies": [{"id":numeric, "ip":string, "mtu":numeric, "port":numeric, "bandwidth":numeric, "certificate":string}]}
+database: remove from conn replies, remove conn request and mapping
+
+5) PollEvents
+-------------
+Send: ISDAS; json = {"isdas":numeric}
+Get back: json = {"join_requests":[{"request_id":numeric, "sigkey":string,"enckey":string}], "conn_requests":[{"request_id":numeric, "requester_isdas":string, ip":string, "mtu":numeric, "port":numeric, "bandwidth":numeric, "linktype":string, "requester_certificate":string}]}
+A)  Join requests
+	get back: request id, sigkey, enckey
+B) Connection requests
+	get back: request id, ER info, certificate
+
+6) UploadJoinReplies
+--------------------
+Send: ISDAS, [{request id, certificate, trc}]; json = {"isdas":string, "replies":[{"request_id":numeric, "certificate":string, "trc":string}]}
+Get back: nothing
+database: add to request id in join replies
+
+7) UploadConnReplies
+--------------------
+Send: ISDAS, [{request id, ER info}]; json = {"isdas":string, "certificate":string, "replies":[{request_id":numeric, "ip":string, "mtu":numeric, "port":numeric, "bandwidth":numeric}]}
+Get back: nothing
+database: add to request id in conn replies
