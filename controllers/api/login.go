@@ -137,7 +137,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// load the user and verify email and password authentication
-	// if succeeded then, set the infromation in the user session
+	// if succeeded then, set the information in the user session
 	// otherwise redirect to the home page
 	dbUser, err := models.FindUserByEmail(email)
 	if err != nil || dbUser == nil {
