@@ -12,12 +12,13 @@ import (
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/crypto/scrypt"
 	"time"
+	"bytes"
 )
 
 const (
 	API_CONTEXT   = string("scion-coordinator")
-	SALT_LENGHT   = 80
-	SECRET_LENGHT = 32
+	SALT_LENGTH   = 80
+	SECRET_LENGTH = 32
 )
 
 type Account struct {
@@ -47,13 +48,13 @@ type user struct {
 }
 
 func generateSalt() ([]byte, error) {
-	salt := make([]byte, SALT_LENGHT)
+	salt := make([]byte, SALT_LENGTH)
 	var saltErr error
 	var total int
 
 	for i := 0; i < 10; i++ {
 		total, saltErr = rand.Read(salt)
-		if saltErr == nil && total == SALT_LENGHT {
+		if saltErr == nil && total == SALT_LENGTH {
 			return salt, nil
 		}
 	}
@@ -75,7 +76,7 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 		return nil, errors.New("User already registered")
 	}
 
-	// generate a random salt when the user resgiterd the first time
+	// generate a random salt when the user registers the first time
 	salt, saltError := generateSalt()
 
 	// in case of errors generating the salt DO NOT PROCEED !
@@ -91,7 +92,7 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 	// 2 - create user
 	// 3 - link user to account
 	if err == orm.ErrNoRows {
-		// 1 check if an account alreacy exists
+		// 1 check if an account already exists
 		a, err := FindAccount(accountName)
 
 		// if there is no account with the name then create it
@@ -99,7 +100,7 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 
 			// Generate the key and the secret
 			apiSecretReader := hkdf.New(sha256.New, derivedPassword, salt, []byte(API_CONTEXT))
-			apiSecretBytes, apiSecretError := bufio.NewReader(apiSecretReader).Peek(SECRET_LENGHT)
+			apiSecretBytes, apiSecretError := bufio.NewReader(apiSecretReader).Peek(SECRET_LENGTH)
 
 			if apiSecretError != nil {
 				return nil, apiSecretError
@@ -117,7 +118,7 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 			}
 		}
 
-		// if there is an error deriving the password thenr DO NOT PROCEED
+		// if there is an error deriving the password then DO NOT PROCEED
 		if scryptErr != nil {
 			return nil, scryptErr
 		}
@@ -200,6 +201,12 @@ func FindAccountByKey(key string) (*Account, error) {
 	return u, err
 }
 
+func FindRequestsByAccountID(accountID uint64) ([]JoinRequestMapping, error) {
+	var requests []JoinRequestMapping
+	_, err := o.QueryTable("join_request_mapping").Filter("account_id", accountID).All(&requests)
+	return requests, err
+}
+
 func (u *user) Delete() error {
 	_, err := o.Delete(u)
 	return err
@@ -273,15 +280,5 @@ func validUserPassword(storedPassHex, storedSaltHex, password string) bool {
 		return false
 	}
 
-	// NOW CALCULATE THE SHA256 of BOTH ! and compare
-	// prevents timing attacks.
-
-	userInputPassHash := sha256.Sum256(derivedPass)
-	storedPassHash := sha256.Sum256(storedPass)
-
-	// cast to string
-	userInputPassHashString := hex.EncodeToString(userInputPassHash[:])
-	storedPassHashString := hex.EncodeToString(storedPassHash[:])
-
-	return userInputPassHashString == storedPassHashString
+	return bytes.Equal(derivedPass, storedPass)
 }

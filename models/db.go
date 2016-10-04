@@ -25,7 +25,7 @@ func init() {
 		new(JoinRequest), new(JoinRequestMapping), new(ConnRequest),
 		new(ConnRequestMapping), new(JoinReply), new(ConnReply))
 
-	// priont verbose logs when generating the tables
+	// print verbose logs when generating the tables
 	verbose := true
 
 	// DANGER: force table re-creation
@@ -36,7 +36,7 @@ func init() {
 		fmt.Println(err)
 	}
 
-	// instanciate a new ORM object for executing the queries
+	// instantiate a new ORM object for executing the queries
 	o = orm.NewOrm()
 	o.Using("default")
 }

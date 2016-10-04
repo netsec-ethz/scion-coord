@@ -1,10 +1,11 @@
 package models
 
 type JoinRequest struct {
-	Id     uint64 `json:"id"`
-	IsdAs  string `json:"isdas"`
-	SigKey string `json:"sigkey"`
-	EncKey string `json:"enckey"`
+	Id        uint64 `json:"id"`
+	IsdAs     string `json:"isdas"`
+	AsToQuery string `json:"isdas"`
+	SigKey    string `json:"sigkey"`
+	EncKey    string `json:"enckey"`
 }
 
 func FindJoinRequestsByIsdAs(isdas string) ([]JoinRequest, error) {
@@ -48,7 +49,7 @@ func (jrm *JoinRequestMapping) Delete() error {
 type JoinReply struct {
 	RequestId   uint64 `json:"request_id" orm:"pk"`
 	IsdAs       string `json:"isdas"`
-	Certificate string `json:"certificate"`
+	Certificate string `json:"certificate" orm:"size(1000)"`
 	TRC         string `json:"trc"`
 }
 
@@ -72,12 +73,15 @@ type ConnRequest struct {
 	Id                   uint64 `json:"id"`
 	IsdAs                string `json:"isdas"`
 	RequesterIsdAs       string `json:"requester_isdas"`
-	RequesterCertificate string `json:"requester_certificate"`
+	RequesterCertificate string `json:"requester_certificate" orm:"size(1000)"`
+	Info                 string `json:"info"` // free form text motivation for the request
 	IP                   string `json:"ip"`
 	Port                 uint64 `json:"port"`
 	MTU                  uint64 `json:"mtu"`
 	Bandwidth            uint64 `json:"bandwidth"`
 	Linktype             string `json:"linktype"`
+	Timestamp            string `json:"timestamp"`  // UTC ISO 8601 format string
+	Signature            string `json:"signature"`
 }
 
 func FindConnRequestsByIsdAs(isdas string) ([]ConnRequest, error) {
@@ -121,7 +125,7 @@ func DeleteConnMappingById(id uint64) error {
 type ConnReply struct {
 	RequestId      uint64 `json:"request_id" orm:"pk"`
 	RequesterIsdAs string `json:"requester_isdas"`
-	Certificate    string `json:"certificate"`
+	Certificate    string `json:"certificate" orm:"size(1000)"`
 	IP             string `json:"ip"`
 	Port           uint64 `json:"port"`
 	MTU            uint64 `json:"mtu"`

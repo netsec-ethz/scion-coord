@@ -142,7 +142,7 @@ func generateXSRFToken() (string, error) {
 }
 
 // if the returned session is nil, it means the session did not exist
-// if the return session is not nil, then sesssion existed before
+// if the return session is not nil, then session existed before
 // if the function returns an error, then we need to stop because the session could not be
 // deserialized
 func GetUserSession(r *http.Request) (*sessions.Session, *models.Session, error) {

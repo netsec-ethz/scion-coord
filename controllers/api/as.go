@@ -58,7 +58,7 @@ func (c *ASController) Insert(w http.ResponseWriter, r *http.Request) {
 
 	var as struct {
 		IsdAs string `json:"isdas"`
-		Core  uint64 `json:"core"`
+		Core  bool `json:"core"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -102,6 +102,7 @@ func (c *ASController) UploadJoinRequest(w http.ResponseWriter, r *http.Request)
 
 	type JoinRequest struct {
 		IsdToJoin uint64 `json:"isd_to_join"`
+		AsToQuery string `json:"as_to_query"`
 		SigKey    string `json:"sigkey"`
 		EncKey    string `json:"enckey"`
 	}
@@ -113,19 +114,15 @@ func (c *ASController) UploadJoinRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	// find core AS in the ISD to join
-	core_ases, err := models.FindCoreAsByIsd(request.IsdToJoin)
+	core_as, err := models.FindCoreAsByIsdAs(request.IsdToJoin, request.AsToQuery)
 	if err != nil {
 		c.BadRequest(err, w, r)
 		return
 	}
-	if len(core_ases) == 0 {
-		c.BadRequest(err, w, r)
-		return
-	}
-	core_as := core_ases[0]
 
 	join_request := models.JoinRequest{
 		IsdAs:  core_as.IsdAs,
+		AsToQuery: request.AsToQuery,
 		SigKey: request.SigKey,
 		EncKey: request.EncKey,
 	}
@@ -215,6 +212,79 @@ func (c *ASController) UploadJoinReplies(w http.ResponseWriter, r *http.Request)
 	fmt.Fprintln(w, "{}")
 }
 
+
+func (c *ASController) QueryCoreASes(w http.ResponseWriter, r *http.Request) {
+
+	var request struct {
+		IsdId uint64 `json:"isd_id"`
+	}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&request); err != nil {
+		c.BadRequest(err, w, r)
+		return
+	}
+
+	// find all core ASes in the ISD
+	core_ases, err := models.FindCoreASesByIsd(request.IsdId)
+	if err != nil {
+		c.BadRequest(err, w, r)
+		return
+	}
+
+	fmt.Printf("%+v\n", core_ases)
+
+	var core_as_ids []string
+
+	for _, core_as := range core_ases {
+		core_as_ids = append(core_as_ids, core_as.IsdAs)
+	}
+
+	reply := struct {
+		IsdID       uint64 `json:"isdid"`
+		CoreASIDs []string `json:"coreASes"`
+	}{request.IsdId, core_as_ids}
+
+	b, err := json.Marshal(reply)
+	if err != nil {
+		c.Error500(err, w, r)
+		return
+	}
+	fmt.Fprintln(w, string(b))
+}
+
+
+func (c *ASController) PollJoinReplies(w http.ResponseWriter, r *http.Request) {
+
+	account, err := FindAccountByRequest(r)
+	if err != nil {
+		c.BadRequest(err, w, r)
+		return
+	}
+
+	requests, err := models.FindRequestsByAccountID(account.Id)
+
+	var joinReplies []models.JoinReply
+
+	for _, request := range requests {
+		joinReply, err := models.FindJoinReplyByRequestId(request.Id)
+		if err == nil {
+			joinReplies = append(joinReplies, *joinReply)
+		}
+	}
+
+	reply := struct {
+		JoinReplies []models.JoinReply `json:"join_replies"`
+	}{joinReplies}
+
+	b, err := json.Marshal(reply)
+	if err != nil {
+		c.Error500(err, w, r)
+		return
+	}
+	fmt.Fprintln(w, string(b))
+}
+
+
 func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 
 	var request struct {
@@ -245,21 +315,6 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 		c.BadRequest(errors.New("No reply"), w, r)
 		return
 	}
-	err = joinReply.Delete()
-	if err != nil {
-		c.Error500(err, w, r)
-		return
-	}
-	err = jrm.Delete()
-	if err != nil {
-		c.Error500(err, w, r)
-		return
-	}
-	err = models.DeleteJoinRequestById(request.RequestId)
-	if err != nil {
-		c.Error500(err, w, r)
-		return
-	}
 
 	isd, err := models.IsdAsToIsd(joinReply.IsdAs)
 	if err != nil {
@@ -269,7 +324,7 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 	finalAs := models.As{
 		IsdAs:   joinReply.IsdAs,
 		Isd:     isd,
-		Core:    0,
+		Core:    false,
 		Account: account,
 		Created: time.Now().UTC(),
 	}
@@ -293,21 +348,24 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, string(b))
 }
 
-func (c *ASController) UploadConnRequests(w http.ResponseWriter, r *http.Request) {
+func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request) {
 
 	type ConnRequestInfo struct {
+		Info      string `json:"info"` // free form text motivation for the request
 		IsdAs     string `json:"isdas"`
 		IP        string `json:"ip"`
 		Port      uint64 `json:"port"`
 		MTU       uint64 `json:"mtu"`
 		Bandwidth uint64 `json:"bandwidth"`
 		Linktype  string `json:"linktype"`
+		Timestamp string `json:"timestamp"`  // UTC ISO 8601 format string
 	}
 
 	var request struct {
 		IsdAs            string            `json:"isdas"`
+		ConnRequestInfos ConnRequestInfo   `json:"request"`
+		Signature        string            `json:"signature"` // signature is over IsdAs and ConnRequestInfos
 		Certificate      string            `json:"certificate"`
-		ConnRequestInfos []ConnRequestInfo `json:"requests"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -333,33 +391,35 @@ func (c *ASController) UploadConnRequests(w http.ResponseWriter, r *http.Request
 
 	var ids []uint64
 
-	for _, cri := range request.ConnRequestInfos {
-		connRequest := models.ConnRequest{
-			IsdAs:                cri.IsdAs,
-			RequesterIsdAs:       request.IsdAs,
-			RequesterCertificate: request.Certificate,
-			IP:                   cri.IP,
-			Port:                 cri.Port,
-			MTU:                  cri.MTU,
-			Bandwidth:            cri.Bandwidth,
-			Linktype:             cri.Linktype,
-		}
+	cri := request.ConnRequestInfos
 
-		// upsert it
-		if err := connRequest.Insert(); err != nil {
-			c.Error500(err, w, r)
-			return
-		}
-		ids = append(ids, connRequest.Id)
-		crm := &models.ConnRequestMapping{
-			RequestId:      connRequest.Id,
-			RequesterIsdAs: request.IsdAs,
-			ServerIsdAs:    cri.IsdAs,
-		}
-		if err := crm.Insert(); err != nil {
-			c.BadRequest(err, w, r)
-			return
-		}
+	connRequest := models.ConnRequest{
+		IsdAs:                cri.IsdAs,
+		RequesterIsdAs:       request.IsdAs,
+		Info:                 cri.Info,
+		IP:                   cri.IP,
+		Port:                 cri.Port,
+		MTU:                  cri.MTU,
+		Bandwidth:            cri.Bandwidth,
+		Linktype:             cri.Linktype,
+		Signature:            request.Signature,
+		RequesterCertificate: request.Certificate,
+	}
+
+	// upsert it
+	if err := connRequest.Insert(); err != nil {
+		c.Error500(err, w, r)
+		return
+	}
+	ids = append(ids, connRequest.Id)
+	crm := &models.ConnRequestMapping{
+		RequestId:      connRequest.Id,
+		RequesterIsdAs: request.IsdAs,
+		ServerIsdAs:    cri.IsdAs,
+	}
+	if err := crm.Insert(); err != nil {
+		c.BadRequest(err, w, r)
+		return
 	}
 
 	// return join_request_id
@@ -376,10 +436,18 @@ func (c *ASController) UploadConnRequests(w http.ResponseWriter, r *http.Request
 }
 
 func (c *ASController) UploadConnReplies(w http.ResponseWriter, r *http.Request) {
+	type ConnReplyInfo struct {
+		RequestId      uint64 `json:"request_id" orm:"pk"`
+		RequesterIsdAs string `json:"requester_isdas"`
+		IP             string `json:"ip"`
+		Port           uint64 `json:"port"`
+		MTU            uint64 `json:"mtu"`
+		Bandwidth      uint64 `json:"bandwidth"`
+	}
 	var request struct {
 		IsdAs       string             `json:"isdas"`
 		Certificate string             `json:"certificate"`
-		Replies     []models.ConnReply `json:"replies"`
+		Replies     []ConnReplyInfo    `json:"replies"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&request); err != nil {
@@ -401,7 +469,16 @@ func (c *ASController) UploadConnReplies(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	for _, reply := range request.Replies {
-		reply.Certificate = request.Certificate
+
+		connReply := models.ConnReply{
+			RequestId:     reply.RequestId,
+			RequesterIsdAs: reply.RequesterIsdAs,
+			Certificate:    request.Certificate, // cert of the replying AS, from the request
+			IP:             reply.IP,
+			Port:           reply.Port,
+			MTU:            reply.MTU,
+			Bandwidth:      reply.Bandwidth,
+		}
 
 		crm, err := models.FindConnMappingByRequestId(reply.RequestId)
 		if err != nil {
@@ -413,7 +490,7 @@ func (c *ASController) UploadConnReplies(w http.ResponseWriter, r *http.Request)
 			c.BadRequest(errors.New("IsdAs and request ID do not match"), w, r)
 			return
 		}
-		if err := reply.Insert(); err != nil {
+		if err := connReply.Insert(); err != nil {
 			c.BadRequest(err, w, r)
 			return
 		}
@@ -454,23 +531,7 @@ func (c *ASController) PollConnReplies(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "{}")
 		return
 	}
-	for _, reply := range replies {
-		err := models.DeleteConnReplyById(reply.RequestId) 
-		if err != nil {
-			c.BadRequest(err, w, r)
-			return
-		}
-		err = models.DeleteConnMappingById(reply.RequestId)
-		if err != nil {
-			c.Error500(err, w, r)
-			return
-		}
-	    err = models.DeleteConnRequestById(reply.RequestId)
-	    if err != nil {
-	    	c.Error500(err ,w ,r)
-	    	return
-	    } 
-	}
+
 	var reply struct {
 		Replies []models.ConnReply `json:"replies"`
 	}
