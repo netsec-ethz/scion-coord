@@ -3,6 +3,7 @@ package models
 import (
 	//"crypto"
 	"bufio"
+	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -12,7 +13,6 @@ import (
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/crypto/scrypt"
 	"time"
-	"bytes"
 )
 
 const (
