@@ -6,6 +6,13 @@ type JoinRequest struct {
 	AsToQuery string `json:"isdas"`
 	SigKey    string `json:"sigkey"`
 	EncKey    string `json:"enckey"`
+	Status    string `json:"status"`
+}
+
+func FindOpenJoinRequestsByIsdAs(isdas string) ([]JoinRequest, error) {
+	var requests []JoinRequest
+	_, err := o.QueryTable("join_request").Filter("IsdAs", isdas).Filter("Status", "PENDING").All(&requests)
+	return requests, err
 }
 
 func FindJoinRequestsByIsdAs(isdas string) ([]JoinRequest, error) {
@@ -17,6 +24,17 @@ func FindJoinRequestsByIsdAs(isdas string) ([]JoinRequest, error) {
 func (jr *JoinRequest) Insert() error {
 	_, err := o.Insert(jr)
 	return err
+}
+
+func (jr *JoinRequest) Update() error {
+	_, err := o.Update(jr)
+	return err
+}
+
+func FindJoinRequestByRequestId(id uint64) (*JoinRequest, error) {
+	req := new(JoinRequest)
+	err := o.QueryTable(req).Filter("Id", id).RelatedSel().One(req)
+	return req, err
 }
 
 func DeleteJoinRequestById(id uint64) error {
@@ -47,10 +65,11 @@ func (jrm *JoinRequestMapping) Delete() error {
 }
 
 type JoinReply struct {
-	RequestId   uint64 `json:"request_id" orm:"pk"`
-	IsdAs       string `json:"isdas"`
-	Certificate string `json:"certificate" orm:"size(1000)"`
-	TRC         string `json:"trc"`
+	RequestId    uint64 `json:"request_id" orm:"pk"`
+	JoiningIsdAs string `json:"joining_isdas"`
+	SigningIsdAs string `json:"signing_isdas"`
+	Certificate  string `json:"certificate" orm:"size(1000)"`
+	TRC          string `json:"trc" orm:"size(1600)"`
 }
 
 func FindJoinReplyByRequestId(id uint64) (*JoinReply, error) {
