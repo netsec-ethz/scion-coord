@@ -1,9 +1,13 @@
 package models
 
+const (
+	PENDING = "PENDING"
+	APPROVED = "APPROVED"
+)
+
 type JoinRequest struct {
 	Id        uint64 `json:"id"`
 	IsdAs     string `json:"isdas"`
-	AsToQuery string `json:"isdas"`
 	SigKey    string `json:"sigkey"`
 	EncKey    string `json:"enckey"`
 	Status    string `json:"status"`
@@ -11,7 +15,7 @@ type JoinRequest struct {
 
 func FindOpenJoinRequestsByIsdAs(isdas string) ([]JoinRequest, error) {
 	var requests []JoinRequest
-	_, err := o.QueryTable("join_request").Filter("IsdAs", isdas).Filter("Status", "PENDING").All(&requests)
+	_, err := o.QueryTable("join_request").Filter("IsdAs", isdas).Filter("Status", PENDING).All(&requests)
 	return requests, err
 }
 
@@ -68,8 +72,8 @@ type JoinReply struct {
 	RequestId    uint64 `json:"request_id" orm:"pk"`
 	JoiningIsdAs string `json:"joining_isdas"`
 	SigningIsdAs string `json:"signing_isdas"`
-	Certificate  string `json:"certificate" orm:"size(1000)"`
-	TRC          string `json:"trc" orm:"size(1600)"`
+	Certificate  string `json:"certificate" orm:"type(text)"`
+	TRC          string `json:"trc" orm:"type(text)"`
 }
 
 func FindJoinReplyByRequestId(id uint64) (*JoinReply, error) {
@@ -92,7 +96,7 @@ type ConnRequest struct {
 	Id                   uint64 `json:"id"`
 	IsdAs                string `json:"isdas"`
 	RequesterIsdAs       string `json:"requester_isdas"`
-	RequesterCertificate string `json:"requester_certificate" orm:"size(1000)"`
+	RequesterCertificate string `json:"requester_certificate" orm:"type(text)"`
 	Info                 string `json:"info"` // free form text motivation for the request
 	IP                   string `json:"ip"`
 	Port                 uint64 `json:"port"`
@@ -144,7 +148,7 @@ func DeleteConnMappingById(id uint64) error {
 type ConnReply struct {
 	RequestId      uint64 `json:"request_id" orm:"pk"`
 	RequesterIsdAs string `json:"requester_isdas"`
-	Certificate    string `json:"certificate" orm:"size(1000)"`
+	Certificate    string `json:"certificate" orm:"type(text)"`
 	IP             string `json:"ip"`
 	Port           uint64 `json:"port"`
 	MTU            uint64 `json:"mtu"`

@@ -123,18 +123,18 @@ func (c *ASController) UploadJoinRequest(w http.ResponseWriter, r *http.Request)
 	}
 
 	if len(core_ases) == 0 {
-		log.Printf("No core AS found for ISD %v\n", isd_to_join)
-		c.Error500(errors.New("No core AS found for ISD"), w, r)
+		log.Printf("No core AS found for ISD %v", isd_to_join)
+		c.Error500(fmt.Errorf("No core AS found for ISD %v", isd_to_join),
+			       w, r)
 		return
 	}
 	// TODO(ercanucan): Send the request to ALL core ASes in this ISD.
 	core_as := core_ases[0]
 	join_request := models.JoinRequest{
 		IsdAs:  core_as.IsdAs,
-		AsToQuery: core_as.IsdAs,
 		SigKey: request.SigKey,
 		EncKey: request.EncKey,
-		Status: "PENDING",
+		Status: models.PENDING,
 	}
 	// insert into the join_requests table in the database
 	if err := join_request.Insert(); err != nil {
@@ -177,19 +177,19 @@ func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 	}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&request); err != nil {
-		log.Printf("Error decoding JSON: %q\n", err.Error())
+		log.Printf("Error decoding JSON: %q", err.Error())
 		c.BadRequest(err, w, r)
 		return
 	}
 	account, err := FindAccountByRequest(r)
 	if err != nil {
-		log.Printf("Error finding account by request: %q\n", err.Error())
+		log.Printf("Error finding account by request: %q", err.Error())
 		c.BadRequest(err, w, r)
 		return
 	}
 	owns, err := ValidateAccountOwnsIsdAs(account, request.IsdAs)
 	if err != nil {
-		log.Printf("Error validating if account owns ISD-AS: %q\n",
+		log.Printf("Error validating if account owns ISD-AS: %q",
 			       err.Error())
 		c.Error500(err, w, r)
 		return
@@ -212,20 +212,20 @@ func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := reply.Insert(); err != nil {
-		log.Printf("Error inserting join reply: %q\n", err.Error())
+		log.Printf("Error inserting join reply: %q", err.Error())
 		c.Error500(err, w, r)
 		return
 	}
 	// Change the join request's status to approved.
  	jr, err := models.FindJoinRequestByRequestId(reply.RequestId)
  	if err != nil {
-		log.Printf("Error finding join request: %v\n", reply.RequestId)
+		log.Printf("Error finding join request: %v", reply.RequestId)
 		c.Error500(err, w, r)
 		return
 	}
-	jr.Status = "APPROVED"
+	jr.Status = models.APPROVED
 	if err := jr.Update(); err != nil {
-		log.Printf("Error updating join request: %q\n", err.Error())
+		log.Printf("Error updating join request: %q", err.Error())
 	}
 
 	log.Println("JoinReply successfully received.")
@@ -244,7 +244,7 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 	}
 	account, err := FindAccountByRequest(r)
 	if err != nil {
-		log.Printf("Error while finding account by request: %q\n", err.Error())
+		log.Printf("Error while finding account by request: %q", err.Error())
 		c.BadRequest(err, w, r)
 		return
 	}
@@ -260,7 +260,7 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 
 	joinReply, err := models.FindJoinReplyByRequestId(request.RequestId)
 	if err != nil {
-		log.Printf("Error fetching join reply for request %v: %q\n",
+		log.Printf("Error fetching join reply for request %v: %q",
 			request.RequestId, err.Error())
 		c.BadRequest(errors.New("No reply"), w, r)
 		return
@@ -280,7 +280,7 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if new_as.Insert(); err != nil {
-		log.Printf("Error inserting new AS: %v\n", new_as.IsdAs)
+		log.Printf("Error inserting new AS: %v", new_as.IsdAs)
 		c.Error500(err, w, r)
 		return
 	}
@@ -293,11 +293,11 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 
 	b, err := json.Marshal(reply)
 	if err != nil {
-		log.Printf("Error Marshaling JSON: %q\n", err.Error())
+		log.Printf("Error Marshaling JSON: %q", err.Error())
 		c.Error500(err, w, r)
 		return
 	}
-	log.Printf("New AS successfully created. %v\n", joinReply.JoiningIsdAs)
+	log.Printf("New AS successfully created. %v", joinReply.JoiningIsdAs)
 	fmt.Fprintln(w, string(b))
 }
 
@@ -515,12 +515,12 @@ func (c *ASController) PollEvents(w http.ResponseWriter, r *http.Request) {
 	isdas := request.IsdAs
 	owns, err := ValidateAccountOwnsIsdAs(account, isdas)
 	if err != nil {
-		log.Printf("Error validating acc %v for isdas %v\n", account, isdas)
+		log.Printf("Error validating acc %v for isdas %v", account, isdas)
 		c.Error500(err, w, r)
 		return
 	}
 	if !owns {
-		log.Printf("Account and AS do not match %v: %v\n", account, isdas)
+		log.Printf("Account and AS do not match %v: %v", account, isdas)
 		c.BadRequest(errors.New("Account and AS do not match"), w, r)
 		return
 	}
