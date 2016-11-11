@@ -1,16 +1,16 @@
 package models
 
 const (
-	PENDING = "PENDING"
+	PENDING  = "PENDING"
 	APPROVED = "APPROVED"
 )
 
 type JoinRequest struct {
-	Id        uint64 `json:"id"`
-	IsdAs     string `json:"isdas"`
-	SigKey    string `json:"sigkey"`
-	EncKey    string `json:"enckey"`
-	Status    string `json:"status"`
+	Id     uint64 `json:"id"`
+	IsdAs  string `json:"isdas"`
+	SigKey string `json:"sigkey"`
+	EncKey string `json:"enckey"`
+	Status string `json:"status"`
 }
 
 func FindOpenJoinRequestsByIsdAs(isdas string) ([]JoinRequest, error) {
@@ -103,7 +103,7 @@ type ConnRequest struct {
 	MTU                  uint64 `json:"mtu"`
 	Bandwidth            uint64 `json:"bandwidth"`
 	Linktype             string `json:"linktype"`
-	Timestamp            string `json:"timestamp"`  // UTC ISO 8601 format string
+	Timestamp            string `json:"timestamp"` // UTC ISO 8601 format string
 	Signature            string `json:"signature"`
 }
 
