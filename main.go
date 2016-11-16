@@ -62,13 +62,10 @@ func main() {
 	router.Handle("/api/as/exists/{as_id}/{key}/{secret}", apiChain.ThenFunc(asController.Exists))
 	router.Handle("/api/as/insert/{key}/{secret}", apiChain.ThenFunc(asController.Insert))
 
-	router.Handle("/api/as/queryCoreASes/{key}/{secret}", apiChain.ThenFunc(asController.QueryCoreASes))
-
 	// ISD join request
 	router.Handle("/api/as/uploadJoinRequest/{key}/{secret}", apiChain.ThenFunc(asController.UploadJoinRequest))
-	router.Handle("/api/as/uploadJoinReplies/{key}/{secret}", apiChain.ThenFunc(asController.UploadJoinReplies))
+	router.Handle("/api/as/uploadJoinReply/{key}/{secret}", apiChain.ThenFunc(asController.UploadJoinReply))
 	router.Handle("/api/as/pollJoinReply/{key}/{secret}", apiChain.ThenFunc(asController.PollJoinReply))
-	router.Handle("/api/as/pollJoinReplies/{key}/{secret}", apiChain.ThenFunc(asController.PollJoinReplies))
 
 	// AS connection request
 	router.Handle("/api/as/uploadConnRequests/{key}/{secret}", apiChain.ThenFunc(asController.UploadConnRequest))

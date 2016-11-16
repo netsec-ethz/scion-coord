@@ -1,11 +1,22 @@
 package models
 
+const (
+	PENDING  = "PENDING"
+	APPROVED = "APPROVED"
+)
+
 type JoinRequest struct {
-	Id        uint64 `json:"id"`
-	IsdAs     string `json:"isdas"`
-	AsToQuery string `json:"isdas"`
-	SigKey    string `json:"sigkey"`
-	EncKey    string `json:"enckey"`
+	Id     uint64 `json:"id"`
+	IsdAs  string `json:"isdas"`
+	SigKey string `json:"sigkey"`
+	EncKey string `json:"enckey"`
+	Status string `json:"status"`
+}
+
+func FindOpenJoinRequestsByIsdAs(isdas string) ([]JoinRequest, error) {
+	var requests []JoinRequest
+	_, err := o.QueryTable("join_request").Filter("IsdAs", isdas).Filter("Status", PENDING).All(&requests)
+	return requests, err
 }
 
 func FindJoinRequestsByIsdAs(isdas string) ([]JoinRequest, error) {
@@ -17,6 +28,17 @@ func FindJoinRequestsByIsdAs(isdas string) ([]JoinRequest, error) {
 func (jr *JoinRequest) Insert() error {
 	_, err := o.Insert(jr)
 	return err
+}
+
+func (jr *JoinRequest) Update() error {
+	_, err := o.Update(jr)
+	return err
+}
+
+func FindJoinRequestByRequestId(id uint64) (*JoinRequest, error) {
+	req := new(JoinRequest)
+	err := o.QueryTable(req).Filter("Id", id).RelatedSel().One(req)
+	return req, err
 }
 
 func DeleteJoinRequestById(id uint64) error {
@@ -47,10 +69,11 @@ func (jrm *JoinRequestMapping) Delete() error {
 }
 
 type JoinReply struct {
-	RequestId   uint64 `json:"request_id" orm:"pk"`
-	IsdAs       string `json:"isdas"`
-	Certificate string `json:"certificate" orm:"size(1000)"`
-	TRC         string `json:"trc"`
+	RequestId    uint64 `json:"request_id" orm:"pk"`
+	JoiningIsdAs string `json:"joining_isdas"`
+	SigningIsdAs string `json:"signing_isdas"`
+	Certificate  string `json:"certificate" orm:"type(text)"`
+	TRC          string `json:"trc" orm:"type(text)"`
 }
 
 func FindJoinReplyByRequestId(id uint64) (*JoinReply, error) {
@@ -73,14 +96,14 @@ type ConnRequest struct {
 	Id                   uint64 `json:"id"`
 	IsdAs                string `json:"isdas"`
 	RequesterIsdAs       string `json:"requester_isdas"`
-	RequesterCertificate string `json:"requester_certificate" orm:"size(1000)"`
+	RequesterCertificate string `json:"requester_certificate" orm:"type(text)"`
 	Info                 string `json:"info"` // free form text motivation for the request
 	IP                   string `json:"ip"`
 	Port                 uint64 `json:"port"`
 	MTU                  uint64 `json:"mtu"`
 	Bandwidth            uint64 `json:"bandwidth"`
 	Linktype             string `json:"linktype"`
-	Timestamp            string `json:"timestamp"`  // UTC ISO 8601 format string
+	Timestamp            string `json:"timestamp"` // UTC ISO 8601 format string
 	Signature            string `json:"signature"`
 }
 
@@ -125,7 +148,7 @@ func DeleteConnMappingById(id uint64) error {
 type ConnReply struct {
 	RequestId      uint64 `json:"request_id" orm:"pk"`
 	RequesterIsdAs string `json:"requester_isdas"`
-	Certificate    string `json:"certificate" orm:"size(1000)"`
+	Certificate    string `json:"certificate" orm:"type(text)"`
 	IP             string `json:"ip"`
 	Port           uint64 `json:"port"`
 	MTU            uint64 `json:"mtu"`
