@@ -82,9 +82,8 @@ func main() {
 	router.Handle("/api/as/pollJoinReply/{key}/{secret}", apiChain.ThenFunc(asController.PollJoinReply))
 
 	// AS connection request
-	router.Handle("/api/as/uploadConnRequests/{key}/{secret}", apiChain.ThenFunc(asController.UploadConnRequest))
-	router.Handle("/api/as/uploadConnReplies/{key}/{secret}", apiChain.ThenFunc(asController.UploadConnReplies))
-	router.Handle("/api/as/pollConnReplies/{key}/{secret}", apiChain.ThenFunc(asController.PollConnReplies))
+	router.Handle("/api/as/uploadConnRequest/{key}/{secret}", apiChain.ThenFunc(asController.UploadConnRequest))
+	router.Handle("/api/as/uploadConnReply/{key}/{secret}", apiChain.ThenFunc(asController.UploadConnReply))
 
 	// show all request TO this AS
 	router.Handle("/api/as/pollEvents/{key}/{secret}", apiChain.ThenFunc(asController.PollEvents))

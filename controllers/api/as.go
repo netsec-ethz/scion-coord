@@ -30,6 +30,35 @@ type ASController struct {
 	controllers.HTTPController
 }
 
+type ConnRequest struct {
+	Info           string `json:"info"` // free form text motivation for the request
+	IsdAsToConnect string `json:"isdas_to_connect"`
+	IP             string `json:"ip"`
+	Port           uint64 `json:"port"`
+	OverlayType    string `json:"overlay_type"`
+	MTU            uint64 `json:"mtu"`
+	Bandwidth      uint64 `json:"bandwidth"`
+	LinkType       string `json:"link_type"`
+	Timestamp      string `json:"timestamp"` // UTC ISO 8601 format string
+}
+
+type ConnReply struct {
+	RequestId      uint64 `json:"request_id" orm:"pk"`
+	ReplyingIsdAs  string `json:"replying_isdas"`
+	RequesterIsdAs string `json:"requester_isdas"`
+	IP             string `json:"ip"`
+	Port           uint64 `json:"port"`
+	OverlayType    string `json:"overlay_type"`
+	MTU            uint64 `json:"mtu"`
+	Bandwidth      uint64 `json:"bandwidth"`
+}
+
+type JoinRequest struct {
+	IsdToJoin uint64 `json:"isd_to_join"`
+	SigKey    string `json:"sigkey"`
+	EncKey    string `json:"enckey"`
+}
+
 func FindAccountByRequest(r *http.Request) (*models.Account, error) {
 
 	key := mux.Vars(r)["key"]
@@ -113,13 +142,30 @@ func (c *ASController) Insert(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "{}")
 }
 
-func (c *ASController) UploadJoinRequest(w http.ResponseWriter, r *http.Request) {
+func (c *ASController) findAndValidateAccount(w http.ResponseWriter, r *http.Request,
+	isdas string) (*models.Account, error) {
 
-	type JoinRequest struct {
-		IsdToJoin uint64 `json:"isd_to_join"`
-		SigKey    string `json:"sigkey"`
-		EncKey    string `json:"enckey"`
+	account, err := FindAccountByRequest(r)
+	if err != nil {
+		log.Printf("Error finding account. Key: %v, Request: %v: %v", mux.Vars(r)["key"], r, err)
+		c.BadRequest(err, w, r)
+		return nil, err
 	}
+	owns, err := ValidateAccountOwnsIsdAs(account, isdas)
+	if err != nil {
+		log.Printf("Error validating account %v owns ISD-AS %v: %v", account, isdas, err)
+		c.Error500(err, w, r)
+		return nil, err
+	}
+	if !owns {
+		log.Printf("Account %v and AS %v do not match.", account, isdas)
+		c.BadRequest(fmt.Errorf("Account %v and AS %v do not match.", account, isdas), w, r)
+		return nil, err
+	}
+	return account, nil
+}
+
+func (c *ASController) UploadJoinRequest(w http.ResponseWriter, r *http.Request) {
 	var request JoinRequest
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&request); err != nil {
@@ -127,10 +173,9 @@ func (c *ASController) UploadJoinRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	// find the account belonging to the request
-	key := mux.Vars(r)["key"]
-	account, err := models.FindAccountByKey(key)
+	account, err := FindAccountByRequest(r)
 	if err != nil {
-		log.Printf("Error finding account for key %v: %v", key, err)
+		log.Printf("Error finding account for request: %v: %v", request, err)
 		c.Error500(err, w, r)
 		return
 	}
@@ -189,34 +234,19 @@ func (c *ASController) UploadJoinRequest(w http.ResponseWriter, r *http.Request)
 }
 
 func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
-
-	var request struct {
+	var req struct {
 		IsdAs     string           `json:"isdas"`
 		JoinReply models.JoinReply `json:"join_reply"`
 	}
 	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&request); err != nil {
+	if err := decoder.Decode(&req); err != nil {
 		log.Printf("Error decoding JSON: %v", err)
 		c.BadRequest(err, w, r)
 		return
 	}
-	reply := request.JoinReply
-	account, err := FindAccountByRequest(r)
+	reply := req.JoinReply
+	account, err := c.findAndValidateAccount(w, r, req.IsdAs)
 	if err != nil {
-		log.Printf("Error finding account for request: %v: %v", reply.RequestId, err)
-		c.BadRequest(err, w, r)
-		return
-	}
-	owns, err := ValidateAccountOwnsIsdAs(account, request.IsdAs)
-	if err != nil {
-		log.Printf("Error validating account %v owns ISD-AS %v: %v", account, request.IsdAs, err)
-		c.Error500(err, w, r)
-		return
-	}
-	if !owns {
-		log.Printf("Account %v and AS %v do not match.", account, request.IsdAs)
-		c.BadRequest(fmt.Errorf("Account %v and AS %v do not match.", account,
-			request.IsdAs), w, r)
 		return
 	}
 	jrm, err := models.FindJoinMappingByRequestId(reply.RequestId)
@@ -226,7 +256,7 @@ func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 		c.Error500(err, w, r)
 		return
 	}
-	if jrm.IsdAs != request.IsdAs {
+	if jrm.IsdAs != req.IsdAs {
 		log.Printf("IsdAs %v and Request ID %v do not match.", jrm.IsdAs, reply.RequestId)
 		c.BadRequest(fmt.Errorf("IsdAs %v and Request ID %v do not match.",
 			jrm.IsdAs, reply.RequestId), w, r)
@@ -234,28 +264,28 @@ func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := reply.Insert(); err != nil {
 		log.Printf("Error inserting join reply. Account: %v Request ID: %v ISD-AS: %v, %v",
-			account, reply.RequestId, request.IsdAs, err)
+			account, reply.RequestId, req.IsdAs, err)
 		c.Error500(err, w, r)
 		return
 	}
-	// Change the join request's status to approved.
+	// Change the join req's status to approved.
 	jr, err := models.FindJoinRequestByRequestId(reply.RequestId)
 	if err != nil {
-		log.Printf("Error finding join request. Account: %v Request ID: %v ISD-AS: %v, %v",
-			account, reply.RequestId, request.IsdAs, err)
+		log.Printf("Error finding join req. Account: %v Request ID: %v ISD-AS: %v, %v",
+			account, reply.RequestId, req.IsdAs, err)
 		c.Error500(err, w, r)
 		return
 	}
 	jr.Status = models.APPROVED
 	if err := jr.Update(); err != nil {
-		log.Printf("Error updating join request. Account: %v Request ID: %v ISD-AS: %v, %v",
-			account, reply.RequestId, request.IsdAs, err)
+		log.Printf("Error updating join req. Account: %v Request ID: %v ISD-AS: %v, %v",
+			account, reply.RequestId, req.IsdAs, err)
 		c.Error500(err, w, r)
 		return
 	}
 
 	log.Printf("JoinReply successfully received. Account: %v Request ID: %v ISD-AS: %v",
-		account, reply.RequestId, request.IsdAs)
+		account, reply.RequestId, req.IsdAs)
 	fmt.Fprintln(w, "{}")
 }
 
@@ -335,238 +365,170 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request) {
-
-	type ConnRequestInfo struct {
-		Info      string `json:"info"` // free form text motivation for the request
-		IsdAs     string `json:"isdas"`
-		IP        string `json:"ip"`
-		Port      uint64 `json:"port"`
-		MTU       uint64 `json:"mtu"`
-		Bandwidth uint64 `json:"bandwidth"`
-		Linktype  string `json:"linktype"`
-		Timestamp string `json:"timestamp"` // UTC ISO 8601 format string
+	var req struct {
+		IsdAs       string      `json:"isdas"`
+		ConnRequest ConnRequest `json:"request"`
+		Signature   string      `json:"signature"` // signature is over IsdAs and ConnRequest
+		Certificate string      `json:"certificate"`
 	}
-
-	var request struct {
-		IsdAs            string          `json:"isdas"`
-		ConnRequestInfos ConnRequestInfo `json:"request"`
-		Signature        string          `json:"signature"` // signature is over IsdAs and ConnRequestInfos
-		Certificate      string          `json:"certificate"`
-	}
-
 	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&request); err != nil {
+	if err := decoder.Decode(&req); err != nil {
+		log.Printf("Error decoding JSON: %v", err)
 		c.BadRequest(err, w, r)
 		return
 	}
-
-	account, err := FindAccountByRequest(r)
+	account, err := c.findAndValidateAccount(w, r, req.IsdAs)
 	if err != nil {
-		c.BadRequest(err, w, r)
 		return
 	}
-	owns, err := ValidateAccountOwnsIsdAs(account, request.IsdAs)
-	if err != nil {
-		c.Error500(err, w, r)
-		return
-	}
-	if !owns {
-		c.BadRequest(errors.New("Account and AS do not match"), w, r)
-		return
-	}
-
-	var ids []uint64
-
-	cri := request.ConnRequestInfos
-
+	cr := req.ConnRequest
 	connRequest := models.ConnRequest{
-		IsdAs:                cri.IsdAs,
-		RequesterIsdAs:       request.IsdAs,
-		Info:                 cri.Info,
-		IP:                   cri.IP,
-		Port:                 cri.Port,
-		MTU:                  cri.MTU,
-		Bandwidth:            cri.Bandwidth,
-		Linktype:             cri.Linktype,
-		Signature:            request.Signature,
-		RequesterCertificate: request.Certificate,
+		IsdAsToConnect:       cr.IsdAsToConnect,
+		RequesterIsdAs:       req.IsdAs,
+		Info:                 cr.Info,
+		IP:                   cr.IP,
+		Port:                 cr.Port,
+		OverlayType:          cr.OverlayType,
+		MTU:                  cr.MTU,
+		Bandwidth:            cr.Bandwidth,
+		LinkType:             cr.LinkType,
+		Timestamp:            cr.Timestamp,
+		Signature:            req.Signature,
+		RequesterCertificate: req.Certificate,
+		Status:               models.PENDING,
 	}
-
-	// upsert it
 	if err := connRequest.Insert(); err != nil {
+		log.Printf("Error inserting Connection Request. Account %v AS %v: %v", account,
+			req.IsdAs, err)
 		c.Error500(err, w, r)
 		return
 	}
-	ids = append(ids, connRequest.Id)
-	crm := &models.ConnRequestMapping{
+	crm := models.ConnRequestMapping{
 		RequestId:      connRequest.Id,
-		RequesterIsdAs: request.IsdAs,
-		ServerIsdAs:    cri.IsdAs,
+		RequesterIsdAs: req.IsdAs,
+		ServerIsdAs:    cr.IsdAsToConnect,
 	}
 	if err := crm.Insert(); err != nil {
+		log.Printf("Error inserting Connection Request Mapping for request "+
+			"%v, account: %v, AS: %v, %v", connRequest.Id, account, req.IsdAs, err)
 		c.BadRequest(err, w, r)
 		return
 	}
-
-	// return join_request_id
-	var reply struct {
-		Ids []uint64 `json:"ids"`
+	var resp struct {
+		Id uint64 `json:"id"`
 	}
-	reply.Ids = ids
-	b, err := json.Marshal(reply)
+	resp.Id = connRequest.Id
+	b, err := json.Marshal(resp)
 	if err != nil {
+		log.Printf("Error marshaling JSON for account: %v request: %v new AS: %v, %v",
+			account, resp.Id, req.IsdAs, err)
 		c.Error500(err, w, r)
 		return
 	}
+	log.Printf("Connection Request Successfully Received: %v Request ID: %v", account, resp.Id)
 	fmt.Fprintln(w, string(b))
 }
 
-func (c *ASController) UploadConnReplies(w http.ResponseWriter, r *http.Request) {
-	type ConnReplyInfo struct {
-		RequestId      uint64 `json:"request_id" orm:"pk"`
-		RequesterIsdAs string `json:"requester_isdas"`
-		IP             string `json:"ip"`
-		Port           uint64 `json:"port"`
-		MTU            uint64 `json:"mtu"`
-		Bandwidth      uint64 `json:"bandwidth"`
-	}
-	var request struct {
-		IsdAs       string          `json:"isdas"`
-		Certificate string          `json:"certificate"`
-		Replies     []ConnReplyInfo `json:"replies"`
+func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		IsdAs       string    `json:"isdas"`
+		Certificate string    `json:"certificate"`
+		Reply       ConnReply `json:"reply"`
 	}
 	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&request); err != nil {
+	if err := decoder.Decode(&req); err != nil {
+		log.Printf("Error decoding JSON: %v", err)
 		c.BadRequest(err, w, r)
 		return
 	}
-	account, err := FindAccountByRequest(r)
+	account, err := c.findAndValidateAccount(w, r, req.IsdAs)
 	if err != nil {
+		return
+	}
+	reply := req.Reply
+	connReply := models.ConnReply{
+		RequestId:      reply.RequestId,
+		ReplyingIsdAs:  req.IsdAs,
+		RequesterIsdAs: reply.RequesterIsdAs,
+		Certificate:    req.Certificate, // cert of the replying AS, from the req
+		IP:             reply.IP,
+		Port:           reply.Port,
+		OverlayType:    reply.OverlayType,
+		MTU:            reply.MTU,
+		Bandwidth:      reply.Bandwidth,
+	}
+
+	crm, err := models.FindConnMappingByRequestId(reply.RequestId)
+	if err != nil {
+		log.Printf("Error finding mapping by conn request. Account: %v Request ID: %v, %v",
+			account, reply.RequestId, err)
 		c.BadRequest(err, w, r)
 		return
 	}
-	owns, err := ValidateAccountOwnsIsdAs(account, request.IsdAs)
+	reply.RequesterIsdAs = crm.RequesterIsdAs
+	if req.IsdAs != crm.ServerIsdAs {
+		log.Printf("IsdAs %v and Request ID %v do not match.", req.IsdAs, crm.RequesterIsdAs)
+		c.BadRequest(errors.New("IsdAs and request ID do not match"), w, r)
+		return
+	}
+	if err := connReply.Insert(); err != nil {
+		log.Printf("Error inserting Connection Reply. Request ID: %v Account: %v AS: %v: %v",
+			reply.RequestId, account, req.IsdAs, err)
+		c.BadRequest(err, w, r)
+		return
+	}
+	// Change the conn req's status to approved.
+	cr, err := models.FindConnRequestByRequestId(reply.RequestId)
 	if err != nil {
+		log.Printf("Error finding conn req. Account: %v Request ID: %v ISD-AS: %v, %v",
+			account, reply.RequestId, req.IsdAs, err)
 		c.Error500(err, w, r)
 		return
 	}
-	if !owns {
-		c.BadRequest(errors.New("Account and AS do not match"), w, r)
+	cr.Status = models.APPROVED
+	if err := cr.Update(); err != nil {
+		log.Printf("Error updating conn req. Account: %v Request ID: %v ISD-AS: %v, %v",
+			account, reply.RequestId, req.IsdAs, err)
+		c.Error500(err, w, r)
 		return
 	}
-	for _, reply := range request.Replies {
-
-		connReply := models.ConnReply{
-			RequestId:      reply.RequestId,
-			RequesterIsdAs: reply.RequesterIsdAs,
-			Certificate:    request.Certificate, // cert of the replying AS, from the request
-			IP:             reply.IP,
-			Port:           reply.Port,
-			MTU:            reply.MTU,
-			Bandwidth:      reply.Bandwidth,
-		}
-
-		crm, err := models.FindConnMappingByRequestId(reply.RequestId)
-		if err != nil {
-			c.BadRequest(err, w, r)
-			return
-		}
-		reply.RequesterIsdAs = crm.RequesterIsdAs
-		if request.IsdAs != crm.ServerIsdAs {
-			c.BadRequest(errors.New("IsdAs and request ID do not match"), w, r)
-			return
-		}
-		if err := connReply.Insert(); err != nil {
-			c.BadRequest(err, w, r)
-			return
-		}
-	}
+	log.Printf("Connection Reply Successfully Received. Account: %v Request ID: %v AS: %v",
+		account, reply.RequestId, req.IsdAs)
 	fmt.Fprintln(w, "{}")
 }
 
-func (c *ASController) PollConnReplies(w http.ResponseWriter, r *http.Request) {
-
-	var request struct {
-		IsdAs string `json:"isdas"`
-	}
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&request); err != nil {
-		c.BadRequest(err, w, r)
-		return
-	}
-	account, err := FindAccountByRequest(r)
-	if err != nil {
-		c.BadRequest(err, w, r)
-		return
-	}
-	owns, err := ValidateAccountOwnsIsdAs(account, request.IsdAs)
-	if err != nil {
-		c.Error500(err, w, r)
-		return
-	}
-	if !owns {
-		c.BadRequest(errors.New("Account and AS do not match"), w, r)
-		return
-	}
-	replies, err := models.FindConnRepliesByIsdAs(request.IsdAs)
-	if err != nil {
-		c.BadRequest(err, w, r)
-		return
-	}
-	if len(replies) == 0 {
-		fmt.Fprint(w, "{}")
-		return
-	}
-
-	var reply struct {
-		Replies []models.ConnReply `json:"replies"`
-	}
-	reply.Replies = replies
-	b, err := json.Marshal(reply)
-	if err != nil {
-		c.Error500(err, w, r)
-		return
-	}
-	fmt.Fprintln(w, string(b))
-}
-
 func (c *ASController) PollEvents(w http.ResponseWriter, r *http.Request) {
-	var request struct {
+	var req struct {
 		IsdAs string `json:"isdas"`
 	}
 	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&request); err != nil {
+	if err := decoder.Decode(&req); err != nil {
 		c.BadRequest(err, w, r)
 		return
 	}
-	account, err := FindAccountByRequest(r)
+	isdas := req.IsdAs
+	account, err := c.findAndValidateAccount(w, r, req.IsdAs)
 	if err != nil {
-		log.Printf("Error while retrieving account for request %v", r)
-		c.BadRequest(err, w, r)
 		return
 	}
-	isdas := request.IsdAs
-	owns, err := ValidateAccountOwnsIsdAs(account, isdas)
-	if err != nil {
-		log.Printf("Error validating acc %v for isdas %v", account, isdas)
-		c.Error500(err, w, r)
-		return
-	}
-	if !owns {
-		log.Printf("Account and AS do not match %v: %v", account, isdas)
-		c.BadRequest(errors.New("Account and AS do not match"), w, r)
-		return
-	}
-
 	joinRequests, err := models.FindOpenJoinRequestsByIsdAs(isdas)
 	if err != nil {
-		log.Printf("Error while retrieving open join requests for %v", isdas)
+		log.Printf("Error while retrieving open join requests. Account: %v, ISD-AS: %v",
+			account, isdas)
 		c.BadRequest(err, w, r)
 		return
 	}
-
 	connRequests, err := models.FindConnRequestsByIsdAs(isdas)
 	if err != nil {
+		log.Printf("Error while retrieving connection requests. Account: %v, ISD-AS: %v",
+			account, isdas)
+		c.BadRequest(err, w, r)
+		return
+	}
+	connReplies, err := models.FindConnRepliesByIsdAs(isdas)
+	if err != nil {
+		log.Printf("Error while retrieving connection replies. Account: %v, ISD-AS: %v",
+			account, isdas)
 		c.BadRequest(err, w, r)
 		return
 	}
@@ -574,16 +536,19 @@ func (c *ASController) PollEvents(w http.ResponseWriter, r *http.Request) {
 	var resp struct {
 		JoinRequests []models.JoinRequest `json:"join_requests"`
 		ConnRequests []models.ConnRequest `json:"conn_requests"`
+		ConnReplies  []models.ConnReply   `json:"conn_replies"`
 	}
 	resp.JoinRequests = joinRequests
 	resp.ConnRequests = connRequests
+	resp.ConnReplies = connReplies
 
-	log.Printf("join_requests = %v", joinRequests)
-	log.Printf("conn_requests = %v", connRequests)
+	log.Printf("join_requests for ISD-AS %v = %v", isdas, joinRequests)
+	log.Printf("conn_requests for ISD-AS %v = %v", isdas, connRequests)
+	log.Printf("conn_replies for ISD-AS %v = %v", isdas, connReplies)
 
 	b, err := json.Marshal(resp)
 	if err != nil {
-		log.Printf("Error during JSON Marshaling")
+		log.Printf("Error during JSON Marshaling. Account: %v, ISD-AS: %v", account, isdas)
 		c.Error500(err, w, r)
 		return
 	}
