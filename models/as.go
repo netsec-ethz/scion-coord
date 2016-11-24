@@ -15,14 +15,17 @@
 package models
 
 import (
-	"strconv"
-	"strings"
+	"fmt"
+	"github.com/astaxie/beego/orm"
+	"github.com/netsec-ethz/scion/go/lib/addr"
+	"log"
 	"time"
 )
 
 type As struct {
-	IsdAs   string   `orm:"index;pk"`
-	Isd     uint64   `orm:"index"`
+	Id      uint64   `orm:"column(id);auto;pk"`
+	Isd     int      `orm:"index"`
+	As      int      `orm:"index"`
 	Core    bool     `orm:"default(false)"`
 	Account *Account `orm:"rel(fk);index"`
 	Created time.Time
@@ -34,22 +37,14 @@ func FindCoreASesByIsd(isd uint64) ([]As, error) {
 	return ases, err
 }
 
-func FindCoreAsByIsdAs(isd uint64, isd_as string) (*As, error) {
+func FindAsByIsdAs(isdas string) (*As, error) {
+	ia, err := addr.IAFromString(isdas)
+	if err != nil {
+		return nil, err
+	}
 	as := new(As)
-	err := o.QueryTable("as").Filter("Isd", isd).Filter("IsdAs", isd_as).Filter("Core", true).RelatedSel().One(as)
+	err = o.QueryTable(as).Filter("Isd", ia.I).Filter("As", ia.A).RelatedSel().One(as)
 	return as, err
-}
-
-func FindAsByIsdAs(isd_as string) (*As, error) {
-	as := new(As)
-	err := o.QueryTable(as).Filter("IsdAs", isd_as).RelatedSel().One(as)
-	return as, err
-}
-
-func AllASes() ([]As, error) {
-	var ASes []As
-	_, err := o.QueryTable("as").All(&ASes)
-	return ASes, err
 }
 
 func (as *As) deleteAs() error {
@@ -58,14 +53,20 @@ func (as *As) deleteAs() error {
 }
 
 func (as *As) Insert() error {
-	_, err := o.Insert(as)
+	// First check whether this AS already exists, duplicates are not allowed.
+	existing_as := new(As)
+	// should always return with orm.ErrNoRows
+	err := o.QueryTable(as).Filter("Isd", as.Isd).Filter("As", as.As).RelatedSel().One(existing_as)
+	if err == nil {
+		log.Printf("ISD-AS (%v-%v) already exists, will not be re-inserted", as.Isd, as.As)
+		return fmt.Errorf("ISD-AS (%v-%v) already exists, will not be re-inserted", as.Isd, as.As)
+	} else if err != orm.ErrNoRows { // some other error occurred during lookup
+		return err
+	}
+	_, err = o.Insert(as)
 	return err
 }
 
-func IsdAsToIsd(isdas string) (uint64, error) {
-	return strconv.ParseUint(strings.Split(isdas, "-")[0], 10, 64)
-}
-
-func FindNumAsInIsd(isd uint64) (int64, error) {
-	return o.QueryTable("as").Filter("Isd", isd).Count()
+func (as *As) String() string {
+	return fmt.Sprintf("%v-%v", as.Isd, as.As)
 }

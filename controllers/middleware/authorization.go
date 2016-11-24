@@ -21,7 +21,7 @@ import (
 	"net/http"
 )
 
-// TODO: distinguish between web interface user authentication and key/secret authentication
+// TODO: distinguish between web interface user authentication and account_id/secret authentication
 // The latter does not need a session
 func AuthHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -34,13 +34,13 @@ func AuthHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		// try then with the key and secret
+		// try then with the account_id and secret
 		vars := mux.Vars(r)
-		key := vars["key"]
+		account_id := vars["account_id"]
 		secret := vars["secret"]
-		// In this case we are receiving a request with key and secret params
-		if key != "" && secret != "" {
-			if account, err := models.FindUserByKeySecret(key, secret); err == nil && account != nil {
+		// In this case we are receiving a request with account_id and secret params
+		if account_id != "" && secret != "" {
+			if account, err := models.FindUserByAccountIdSecret(account_id, secret); err == nil && account != nil {
 				// proceed with the next handler
 				next.ServeHTTP(w, r)
 				return
@@ -49,11 +49,11 @@ func AuthHandler(next http.Handler) http.Handler {
 		}
 
 		// try with standard Golang parameters
-		key = r.URL.Query().Get("key")
+		account_id = r.URL.Query().Get("account_id")
 		secret = r.URL.Query().Get("secret")
 
-		if key != "" && secret != "" {
-			if account, err := models.FindUserByKeySecret(key, secret); err == nil && account != nil {
+		if account_id != "" && secret != "" {
+			if account, err := models.FindUserByAccountIdSecret(account_id, secret); err == nil && account != nil {
 				// proceed with the next handler
 				next.ServeHTTP(w, r)
 				return

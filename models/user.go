@@ -39,7 +39,7 @@ type Account struct {
 	Id           uint64
 	Name         string
 	Organisation string
-	Key          string
+	AccountId    string
 	Secret       string
 	Users        []*user `orm:"reverse(many);index"`
 	ASes         []*As   `orm:"reverse(many);index"`
@@ -112,7 +112,7 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 		// if there is no account with the name then create it
 		if err == orm.ErrNoRows {
 
-			// Generate the key and the secret
+			// Generate the accountId and the secret
 			apiSecretReader := hkdf.New(sha256.New, derivedPassword, salt, []byte(API_CONTEXT))
 			apiSecretBytes, apiSecretError := bufio.NewReader(apiSecretReader).Peek(SECRET_LENGTH)
 
@@ -125,7 +125,7 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 			a.Name = accountName
 			a.Created = time.Now().UTC()
 			a.Updated = time.Now().UTC()
-			a.Key = uuid.New()
+			a.AccountId = uuid.New()
 			a.Secret = hex.EncodeToString(apiSecretBytes)
 			if err := a.Upsert(); err != nil {
 				return nil, err
@@ -203,22 +203,16 @@ func FindUserById(id string) (*user, error) {
 	return u, err
 }
 
-func FindUserByKeySecret(key, secret string) (*Account, error) {
+func FindUserByAccountIdSecret(acc_id, secret string) (*Account, error) {
 	u := new(Account)
-	err := o.QueryTable(u).Filter("Key", key).Filter("Secret", secret).One(u)
+	err := o.QueryTable(u).Filter("AccountId", acc_id).Filter("Secret", secret).One(u)
 	return u, err
 }
 
-func FindAccountByKey(key string) (*Account, error) {
+func FindAccountByAccountId(acc_id string) (*Account, error) {
 	u := new(Account)
-	err := o.QueryTable(u).Filter("Key", key).One(u)
+	err := o.QueryTable(u).Filter("AccountId", acc_id).One(u)
 	return u, err
-}
-
-func FindRequestsByAccountID(accountID uint64) ([]JoinRequestMapping, error) {
-	var requests []JoinRequestMapping
-	_, err := o.QueryTable("join_request_mapping").Filter("account_id", accountID).All(&requests)
-	return requests, err
 }
 
 func (u *user) Delete() error {
