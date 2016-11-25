@@ -1,3 +1,17 @@
+// Copyright 2016 ETH Zurich
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package models
 
 import (
@@ -38,9 +52,9 @@ func TestJoinReply(t *testing.T) {
 }
 
 func TestConnRequest(t *testing.T) {
-	cReqIn := &ConnRequest{IsdAsToConnect: "111-111", RequesterIsdAs: "222-222",
+	cReqIn := &ConnRequest{IsdAsToConnectTo: "111-111", RequesterIsdAs: "222-222",
 		RequesterCertificate: "test_cert", Info: "test_info", IP: "123.123.123.123",
-		Port: 555, OverlayType: "UPD/IP", MTU: 1472, Bandwidth: 1000, Signature: "test_sig",
+		Port: 555, OverlayType: "UDP/IP", MTU: 1472, Bandwidth: 1000, Signature: "test_sig",
 		Status: PENDING}
 	if err := cReqIn.Insert(); err != nil {
 		t.Error("Failed to insert the test connection request.", err)
@@ -71,5 +85,4 @@ func TestConnReply(t *testing.T) {
 	if err := DeleteConnReplyById(cReps[0].RequestId); err != nil {
 		t.Error("Failed to delete the test connection reply.", err)
 	}
-
 }

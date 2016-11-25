@@ -31,26 +31,26 @@ type ASController struct {
 }
 
 type ConnRequest struct {
-	Info           string `json:"info"` // free form text motivation for the request
-	IsdAsToConnect string `json:"isdas_to_connect"`
-	IP             string `json:"ip"`
-	Port           uint64 `json:"port"`
-	OverlayType    string `json:"overlay_type"`
-	MTU            uint64 `json:"mtu"`
-	Bandwidth      uint64 `json:"bandwidth"`
-	LinkType       string `json:"link_type"`
-	Timestamp      string `json:"timestamp"` // UTC ISO 8601 format string
+	Info             string `json:"info"` // free form text motivation for the request
+	IsdAsToConnectTo string `json:"isdas_to_connect"`
+	OverlayType      string `json:"overlay_type"`
+	IP               string `json:"ip"`
+	Port             uint64 `json:"port"`
+	MTU              uint64 `json:"mtu"`       // bytes
+	Bandwidth        uint64 `json:"bandwidth"` // kbps
+	LinkType         string `json:"link_type"`
+	Timestamp        string `json:"timestamp"` // UTC ISO 8601 format string
 }
 
 type ConnReply struct {
 	RequestId      uint64 `json:"request_id" orm:"pk"`
 	ReplyingIsdAs  string `json:"replying_isdas"`
 	RequesterIsdAs string `json:"requester_isdas"`
+	OverlayType    string `json:"overlay_type"`
 	IP             string `json:"ip"`
 	Port           uint64 `json:"port"`
-	OverlayType    string `json:"overlay_type"`
-	MTU            uint64 `json:"mtu"`
-	Bandwidth      uint64 `json:"bandwidth"`
+	MTU            uint64 `json:"mtu"`       // bytes
+	Bandwidth      uint64 `json:"bandwidth"` // kbps
 }
 
 type JoinRequest struct {
@@ -169,6 +169,7 @@ func (c *ASController) UploadJoinRequest(w http.ResponseWriter, r *http.Request)
 	var request JoinRequest
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&request); err != nil {
+		log.Printf("Error decoding JSON: %v, %v", r.Body, err)
 		c.BadRequest(err, w, r)
 		return
 	}
@@ -240,7 +241,7 @@ func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 	}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&req); err != nil {
-		log.Printf("Error decoding JSON: %v", err)
+		log.Printf("Error decoding JSON: %v, %v", r.Body, err)
 		c.BadRequest(err, w, r)
 		return
 	}
@@ -373,7 +374,7 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 	}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&req); err != nil {
-		log.Printf("Error decoding JSON: %v", err)
+		log.Printf("Error decoding JSON: %v, %v", r.Body, err)
 		c.BadRequest(err, w, r)
 		return
 	}
@@ -383,7 +384,7 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 	}
 	cr := req.ConnRequest
 	connRequest := models.ConnRequest{
-		IsdAsToConnect:       cr.IsdAsToConnect,
+		IsdAsToConnectTo:     cr.IsdAsToConnectTo,
 		RequesterIsdAs:       req.IsdAs,
 		Info:                 cr.Info,
 		IP:                   cr.IP,
@@ -404,9 +405,9 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	crm := models.ConnRequestMapping{
-		RequestId:      connRequest.Id,
-		RequesterIsdAs: req.IsdAs,
-		ServerIsdAs:    cr.IsdAsToConnect,
+		RequestId:        connRequest.Id,
+		RequesterIsdAs:   req.IsdAs,
+		IsdAsToConnectTo: cr.IsdAsToConnectTo,
 	}
 	if err := crm.Insert(); err != nil {
 		log.Printf("Error inserting Connection Request Mapping for request "+
@@ -437,7 +438,7 @@ func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 	}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&req); err != nil {
-		log.Printf("Error decoding JSON: %v", err)
+		log.Printf("Error decoding JSON: %v, %v", r.Body, err)
 		c.BadRequest(err, w, r)
 		return
 	}
@@ -466,8 +467,8 @@ func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	reply.RequesterIsdAs = crm.RequesterIsdAs
-	if req.IsdAs != crm.ServerIsdAs {
-		log.Printf("IsdAs %v and Request ID %v do not match.", req.IsdAs, crm.RequesterIsdAs)
+	if req.IsdAs != crm.IsdAsToConnectTo {
+		log.Printf("ISD-AS %v and Request ID %v do not match.", req.IsdAs, crm.RequesterIsdAs)
 		c.BadRequest(errors.New("IsdAs and request ID do not match"), w, r)
 		return
 	}
@@ -492,8 +493,9 @@ func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 		c.Error500(err, w, r)
 		return
 	}
-	log.Printf("Connection Reply Successfully Received. Account: %v Request ID: %v AS: %v",
-		account, reply.RequestId, req.IsdAs)
+	log.Printf("Connection Reply Successfully Received. Account: %v Request ID: %v "+
+		"Requestor AS: %v Replying AS: %v", account, reply.RequestId, reply.RequesterIsdAs,
+		reply.ReplyingIsdAs)
 	fmt.Fprintln(w, "{}")
 }
 
@@ -503,6 +505,7 @@ func (c *ASController) PollEvents(w http.ResponseWriter, r *http.Request) {
 	}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&req); err != nil {
+		log.Printf("Error decoding JSON: %v, %v", r.Body, err)
 		c.BadRequest(err, w, r)
 		return
 	}
@@ -542,13 +545,14 @@ func (c *ASController) PollEvents(w http.ResponseWriter, r *http.Request) {
 	resp.ConnRequests = connRequests
 	resp.ConnReplies = connReplies
 
-	log.Printf("join_requests for ISD-AS %v = %v", isdas, joinRequests)
-	log.Printf("conn_requests for ISD-AS %v = %v", isdas, connRequests)
-	log.Printf("conn_replies for ISD-AS %v = %v", isdas, connReplies)
+	// log.Printf("join_requests for ISD-AS %v = %v", isdas, joinRequests)
+	// log.Printf("conn_requests for ISD-AS %v = %v", isdas, connRequests)
+	// log.Printf("conn_replies for ISD-AS %v = %v", isdas, connReplies)
 
 	b, err := json.Marshal(resp)
 	if err != nil {
-		log.Printf("Error during JSON Marshaling. Account: %v, ISD-AS: %v", account, isdas)
+		log.Printf("Error during JSON Marshaling. Account: %v, ISD-AS: %v, %v", account, isdas,
+			err)
 		c.Error500(err, w, r)
 		return
 	}

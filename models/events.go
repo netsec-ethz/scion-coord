@@ -27,55 +27,6 @@ type JoinRequest struct {
 	Status string `json:"status"`
 }
 
-type JoinReply struct {
-	RequestId    uint64 `json:"request_id" orm:"pk"`
-	JoiningIsdAs string `json:"joining_isdas"`
-	SigningIsdAs string `json:"signing_isdas"`
-	Certificate  string `json:"certificate" orm:"type(text)"`
-	TRC          string `json:"trc" orm:"type(text)"`
-}
-
-type ConnRequest struct {
-	Id                   uint64 `json:"id"`
-	IsdAsToConnect       string `json:"isdas_to_connect"`
-	RequesterIsdAs       string `json:"requester_isdas"`
-	RequesterCertificate string `json:"requester_certificate" orm:"type(text)"`
-	Info                 string `json:"info"` // free form text motivation for the request
-	IP                   string `json:"ip"`
-	Port                 uint64 `json:"port"`
-	OverlayType          string `json:"overlay_type"`
-	MTU                  uint64 `json:"mtu"`
-	Bandwidth            uint64 `json:"bandwidth"`
-	LinkType             string `json:"link_type"`
-	Timestamp            string `json:"timestamp"` // UTC ISO 8601 format string
-	Signature            string `json:"signature"`
-	Status               string `json:"status"`
-}
-
-type ConnReply struct {
-	RequestId      uint64 `json:"request_id" orm:"pk"`
-	ReplyingIsdAs  string `json:"replying_isdas"`
-	RequesterIsdAs string `json:"requester_isdas"`
-	Certificate    string `json:"certificate" orm:"type(text)"`
-	IP             string `json:"ip"`
-	Port           uint64 `json:"port"`
-	OverlayType    string `json:"overlay_type"`
-	MTU            uint64 `json:"mtu"`
-	Bandwidth      uint64 `json:"bandwidth"`
-}
-
-type ConnRequestMapping struct {
-	RequestId      uint64 `orm:"pk"`
-	RequesterIsdAs string
-	ServerIsdAs    string
-}
-
-type JoinRequestMapping struct {
-	Id      uint64
-	IsdAs   string
-	Account *Account `orm:"rel(fk)"`
-}
-
 func FindOpenJoinRequestsByIsdAs(isdas string) ([]JoinRequest, error) {
 	var requests []JoinRequest
 	_, err := o.QueryTable("join_request").Filter("IsdAs", isdas).Filter("Status", PENDING).All(&requests)
@@ -120,6 +71,12 @@ func DeleteJoinRequestById(id uint64) error {
 	return err
 }
 
+type JoinRequestMapping struct {
+	Id      uint64   `json:"id"`
+	IsdAs   string   `json:"isdas"`
+	Account *Account `orm:"rel(fk)"`
+}
+
 func FindJoinMappingByRequestId(id uint64) (*JoinRequestMapping, error) {
 	jrm := new(JoinRequestMapping)
 	err := o.QueryTable(jrm).Filter("Id", id).RelatedSel().One(jrm)
@@ -134,6 +91,14 @@ func (jrm *JoinRequestMapping) Insert() error {
 func (jrm *JoinRequestMapping) Delete() error {
 	_, err := o.Delete(jrm)
 	return err
+}
+
+type JoinReply struct {
+	RequestId    uint64 `json:"request_id" orm:"pk"`
+	JoiningIsdAs string `json:"joining_isdas"`
+	SigningIsdAs string `json:"signing_isdas"`
+	Certificate  string `json:"certificate" orm:"type(text)"`
+	TRC          string `json:"trc" orm:"type(text)"`
 }
 
 func FindJoinReplyByRequestId(id uint64) (*JoinReply, error) {
@@ -157,9 +122,26 @@ func DeleteJoinReplyById(id uint64) error {
 	return err
 }
 
+type ConnRequest struct {
+	Id                   uint64 `json:"id"`
+	IsdAsToConnectTo     string `json:"isdas_to_connect"`
+	RequesterIsdAs       string `json:"requester_isdas"`
+	RequesterCertificate string `json:"requester_certificate" orm:"type(text)"`
+	Info                 string `json:"info"` // free form text motivation for the request
+	OverlayType          string `json:"overlay_type"`
+	IP                   string `json:"ip"`
+	Port                 uint64 `json:"port"`
+	MTU                  uint64 `json:"mtu"`       // bytes
+	Bandwidth            uint64 `json:"bandwidth"` // kbps
+	LinkType             string `json:"link_type"`
+	Timestamp            string `json:"timestamp"` // UTC ISO 8601 format string
+	Signature            string `json:"signature"`
+	Status               string `json:"status"`
+}
+
 func FindConnRequestsByIsdAs(isdas string) ([]ConnRequest, error) {
 	var requests []ConnRequest
-	_, err := o.QueryTable("conn_request").Filter("IsdAsToConnect", isdas).All(&requests)
+	_, err := o.QueryTable("conn_request").Filter("IsdAsToConnectTo", isdas).All(&requests)
 	return requests, err
 }
 
@@ -178,6 +160,12 @@ func DeleteConnRequestById(id uint64) error {
 	return err
 }
 
+type ConnRequestMapping struct {
+	RequestId        uint64 `orm:"pk"`
+	RequesterIsdAs   string
+	IsdAsToConnectTo string
+}
+
 func FindConnMappingByRequestId(id uint64) (ConnRequestMapping, error) {
 	var crm ConnRequestMapping
 	err := o.QueryTable(crm).Filter("RequestId", id).RelatedSel().One(&crm)
@@ -192,6 +180,18 @@ func (crm *ConnRequestMapping) Insert() error {
 func DeleteConnMappingById(id uint64) error {
 	_, err := o.Delete(&ConnRequestMapping{RequestId: id})
 	return err
+}
+
+type ConnReply struct {
+	RequestId      uint64 `json:"request_id" orm:"pk"`
+	ReplyingIsdAs  string `json:"replying_isdas"`
+	RequesterIsdAs string `json:"requester_isdas"`
+	Certificate    string `json:"certificate" orm:"type(text)"`
+	OverlayType    string `json:"overlay_type"`
+	IP             string `json:"ip"`
+	Port           uint64 `json:"port"`
+	MTU            uint64 `json:"mtu"`       // bytes
+	Bandwidth      uint64 `json:"bandwidth"` // kbps
 }
 
 func FindConnRepliesByIsdAs(isdas string) ([]ConnReply, error) {
