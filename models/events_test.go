@@ -21,7 +21,7 @@ import (
 )
 
 func TestJoinRequest(t *testing.T) {
-	jReqIn := &JoinRequest{IsdAs: "100-100", SigKey: "sigkey", EncKey: "enckey", Status: PENDING}
+	jReqIn := &JoinRequest{RespondIA: "100-100", SigKey: "sigkey", EncKey: "enckey", Status: PENDING}
 	if err := jReqIn.Insert(); err != nil {
 		t.Error("Failed to insert the test join request.", err)
 	}
@@ -36,7 +36,7 @@ func TestJoinRequest(t *testing.T) {
 }
 
 func TestJoinReply(t *testing.T) {
-	jRepIn := &JoinReply{RequestId: 1234, JoiningIsdAs: "123-123", SigningIsdAs: "321-312",
+	jRepIn := &JoinReply{RequestId: 1234, JoiningIA: "123-123", RespondIA: "321-312",
 		Certificate: "cert", TRC: "trc"}
 	if err := jRepIn.Insert(); err != nil {
 		t.Error("Failed to insert the test join reply.", err)
@@ -52,7 +52,7 @@ func TestJoinReply(t *testing.T) {
 }
 
 func TestConnRequest(t *testing.T) {
-	cReqIn := &ConnRequest{IsdAsToConnectTo: "111-111", RequesterIsdAs: "222-222",
+	cReqIn := &ConnRequest{RespondIA: "111-111", RequestIA: "222-222",
 		RequesterCertificate: "test_cert", Info: "test_info", IP: "123.123.123.123",
 		Port: 555, OverlayType: "UDP/IP", MTU: 1472, Bandwidth: 1000, Signature: "test_sig",
 		Status: PENDING}
@@ -70,13 +70,13 @@ func TestConnRequest(t *testing.T) {
 }
 
 func TestConnReply(t *testing.T) {
-	cRepIn := &ConnReply{RequestId: 4321, ReplyingIsdAs: "321-321", RequesterIsdAs: "678-678",
+	cRepIn := &ConnReply{RequestId: 4321, RespondIA: "321-321", RequestIA: "678-678",
 		Certificate: "test_cert", IP: "123.123.123.123", Port: 333, OverlayType: "UDP/IP",
 		MTU: 1472, Bandwidth: 1000}
 	if err := cRepIn.Insert(); err != nil {
 		t.Error("Failed to insert the test connection reply.", err)
 	}
-	cReps, err := FindConnRepliesByIsdAs(cRepIn.RequesterIsdAs)
+	cReps, err := FindConnRepliesByIsdAs(cRepIn.RequestIA)
 	if err != nil {
 		t.Error("Failed to retrieve the test connection reply.", err)
 	}

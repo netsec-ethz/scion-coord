@@ -26,31 +26,30 @@ import (
 	"time"
 )
 
-type ASController struct {
-	controllers.HTTPController
-}
-
 type ConnRequest struct {
-	Info             string `json:"info"` // free form text motivation for the request
-	IsdAsToConnectTo string `json:"isdas_to_connect"`
-	OverlayType      string `json:"overlay_type"`
-	IP               string `json:"ip"`
-	Port             uint64 `json:"port"`
-	MTU              uint64 `json:"mtu"`       // bytes
-	Bandwidth        uint64 `json:"bandwidth"` // kbps
-	LinkType         string `json:"link_type"`
-	Timestamp        string `json:"timestamp"` // UTC ISO 8601 format string
+	Info        string `json:"info"` // free form text motivation for the request
+	RespondIA   string `json:"respond_ia"`
+	OverlayType string `json:"overlay_type"`
+	IP          string `json:"ip"`
+	Port        uint64 `json:"port"`
+	MTU         uint64 `json:"mtu"`       // bytes
+	Bandwidth   uint64 `json:"bandwidth"` // kbps
+	LinkType    string `json:"link_type"`
+	Timestamp   string `json:"timestamp"` // UTC ISO 8601 format string, 1s precision
+	Signature   string `json:"signature"` // signature is over IsdAs and ConnRequest
+	Certificate string `json:"certificate"`
 }
 
 type ConnReply struct {
-	RequestId      uint64 `json:"request_id" orm:"pk"`
-	ReplyingIsdAs  string `json:"replying_isdas"`
-	RequesterIsdAs string `json:"requester_isdas"`
-	OverlayType    string `json:"overlay_type"`
-	IP             string `json:"ip"`
-	Port           uint64 `json:"port"`
-	MTU            uint64 `json:"mtu"`       // bytes
-	Bandwidth      uint64 `json:"bandwidth"` // kbps
+	RequestId   uint64 `json:"request_id" orm:"pk"`
+	RespondIA   string `json:"respond_ia"`
+	RequestIA   string `json:"request_ia"`
+	OverlayType string `json:"overlay_type"`
+	IP          string `json:"ip"`
+	Port        uint64 `json:"port"`
+	MTU         uint64 `json:"mtu"`       // bytes
+	Bandwidth   uint64 `json:"bandwidth"` // kbps
+	Certificate string `json:"certificate"`
 }
 
 type JoinRequest struct {
@@ -78,6 +77,10 @@ func ValidateAccountOwnsIsdAs(account *models.Account, isdas string) (bool, erro
 		return false, err
 	}
 	return as.Account.Id == account.Id, nil
+}
+
+type ASController struct {
+	controllers.HTTPController
 }
 
 func (c *ASController) Exists(w http.ResponseWriter, r *http.Request) {
@@ -196,10 +199,10 @@ func (c *ASController) UploadJoinRequest(w http.ResponseWriter, r *http.Request)
 	// TODO(ercanucan): Send the request to ALL core ASes in this ISD.
 	core_as := core_ases[0]
 	join_request := models.JoinRequest{
-		IsdAs:  core_as.IsdAs,
-		SigKey: request.SigKey,
-		EncKey: request.EncKey,
-		Status: models.PENDING,
+		RespondIA: core_as.IsdAs,
+		SigKey:    request.SigKey,
+		EncKey:    request.EncKey,
+		Status:    models.PENDING,
 	}
 	// insert into the join_requests table in the database
 	if err := join_request.Insert(); err != nil {
@@ -208,9 +211,9 @@ func (c *ASController) UploadJoinRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	mapping := models.JoinRequestMapping{
-		Id:      join_request.Id,
-		Account: account,
-		IsdAs:   core_as.IsdAs,
+		Id:        join_request.Id,
+		Account:   account,
+		RespondIA: core_as.IsdAs,
 	}
 	if err := mapping.Insert(); err != nil {
 		log.Printf("Error inserting to Join Request Mapping for request "+
@@ -236,7 +239,7 @@ func (c *ASController) UploadJoinRequest(w http.ResponseWriter, r *http.Request)
 
 func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		IsdAs     string           `json:"isdas"`
+		RespondIA string           `json:"respond_ia"`
 		JoinReply models.JoinReply `json:"join_reply"`
 	}
 	decoder := json.NewDecoder(r.Body)
@@ -246,7 +249,7 @@ func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	reply := req.JoinReply
-	account, err := c.findAndValidateAccount(w, r, req.IsdAs)
+	account, err := c.findAndValidateAccount(w, r, req.RespondIA)
 	if err != nil {
 		return
 	}
@@ -257,15 +260,15 @@ func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 		c.Error500(err, w, r)
 		return
 	}
-	if jrm.IsdAs != req.IsdAs {
-		log.Printf("IsdAs %v and Request ID %v do not match.", jrm.IsdAs, reply.RequestId)
-		c.BadRequest(fmt.Errorf("IsdAs %v and Request ID %v do not match.",
-			jrm.IsdAs, reply.RequestId), w, r)
+	if jrm.RespondIA != req.RespondIA {
+		log.Printf("RespondIA %v and Request ID %v do not match.", jrm.RespondIA, reply.RequestId)
+		c.BadRequest(fmt.Errorf("RespondIA %v and Request ID %v do not match.",
+			jrm.RespondIA, reply.RequestId), w, r)
 		return
 	}
 	if err := reply.Insert(); err != nil {
 		log.Printf("Error inserting join reply. Account: %v Request ID: %v ISD-AS: %v, %v",
-			account, reply.RequestId, req.IsdAs, err)
+			account, reply.RequestId, req.RespondIA, err)
 		c.Error500(err, w, r)
 		return
 	}
@@ -273,20 +276,20 @@ func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 	jr, err := models.FindJoinRequestByRequestId(reply.RequestId)
 	if err != nil {
 		log.Printf("Error finding join req. Account: %v Request ID: %v ISD-AS: %v, %v",
-			account, reply.RequestId, req.IsdAs, err)
+			account, reply.RequestId, req.RespondIA, err)
 		c.Error500(err, w, r)
 		return
 	}
 	jr.Status = models.APPROVED
 	if err := jr.Update(); err != nil {
 		log.Printf("Error updating join req. Account: %v Request ID: %v ISD-AS: %v, %v",
-			account, reply.RequestId, req.IsdAs, err)
+			account, reply.RequestId, req.RespondIA, err)
 		c.Error500(err, w, r)
 		return
 	}
 
 	log.Printf("JoinReply successfully received. Account: %v Request ID: %v ISD-AS: %v",
-		account, reply.RequestId, req.IsdAs)
+		account, reply.RequestId, req.RespondIA)
 	fmt.Fprintln(w, "{}")
 }
 
@@ -301,8 +304,7 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 	}
 	account, err := FindAccountByRequest(r)
 	if err != nil {
-		log.Printf("Error finding account for request: %v: %v",
-			request.RequestId, err)
+		log.Printf("Error finding account for request: %v: %v", request.RequestId, err)
 		c.BadRequest(err, w, r)
 		return
 	}
@@ -314,8 +316,7 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if jrm.Account.Id != account.Id {
-		log.Printf("Account %v and Request ID %v do not match", account,
-			request.RequestId)
+		log.Printf("Account %v and Request ID %v do not match", account, request.RequestId)
 		c.BadRequest(fmt.Errorf("Account %v and Request ID %v do not match",
 			account, request.RequestId), w, r)
 		return
@@ -327,15 +328,14 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 		c.BadRequest(err, w, r)
 		return
 	}
-	isd, err := models.IsdAsToIsd(joinReply.JoiningIsdAs)
+	isd, err := models.IsdAsToIsd(joinReply.JoiningIA)
 	if err != nil {
-		log.Printf("Error extracting ISD from ISD-AS %v, %v "+
-			joinReply.JoiningIsdAs, err)
+		log.Printf("Error extracting ISD from ISD-AS %v, %v ", joinReply.JoiningIA, err)
 		c.Error500(err, w, r)
 		return
 	}
 	new_as := models.As{
-		IsdAs:   joinReply.JoiningIsdAs,
+		IsdAs:   joinReply.JoiningIA,
 		Isd:     isd,
 		Core:    false,
 		Account: account,
@@ -351,26 +351,24 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 		IsdAs       string `json:"assigned_isdas"`
 		Certificate string `json:"certificate"`
 		TRC         string `json:"trc"`
-	}{joinReply.JoiningIsdAs, joinReply.Certificate, joinReply.TRC}
+	}{joinReply.JoiningIA, joinReply.Certificate, joinReply.TRC}
 
 	b, err := json.Marshal(reply)
 	if err != nil {
 		log.Printf("Error marshaling JSON for account: %v request: %v new AS: %v, %v",
-			account, request.RequestId, joinReply.JoiningIsdAs, err)
+			account, request.RequestId, joinReply.JoiningIA, err)
 		c.Error500(err, w, r)
 		return
 	}
 	log.Printf("New AS successfully created. Account: %v Request ID: %v new AS: %v",
-		account, request.RequestId, joinReply.JoiningIsdAs)
+		account, request.RequestId, joinReply.JoiningIA)
 	fmt.Fprintln(w, string(b))
 }
 
 func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		IsdAs       string      `json:"isdas"`
+		RequestIA   string      `json:"request_ia"`
 		ConnRequest ConnRequest `json:"request"`
-		Signature   string      `json:"signature"` // signature is over IsdAs and ConnRequest
-		Certificate string      `json:"certificate"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&req); err != nil {
@@ -378,14 +376,14 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 		c.BadRequest(err, w, r)
 		return
 	}
-	account, err := c.findAndValidateAccount(w, r, req.IsdAs)
+	account, err := c.findAndValidateAccount(w, r, req.RequestIA)
 	if err != nil {
 		return
 	}
 	cr := req.ConnRequest
 	connRequest := models.ConnRequest{
-		IsdAsToConnectTo:     cr.IsdAsToConnectTo,
-		RequesterIsdAs:       req.IsdAs,
+		RequestIA:            req.RequestIA,
+		RespondIA:            cr.RespondIA,
 		Info:                 cr.Info,
 		IP:                   cr.IP,
 		Port:                 cr.Port,
@@ -394,24 +392,24 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 		Bandwidth:            cr.Bandwidth,
 		LinkType:             cr.LinkType,
 		Timestamp:            cr.Timestamp,
-		Signature:            req.Signature,
-		RequesterCertificate: req.Certificate,
+		Signature:            cr.Signature,
+		RequesterCertificate: cr.Certificate,
 		Status:               models.PENDING,
 	}
 	if err := connRequest.Insert(); err != nil {
 		log.Printf("Error inserting Connection Request. Account %v AS %v: %v", account,
-			req.IsdAs, err)
+			req.RequestIA, err)
 		c.Error500(err, w, r)
 		return
 	}
 	crm := models.ConnRequestMapping{
-		RequestId:        connRequest.Id,
-		RequesterIsdAs:   req.IsdAs,
-		IsdAsToConnectTo: cr.IsdAsToConnectTo,
+		RequestId: connRequest.Id,
+		RequestIA: req.RequestIA,
+		RespondIA: cr.RespondIA,
 	}
 	if err := crm.Insert(); err != nil {
 		log.Printf("Error inserting Connection Request Mapping for request "+
-			"%v, account: %v, AS: %v, %v", connRequest.Id, account, req.IsdAs, err)
+			"%v, account: %v, AS: %v, %v", connRequest.Id, account, req.RequestIA, err)
 		c.BadRequest(err, w, r)
 		return
 	}
@@ -422,7 +420,7 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 	b, err := json.Marshal(resp)
 	if err != nil {
 		log.Printf("Error marshaling JSON for account: %v request: %v new AS: %v, %v",
-			account, resp.Id, req.IsdAs, err)
+			account, resp.Id, req.RequestIA, err)
 		c.Error500(err, w, r)
 		return
 	}
@@ -432,9 +430,8 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 
 func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		IsdAs       string    `json:"isdas"`
-		Certificate string    `json:"certificate"`
-		Reply       ConnReply `json:"reply"`
+		IsdAs string    `json:"isdas"`
+		Reply ConnReply `json:"reply"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&req); err != nil {
@@ -448,15 +445,15 @@ func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 	}
 	reply := req.Reply
 	connReply := models.ConnReply{
-		RequestId:      reply.RequestId,
-		ReplyingIsdAs:  req.IsdAs,
-		RequesterIsdAs: reply.RequesterIsdAs,
-		Certificate:    req.Certificate, // cert of the replying AS, from the req
-		IP:             reply.IP,
-		Port:           reply.Port,
-		OverlayType:    reply.OverlayType,
-		MTU:            reply.MTU,
-		Bandwidth:      reply.Bandwidth,
+		RequestId:   reply.RequestId,
+		RespondIA:   req.IsdAs,
+		RequestIA:   reply.RequestIA,
+		Certificate: reply.Certificate, // cert of the replying AS, from the req
+		IP:          reply.IP,
+		Port:        reply.Port,
+		OverlayType: reply.OverlayType,
+		MTU:         reply.MTU,
+		Bandwidth:   reply.Bandwidth,
 	}
 
 	crm, err := models.FindConnMappingByRequestId(reply.RequestId)
@@ -466,9 +463,9 @@ func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 		c.BadRequest(err, w, r)
 		return
 	}
-	reply.RequesterIsdAs = crm.RequesterIsdAs
-	if req.IsdAs != crm.IsdAsToConnectTo {
-		log.Printf("ISD-AS %v and Request ID %v do not match.", req.IsdAs, crm.RequesterIsdAs)
+	reply.RequestIA = crm.RequestIA
+	if req.IsdAs != crm.RespondIA {
+		log.Printf("ISD-AS %v and Request ID %v do not match.", req.IsdAs, crm.RequestIA)
 		c.BadRequest(errors.New("IsdAs and request ID do not match"), w, r)
 		return
 	}
@@ -494,8 +491,8 @@ func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("Connection Reply Successfully Received. Account: %v Request ID: %v "+
-		"Requestor AS: %v Replying AS: %v", account, reply.RequestId, reply.RequesterIsdAs,
-		reply.ReplyingIsdAs)
+		"Requestor AS: %v Replying AS: %v", account, reply.RequestId, reply.RequestIA,
+		reply.RespondIA)
 	fmt.Fprintln(w, "{}")
 }
 
