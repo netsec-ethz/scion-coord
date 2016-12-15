@@ -20,11 +20,13 @@ const (
 )
 
 type JoinRequest struct {
-	Id        uint64 `json:"id"`
-	RespondIA string `json:"respond_ia"`
-	SigKey    string `json:"sigkey"`
-	EncKey    string `json:"enckey"`
-	Status    string `json:"status"`
+	Id        uint64   `json:"id" orm:"pk"`
+	RequestId uint64   `json:"request_id"`
+	Account   *Account `orm:"rel(fk)"`
+	RespondIA string   `json:"respond_ia"`
+	SigKey    string   `json:"sigkey"`
+	EncKey    string   `json:"enckey"`
+	Status    string   `json:"status"`
 }
 
 func FindOpenJoinRequestsByIsdAs(isdas string) ([]JoinRequest, error) {
@@ -54,9 +56,9 @@ func (jr *JoinRequest) Delete() error {
 	return err
 }
 
-func FindJoinRequestByRequestId(id uint64) (*JoinRequest, error) {
+func FindJoinRequestByRequestId(req_id uint64) (*JoinRequest, error) {
 	req := new(JoinRequest)
-	err := o.QueryTable(req).Filter("Id", id).RelatedSel().One(req)
+	err := o.QueryTable(req).Filter("RequestId", req_id).RelatedSel().One(req)
 	return req, err
 }
 
@@ -66,44 +68,25 @@ func FindConnRequestByRequestId(id uint64) (*ConnRequest, error) {
 	return req, err
 }
 
-func DeleteJoinRequestById(id uint64) error {
-	_, err := o.Delete(&JoinRequest{Id: id})
-	return err
-}
-
-type JoinRequestMapping struct {
-	Id        uint64   `json:"id"`
-	RespondIA string   `json:"respond_ia"`
-	Account   *Account `orm:"rel(fk)"`
-}
-
-func FindJoinMappingByRequestId(id uint64) (*JoinRequestMapping, error) {
-	jrm := new(JoinRequestMapping)
-	err := o.QueryTable(jrm).Filter("Id", id).RelatedSel().One(jrm)
-	return jrm, err
-}
-
-func (jrm *JoinRequestMapping) Insert() error {
-	_, err := o.Insert(jrm)
-	return err
-}
-
-func (jrm *JoinRequestMapping) Delete() error {
-	_, err := o.Delete(jrm)
+func DeleteJoinRequestByRequestId(req_id uint64) error {
+	_, err := o.Delete(&JoinRequest{RequestId: req_id})
 	return err
 }
 
 type JoinReply struct {
-	RequestId   uint64 `json:"request_id" orm:"pk"`
-	JoiningIA   string `json:"joining_ia"`
-	RespondIA   string `json:"respond_ia"`
-	Certificate string `json:"certificate" orm:"type(text)"`
-	TRC         string `json:"trc" orm:"type(text)"`
+	Id          uint64   `json:"id" orm:"pk"`
+	RequestId   uint64   `json:"request_id"`
+	Account     *Account `orm:"rel(fk)"`
+	Status      string   `json:"status"`
+	JoiningIA   string   `json:"joining_ia"`
+	RespondIA   string   `json:"respond_ia"`
+	Certificate string   `json:"certificate" orm:"type(text)"`
+	TRC         string   `json:"trc" orm:"type(text)"`
 }
 
-func FindJoinReplyByRequestId(id uint64) (*JoinReply, error) {
+func FindJoinReplyByRequestId(req_id uint64) (*JoinReply, error) {
 	jr := new(JoinReply)
-	err := o.QueryTable(jr).Filter("RequestId", id).RelatedSel().One(jr)
+	err := o.QueryTable(jr).Filter("RequestId", req_id).RelatedSel().One(jr)
 	return jr, err
 }
 
@@ -117,26 +100,28 @@ func (jr *JoinReply) Delete() error {
 	return err
 }
 
-func DeleteJoinReplyById(id uint64) error {
-	_, err := o.Delete(&JoinReply{RequestId: id})
+func DeleteJoinReplyById(req_id uint64) error {
+	_, err := o.Delete(&JoinReply{RequestId: req_id})
 	return err
 }
 
 type ConnRequest struct {
-	Id                   uint64 `json:"id"`
-	RequestIA            string `json:"request_ia"`
-	RespondIA            string `json:"respond_ia"`
-	RequesterCertificate string `json:"requester_certificate" orm:"type(text)"`
-	Info                 string `json:"info"` // free form text motivation for the request
-	OverlayType          string `json:"overlay_type"`
-	IP                   string `json:"ip"`
-	Port                 uint64 `json:"port"`
-	MTU                  uint64 `json:"mtu"`       // bytes
-	Bandwidth            uint64 `json:"bandwidth"` // kbps
-	LinkType             string `json:"link_type"`
-	Timestamp            string `json:"timestamp"` // UTC ISO 8601 format string, 1s precision
-	Signature            string `json:"signature"`
-	Status               string `json:"status"`
+	Id                   uint64   `json:"id" orm:"pk"`
+	RequestId            uint64   `json:"request_id"`
+	Account              *Account `orm:"rel(fk)"`
+	Status               string   `json:"status"`
+	RequestIA            string   `json:"request_ia"`
+	RespondIA            string   `json:"respond_ia"`
+	RequesterCertificate string   `json:"requester_certificate" orm:"type(text)"`
+	Info                 string   `json:"info"` // free form text motivation for the request
+	OverlayType          string   `json:"overlay_type"`
+	IP                   string   `json:"ip"`
+	Port                 uint64   `json:"port"`
+	MTU                  uint64   `json:"mtu"`       // bytes
+	Bandwidth            uint64   `json:"bandwidth"` // kbps
+	LinkType             string   `json:"link_type"`
+	Timestamp            string   `json:"timestamp"` // UTC ISO 8601 format string, 1s precision
+	Signature            string   `json:"signature"`
 }
 
 func FindConnRequestsByIsdAs(isdas string) ([]ConnRequest, error) {
@@ -155,43 +140,24 @@ func (cr *ConnRequest) Update() error {
 	return err
 }
 
-func DeleteConnRequestById(id uint64) error {
-	_, err := o.Delete(&ConnRequest{Id: id})
-	return err
-}
-
-type ConnRequestMapping struct {
-	RequestId uint64 `orm:"pk"`
-	RequestIA string
-	RespondIA string
-}
-
-func FindConnMappingByRequestId(id uint64) (ConnRequestMapping, error) {
-	var crm ConnRequestMapping
-	err := o.QueryTable(crm).Filter("RequestId", id).RelatedSel().One(&crm)
-	return crm, err
-}
-
-func (crm *ConnRequestMapping) Insert() error {
-	_, err := o.Insert(crm)
-	return err
-}
-
-func DeleteConnMappingById(id uint64) error {
-	_, err := o.Delete(&ConnRequestMapping{RequestId: id})
+func DeleteConnRequestById(req_id uint64) error {
+	_, err := o.Delete(&ConnRequest{RequestId: req_id})
 	return err
 }
 
 type ConnReply struct {
-	RequestId   uint64 `json:"request_id" orm:"pk"`
-	RespondIA   string `json:"respond_ia"`
-	RequestIA   string `json:"request_ia"`
-	Certificate string `json:"certificate" orm:"type(text)"`
-	OverlayType string `json:"overlay_type"`
-	IP          string `json:"ip"`
-	Port        uint64 `json:"port"`
-	MTU         uint64 `json:"mtu"`       // bytes
-	Bandwidth   uint64 `json:"bandwidth"` // kbps
+	Id          uint64   `json:"id" orm:"pk"`
+	RequestId   uint64   `json:"request_id"`
+	Account     *Account `orm:"rel(fk)"`
+	Status      string   `json:"status"`
+	RespondIA   string   `json:"respond_ia"`
+	RequestIA   string   `json:"request_ia"`
+	Certificate string   `json:"certificate" orm:"type(text)"`
+	OverlayType string   `json:"overlay_type"`
+	IP          string   `json:"ip"`
+	Port        uint64   `json:"port"`
+	MTU         uint64   `json:"mtu"`       // bytes
+	Bandwidth   uint64   `json:"bandwidth"` // kbps
 }
 
 func FindConnRepliesByIsdAs(isdas string) ([]ConnReply, error) {
@@ -205,7 +171,7 @@ func (cr *ConnReply) Insert() error {
 	return err
 }
 
-func DeleteConnReplyById(id uint64) error {
-	_, err := o.Delete(&ConnReply{RequestId: id})
+func DeleteConnReplyById(req_id uint64) error {
+	_, err := o.Delete(&ConnReply{RequestId: req_id})
 	return err
 }
