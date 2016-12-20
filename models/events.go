@@ -20,13 +20,13 @@ const (
 )
 
 type JoinRequest struct {
-	Id        uint64   `json:"id" orm:"pk"`
-	RequestId uint64   `json:"request_id"`
+	Id        uint64 `orm:"pk"`
+	RequestId uint64
 	Account   *Account `orm:"rel(fk)"`
-	RespondIA string   `json:"respond_ia"`
-	SigKey    string   `json:"sigkey"`
-	EncKey    string   `json:"enckey"`
-	Status    string   `json:"status"`
+	RespondIA string
+	SigKey    string
+	EncKey    string
+	Status    string
 }
 
 func FindOpenJoinRequestsByIsdAs(isdas string) ([]JoinRequest, error) {
@@ -74,14 +74,14 @@ func DeleteJoinRequestByRequestId(req_id uint64) error {
 }
 
 type JoinReply struct {
-	Id          uint64   `json:"id" orm:"pk"`
-	RequestId   uint64   `json:"request_id"`
+	Id          uint64 `orm:"pk"`
+	RequestId   uint64
 	Account     *Account `orm:"rel(fk)"`
-	Status      string   `json:"status"`
-	JoiningIA   string   `json:"joining_ia"`
-	RespondIA   string   `json:"respond_ia"`
-	Certificate string   `json:"certificate" orm:"type(text)"`
-	TRC         string   `json:"trc" orm:"type(text)"`
+	Status      string
+	JoiningIA   string
+	RespondIA   string
+	Certificate string `orm:"type(text)"`
+	TRC         string `orm:"type(text)"`
 }
 
 func FindJoinReplyByRequestId(req_id uint64) (*JoinReply, error) {
@@ -106,22 +106,22 @@ func DeleteJoinReplyById(req_id uint64) error {
 }
 
 type ConnRequest struct {
-	Id                   uint64   `json:"id" orm:"pk"`
-	RequestId            uint64   `json:"request_id"`
+	Id                   uint64 `orm:"pk"`
+	RequestId            uint64
 	Account              *Account `orm:"rel(fk)"`
-	Status               string   `json:"status"`
-	RequestIA            string   `json:"request_ia"`
-	RespondIA            string   `json:"respond_ia"`
-	RequesterCertificate string   `json:"requester_certificate" orm:"type(text)"`
-	Info                 string   `json:"info"` // free form text motivation for the request
-	OverlayType          string   `json:"overlay_type"`
-	IP                   string   `json:"ip"`
-	Port                 uint64   `json:"port"`
-	MTU                  uint64   `json:"mtu"`       // bytes
-	Bandwidth            uint64   `json:"bandwidth"` // kbps
-	LinkType             string   `json:"link_type"`
-	Timestamp            string   `json:"timestamp"` // UTC ISO 8601 format string, 1s precision
-	Signature            string   `json:"signature"`
+	Status               string
+	RequestIA            string
+	RespondIA            string
+	RequesterCertificate string `orm:"type(text)"`
+	Info                 string // free form text motivation for the request
+	OverlayType          string
+	IP                   string
+	Port                 uint64
+	MTU                  uint64 // bytes
+	Bandwidth            uint64 // kbps
+	LinkType             string
+	Timestamp            string // UTC ISO 8601 format string, 1s precision
+	Signature            string
 }
 
 func FindConnRequestsByIsdAs(isdas string) ([]ConnRequest, error) {
@@ -146,18 +146,18 @@ func DeleteConnRequestById(req_id uint64) error {
 }
 
 type ConnReply struct {
-	Id          uint64   `json:"id" orm:"pk"`
-	RequestId   uint64   `json:"request_id"`
+	Id          uint64 `orm:"pk"`
+	RequestId   uint64
 	Account     *Account `orm:"rel(fk)"`
-	Status      string   `json:"status"`
-	RespondIA   string   `json:"respond_ia"`
-	RequestIA   string   `json:"request_ia"`
-	Certificate string   `json:"certificate" orm:"type(text)"`
-	OverlayType string   `json:"overlay_type"`
-	IP          string   `json:"ip"`
-	Port        uint64   `json:"port"`
-	MTU         uint64   `json:"mtu"`       // bytes
-	Bandwidth   uint64   `json:"bandwidth"` // kbps
+	Status      string
+	RespondIA   string
+	RequestIA   string
+	Certificate string `orm:"type(text)"`
+	OverlayType string
+	IP          string
+	Port        uint64
+	MTU         uint64 // bytes
+	Bandwidth   uint64 // kbps
 }
 
 func FindConnRepliesByIsdAs(isdas string) ([]ConnReply, error) {

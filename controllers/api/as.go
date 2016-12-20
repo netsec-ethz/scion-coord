@@ -27,47 +27,48 @@ import (
 )
 
 type ConnRequest struct {
-	RequestId   uint64 `json:"request_id"`
-	Info        string `json:"info"` // free form text motivation for the request
-	RespondIA   string `json:"respond_ia"`
-	OverlayType string `json:"overlay_type"`
-	IP          string `json:"ip"`
-	Port        uint64 `json:"port"`
-	MTU         uint64 `json:"mtu"`       // bytes
-	Bandwidth   uint64 `json:"bandwidth"` // kbps
-	LinkType    string `json:"link_type"`
-	Timestamp   string `json:"timestamp"` // UTC ISO 8601 format string, 1s precision
-	Signature   string `json:"signature"` // signature is over IsdAs and ConnRequest
-	Certificate string `json:"certificate"`
+	RequestId   uint64
+	Info        string // free form text motivation for the request
+	RequestIA   string
+	RespondIA   string
+	OverlayType string
+	IP          string
+	Port        uint64
+	MTU         uint64 // bytes
+	Bandwidth   uint64 // kbps
+	LinkType    string
+	Timestamp   string // UTC ISO 8601 format string, 1s precision
+	Signature   string // signature is over IsdAs and ConnRequest
+	Certificate string
 }
 
 type ConnReply struct {
-	RequestId   uint64 `json:"request_id"`
-	Status      string `json:"status"`
-	RespondIA   string `json:"respond_ia"`
-	RequestIA   string `json:"request_ia"`
-	OverlayType string `json:"overlay_type"`
-	IP          string `json:"ip"`
-	Port        uint64 `json:"port"`
-	MTU         uint64 `json:"mtu"`       // bytes
-	Bandwidth   uint64 `json:"bandwidth"` // kbps
-	Certificate string `json:"certificate"`
+	RequestId   uint64
+	Status      string
+	RequestIA   string
+	RespondIA   string
+	OverlayType string
+	IP          string
+	Port        uint64
+	MTU         uint64 // bytes
+	Bandwidth   uint64 // kbps
+	Certificate string
 }
 
 type JoinRequest struct {
-	RequestId uint64 `json:"request_id"`
-	IsdToJoin uint64 `json:"isd_to_join"`
-	SigKey    string `json:"sigkey"`
-	EncKey    string `json:"enckey"`
+	RequestId uint64
+	IsdToJoin uint64
+	SigKey    string
+	EncKey    string
 }
 
 type JoinReply struct {
-	RequestId   uint64 `json:"request_id"`
-	Status      string `json:"status"`
-	JoiningIA   string `json:"joining_ia"`
-	RespondIA   string `json:"respond_ia"`
-	Certificate string `json:"certificate" orm:"type(text)"`
-	TRC         string `json:"trc" orm:"type(text)"`
+	RequestId   uint64
+	Status      string
+	JoiningIA   string
+	RespondIA   string
+	Certificate string `orm:"type(text)"`
+	TRC         string `orm:"type(text)"`
 }
 
 func FindAccountByRequest(r *http.Request) (*models.Account, error) {
@@ -241,7 +242,6 @@ func (c *ASController) UploadJoinRequest(w http.ResponseWriter, r *http.Request)
 
 func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		RespondIA string    `json:"respond_ia"`
 		JoinReply JoinReply `json:"join_reply"`
 	}
 	decoder := json.NewDecoder(r.Body)
@@ -251,7 +251,7 @@ func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	reply := req.JoinReply
-	account, err := c.findAndValidateAccount(w, r, req.RespondIA)
+	account, err := c.findAndValidateAccount(w, r, reply.RespondIA)
 	if err != nil {
 		return
 	}
@@ -260,13 +260,13 @@ func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 		Account:     account,
 		Status:      reply.Status,
 		JoiningIA:   reply.JoiningIA,
-		RespondIA:   req.RespondIA,
+		RespondIA:   reply.RespondIA,
 		Certificate: reply.Certificate,
 		TRC:         reply.TRC,
 	}
 	if err := joinReply.Insert(); err != nil {
 		log.Printf("Error inserting join reply. Account: %v Request ID: %v ISD-AS: %v, %v",
-			account, joinReply.RequestId, req.RespondIA, err)
+			account, joinReply.RequestId, reply.RespondIA, err)
 		c.Error500(err, w, r)
 		return
 	}
@@ -274,19 +274,19 @@ func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 	join_req, err := models.FindJoinRequestByRequestId(joinReply.RequestId)
 	if err != nil {
 		log.Printf("Error finding join req. Account: %v Request ID: %v ISD-AS: %v, %v",
-			account, joinReply.RequestId, req.RespondIA, err)
+			account, joinReply.RequestId, reply.RespondIA, err)
 		c.Error500(err, w, r)
 		return
 	}
 	join_req.Status = reply.Status
 	if err := join_req.Update(); err != nil {
 		log.Printf("Error updating join req. Account: %v Request ID: %v ISD-AS: %v, %v",
-			account, joinReply.RequestId, req.RespondIA, err)
+			account, joinReply.RequestId, reply.RespondIA, err)
 		c.Error500(err, w, r)
 		return
 	}
 	log.Printf("Join reply successfully received. Account: %v Request ID: %v ISD-AS: %v",
-		account, joinReply.RequestId, req.RespondIA)
+		account, joinReply.RequestId, reply.RespondIA)
 	if reply.Status == models.APPROVED {
 		isd, err := models.IsdAsToIsd(joinReply.JoiningIA)
 		if err != nil {
@@ -355,7 +355,6 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 
 func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		RequestIA   string      `json:"request_ia"`
 		ConnRequest ConnRequest `json:"request"`
 	}
 	decoder := json.NewDecoder(r.Body)
@@ -364,15 +363,15 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 		c.BadRequest(err, w, r)
 		return
 	}
-	account, err := c.findAndValidateAccount(w, r, req.RequestIA)
+	cr := req.ConnRequest
+	account, err := c.findAndValidateAccount(w, r, cr.RequestIA)
 	if err != nil {
 		return
 	}
-	cr := req.ConnRequest
 	connRequest := models.ConnRequest{
 		RequestId:            cr.RequestId,
 		Account:              account,
-		RequestIA:            req.RequestIA,
+		RequestIA:            cr.RequestIA,
 		RespondIA:            cr.RespondIA,
 		Info:                 cr.Info,
 		IP:                   cr.IP,
@@ -388,7 +387,7 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 	}
 	if err := connRequest.Insert(); err != nil {
 		log.Printf("Error inserting Connection Request. Account %v AS %v: %v", account,
-			req.RequestIA, err)
+			cr.RequestIA, err)
 		c.Error500(err, w, r)
 		return
 	}
@@ -401,7 +400,7 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 	b, err := json.Marshal(resp)
 	if err != nil {
 		log.Printf("Error marshaling JSON for account: %v request: %v new AS: %v, %v",
-			account, resp.RequestId, req.RequestIA, err)
+			account, resp.RequestId, cr.RequestIA, err)
 		c.Error500(err, w, r)
 		return
 	}
@@ -412,8 +411,7 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 
 func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		RespondIA string    `json:"respond_ia"`
-		Reply     ConnReply `json:"reply"`
+		Reply ConnReply `json:"reply"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&req); err != nil {
@@ -421,16 +419,16 @@ func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 		c.BadRequest(err, w, r)
 		return
 	}
-	account, err := c.findAndValidateAccount(w, r, req.RespondIA)
+	reply := req.Reply
+	account, err := c.findAndValidateAccount(w, r, reply.RespondIA)
 	if err != nil {
 		return
 	}
-	reply := req.Reply
 	connReply := models.ConnReply{
 		RequestId:   reply.RequestId,
 		Account:     account,
 		Status:      reply.Status,
-		RespondIA:   req.RespondIA,
+		RespondIA:   reply.RespondIA,
 		RequestIA:   reply.RequestIA,
 		Certificate: reply.Certificate, // cert of the replying AS, from the req
 		IP:          reply.IP,
@@ -441,7 +439,7 @@ func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := connReply.Insert(); err != nil {
 		log.Printf("Error inserting Connection Reply. Request ID: %v Account: %v AS: %v: %v",
-			reply.RequestId, account, req.RespondIA, err)
+			reply.RequestId, account, reply.RespondIA, err)
 		c.BadRequest(err, w, r)
 		return
 	}
@@ -449,20 +447,20 @@ func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 	cr, err := models.FindConnRequestByRequestId(reply.RequestId)
 	if err != nil {
 		log.Printf("Error finding conn req. Account: %v Request ID: %v ISD-AS: %v, %v",
-			account, reply.RequestId, req.RespondIA, err)
+			account, reply.RequestId, reply.RespondIA, err)
 		c.Error500(err, w, r)
 		return
 	}
 	cr.Status = reply.Status
 	if err := cr.Update(); err != nil {
 		log.Printf("Error updating conn req. Account: %v Request ID: %v ISD-AS: %v, %v",
-			account, reply.RequestId, req.RespondIA, err)
+			account, reply.RequestId, reply.RespondIA, err)
 		c.Error500(err, w, r)
 		return
 	}
 	log.Printf("Connection Reply Successfully Received. Account: %v Request ID: %v "+
 		"Requesting AS: %v Replying AS: %v", account, reply.RequestId, reply.RequestIA,
-		req.RespondIA)
+		reply.RespondIA)
 	fmt.Fprintln(w, "{}")
 }
 
