@@ -68,8 +68,8 @@ func FindConnRequestByRequestId(id uint64) (*ConnRequest, error) {
 	return req, err
 }
 
-func DeleteJoinRequestByRequestId(req_id uint64) error {
-	_, err := o.Delete(&JoinRequest{RequestId: req_id})
+func DeleteJoinRequestById(id uint64) error {
+	_, err := o.Delete(&JoinRequest{Id: id})
 	return err
 }
 
@@ -100,8 +100,8 @@ func (jr *JoinReply) Delete() error {
 	return err
 }
 
-func DeleteJoinReplyById(req_id uint64) error {
-	_, err := o.Delete(&JoinReply{RequestId: req_id})
+func DeleteJoinReplyById(id uint64) error {
+	_, err := o.Delete(&JoinReply{Id: id})
 	return err
 }
 
@@ -140,8 +140,13 @@ func (cr *ConnRequest) Update() error {
 	return err
 }
 
-func DeleteConnRequestById(req_id uint64) error {
-	_, err := o.Delete(&ConnRequest{RequestId: req_id})
+func (cr *ConnRequest) Delete() error {
+	_, err := o.Delete(cr)
+	return err
+}
+
+func DeleteConnRequestById(id uint64) error {
+	_, err := o.Delete(&ConnRequest{Id: id})
 	return err
 }
 
@@ -171,7 +176,12 @@ func (cr *ConnReply) Insert() error {
 	return err
 }
 
-func DeleteConnReplyById(req_id uint64) error {
-	_, err := o.Delete(&ConnReply{RequestId: req_id})
+func (cr *ConnReply) Delete() error {
+	_, err := o.Delete(cr)
+	return err
+}
+
+func DeleteConnReplyById(id uint64) error {
+	_, err := o.Delete(&ConnReply{Id: id})
 	return err
 }
