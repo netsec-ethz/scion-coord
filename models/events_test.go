@@ -15,7 +15,7 @@
 package models
 
 import (
-	"fmt"
+	//	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -32,12 +32,12 @@ func createTestUser(t *testing.T) *user {
 
 func TestJoinRequest(t *testing.T) {
 	u := createTestUser(t)
-	jReqIn := &JoinRequest{Id: 1, RequestId: 777, RespondIA: "100-100", SigKey: "sigkey",
+	jReqIn := &JoinRequest{RequestId: 777, RespondIA: "100-100", SigKey: "sigkey",
 		Account: u.Account, EncKey: "enckey", Status: PENDING}
 	if err := jReqIn.Insert(); err != nil {
 		t.Error("Failed to insert the test join request.", err)
 	}
-	jReqOut, err := FindJoinRequestByRequestId(jReqIn.RequestId)
+	jReqOut, err := FindJoinRequest(u.Account, jReqIn.RequestId)
 	if err != nil {
 		t.Error("Failed to retrieve the test join request.", err)
 	}
@@ -47,7 +47,7 @@ func TestJoinRequest(t *testing.T) {
 	assert.Equal(t, jReqIn.SigKey, jReqOut.SigKey)
 	assert.Equal(t, jReqIn.EncKey, jReqOut.EncKey)
 	assert.Equal(t, jReqIn.Status, jReqOut.Status)
-	if err := jReqIn.Delete(); err != nil {
+	if err := DeleteJoinRequest(u.Account, jReqIn.RequestId); err != nil {
 		t.Error("Failed to delete the test join request.", err)
 	}
 	if err := u.Delete(); err != nil {
@@ -57,13 +57,12 @@ func TestJoinRequest(t *testing.T) {
 
 func TestJoinReply(t *testing.T) {
 	u := createTestUser(t)
-	jRepIn := &JoinReply{Id: 4, RequestId: 1234, JoiningIA: "123-123", RespondIA: "321-312",
+	jRepIn := &JoinReply{RequestId: 1234, JoiningIA: "123-123", RespondIA: "321-312",
 		Account: u.Account, Certificate: "cert", TRC: "trc"}
 	if err := jRepIn.Insert(); err != nil {
 		t.Error("Failed to insert the test join reply.", err)
 	}
-	jRepOut, err := FindJoinReplyByRequestId(jRepIn.RequestId)
-	fmt.Printf("Id: %v", jRepOut)
+	jRepOut, err := FindJoinReply(u.Account, jRepIn.RequestId)
 	if err != nil {
 		t.Error("Failed to retrieve the test join reply.", err)
 	}
@@ -73,7 +72,7 @@ func TestJoinReply(t *testing.T) {
 	assert.Equal(t, jRepIn.Account.Name, jRepOut.Account.Name)
 	assert.Equal(t, jRepIn.Certificate, jRepOut.Certificate)
 	assert.Equal(t, jRepIn.TRC, jRepOut.TRC)
-	if err := jRepIn.Delete(); err != nil {
+	if err := DeleteJoinReply(u.Account, jRepIn.RequestId); err != nil {
 		t.Error("Failed to delete the test join reply.", err)
 	}
 	if err := u.Delete(); err != nil {
@@ -83,14 +82,14 @@ func TestJoinReply(t *testing.T) {
 
 func TestConnRequest(t *testing.T) {
 	u := createTestUser(t)
-	cReqIn := &ConnRequest{Id: 5, RequestId: 8, RespondIA: "111-111", RequestIA: "222-222",
+	cReqIn := &ConnRequest{RequestId: 999, RespondIA: "111-111", RequestIA: "222-222",
 		Account: u.Account, RequesterCertificate: "test_cert", Info: "test_info",
 		IP: "123.123.123.123", Port: 555, OverlayType: "UDP/IP", MTU: 1472, Bandwidth: 1000,
 		Signature: "test_sig", Status: PENDING}
 	if err := cReqIn.Insert(); err != nil {
 		t.Error("Failed to insert the test connection request.", err)
 	}
-	cReqOut, err := FindConnRequestByRequestId(cReqIn.Id)
+	cReqOut, err := FindConnRequest(u.Account, cReqIn.RequestId)
 	if err != nil {
 		t.Error("Failed to retrieve the test connection request.", err)
 	}
@@ -98,7 +97,7 @@ func TestConnRequest(t *testing.T) {
 	assert.Equal(t, cReqIn.IP, cReqOut.IP)
 	assert.Equal(t, cReqIn.Account.Name, cReqOut.Account.Name)
 	assert.Equal(t, cReqIn.OverlayType, cReqOut.OverlayType)
-	if err := cReqOut.Delete(); err != nil {
+	if err := DeleteConnRequest(u.Account, cReqOut.RequestId); err != nil {
 		t.Error("Failed to delete the test connection request.", err)
 	}
 	if err := u.Delete(); err != nil {
@@ -114,7 +113,7 @@ func TestConnReply(t *testing.T) {
 	if err := cRepIn.Insert(); err != nil {
 		t.Error("Failed to insert the test connection reply.", err)
 	}
-	cReps, err := FindConnRepliesByIsdAs(cRepIn.RequestIA)
+	cReps, err := FindConnRepliesByRequestIA(cRepIn.RequestIA)
 	if err != nil {
 		t.Error("Failed to retrieve the test connection reply.", err)
 	}
@@ -124,7 +123,7 @@ func TestConnReply(t *testing.T) {
 	assert.Equal(t, cRepIn.Bandwidth, cRepOut.Bandwidth)
 	assert.Equal(t, cRepIn.Account.Name, cRepOut.Account.Name)
 	assert.Equal(t, cRepIn.Port, cRepOut.Port)
-	if err := cRepOut.Delete(); err != nil {
+	if err := DeleteConnReply(u.Account, cRepIn.RequestId); err != nil {
 		t.Error("Failed to delete the test connection reply.", err)
 	}
 	if err := u.Delete(); err != nil {
