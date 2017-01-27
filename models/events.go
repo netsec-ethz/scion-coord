@@ -79,7 +79,7 @@ type JoinReply struct {
 	JoiningIA   string
 	IsCore      string // whether the new AS joins as core
 	RespondIA   string
-	Certificate string `orm:"type(text)"`
+	Certificate string `orm:"type(text)"` // certificate generated for the newly joining AS
 	TRC         string `orm:"type(text)"`
 }
 

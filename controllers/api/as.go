@@ -40,7 +40,7 @@ type ConnRequest struct {
 	LinkType    string
 	Timestamp   string // UTC ISO 8601 format string, 1s precision
 	Signature   string
-	Certificate string
+	Certificate string // certificate of the requesting AS
 }
 
 type ConnReply struct {
@@ -54,15 +54,15 @@ type ConnReply struct {
 	Port        uint64
 	MTU         uint64 // bytes
 	Bandwidth   uint64 // kbps
-	Certificate string
+	Certificate string // certificate of the responding AS
 }
 
 type JoinRequest struct {
 	RequestId uint64
 	Info      string // free form text motivation for the request
 	IsdToJoin uint64
-	SigKey    string
-	EncKey    string
+	SigKey    string // signing public key
+	EncKey    string // encryption public key
 }
 
 type JoinReply struct {
@@ -72,7 +72,7 @@ type JoinReply struct {
 	JoiningIA   string
 	IsCore      string // whether the new AS joins as core
 	RespondIA   string
-	Certificate string `orm:"type(text)"`
+	Certificate string `orm:"type(text)"` // certificate generated for the newly joining AS
 	TRC         string `orm:"type(text)"`
 }
 
@@ -160,6 +160,8 @@ func (c *ASController) Insert(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "{}")
 }
 
+// Find the account using the 'key' in the request
+// and ensure the account owns the concerned ISD-AS
 func (c *ASController) findAndValidateAccount(w http.ResponseWriter, r *http.Request,
 	isdas string) (*models.Account, error) {
 
@@ -510,6 +512,7 @@ func (c *ASController) prepConnReplies(in []models.ConnReply) []ConnReply {
 	return out
 }
 
+// API end-point to query outstanding requests/events for an AS
 func (c *ASController) PollEvents(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		IsdAs string
