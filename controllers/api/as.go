@@ -69,15 +69,16 @@ type JoinRequest struct {
 }
 
 type JoinReply struct {
-	RequestId    uint64
-	Status       string
-	Info         string // free form text for the reply
-	JoiningIA    string
-	IsCore       string // whether the new AS joins as core
-	RequesterKey string // the key the identify which account made the request
-	RespondIA    string
-	Certificate  string `orm:"type(text)"` // certificate generated for the newly joining AS
-	TRC          string `orm:"type(text)"`
+	RequestId            uint64
+	Status               string
+	Info                 string // free form text for the reply
+	JoiningIA            string
+	IsCore               string // whether the new AS joins as core
+	RequesterKey         string // the key the identify which account made the request
+	RespondIA            string
+	Certificate          string `orm:"type(text)"` // certificate of the newly joining AS
+	RespondIACertificate string `orm:"type(text)"` // certificate of the responding AS
+	TRC                  string `orm:"type(text)"`
 }
 
 func FindAccountByRequest(r *http.Request) (*models.Account, error) {
@@ -214,15 +215,16 @@ func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	joinReply := models.JoinReply{
-		RequestId:    reply.RequestId,
-		Account:      account,
-		RequesterKey: reply.RequesterKey,
-		Status:       reply.Status,
-		JoiningIA:    reply.JoiningIA,
-		IsCore:       reply.IsCore,
-		RespondIA:    reply.RespondIA,
-		Certificate:  reply.Certificate,
-		TRC:          reply.TRC,
+		RequestId:            reply.RequestId,
+		Account:              account,
+		RequesterKey:         reply.RequesterKey,
+		Status:               reply.Status,
+		JoiningIA:            reply.JoiningIA,
+		IsCore:               reply.IsCore,
+		RespondIA:            reply.RespondIA,
+		Certificate:          reply.Certificate,
+		RespondIACertificate: reply.RespondIACertificate,
+		TRC:                  reply.TRC,
 	}
 	if err := joinReply.Insert(); err != nil {
 		log.Printf("Error inserting join reply. Account: %v Request ID: %v ISD-AS: %v, %v",
@@ -297,19 +299,20 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "{}")
 		return
 	} else if err != nil {
-		log.Printf("Error duing Join Reply lookup. Account: %v Request ID: %v, %v",
+		log.Printf("Error during Join Reply lookup. Account: %v Request ID: %v, %v",
 			account, request.RequestId, err)
 		c.Error500(err, w, r)
 		return
 	}
 	reply := JoinReply{
-		RequestId:   joinReply.RequestId,
-		Status:      joinReply.Status,
-		RespondIA:   joinReply.RespondIA,
-		IsCore:      joinReply.IsCore,
-		JoiningIA:   joinReply.JoiningIA,
-		Certificate: joinReply.Certificate,
-		TRC:         joinReply.TRC,
+		RequestId:            joinReply.RequestId,
+		Status:               joinReply.Status,
+		RespondIA:            joinReply.RespondIA,
+		IsCore:               joinReply.IsCore,
+		JoiningIA:            joinReply.JoiningIA,
+		Certificate:          joinReply.Certificate,
+		RespondIACertificate: joinReply.RespondIACertificate,
+		TRC:                  joinReply.TRC,
 	}
 	b, err := json.Marshal(reply)
 	if err != nil {

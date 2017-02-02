@@ -78,17 +78,18 @@ func DeleteJoinRequest(acc *Account, req_id uint64) error {
 }
 
 type JoinReply struct {
-	Id           uint64 `orm:"column(id);auto;pk"`
-	RequestId    uint64
-	Info         string   // free form text for the reply
-	Account      *Account `orm:"rel(fk)"` // Account which should receive the join reply
-	RequesterKey string   // the key to identify which account made the request
-	Status       string
-	JoiningIA    string
-	IsCore       string // whether the new AS joins as core
-	RespondIA    string
-	Certificate  string `orm:"type(text)"` // certificate generated for the newly joining AS
-	TRC          string `orm:"type(text)"`
+	Id                   uint64 `orm:"column(id);auto;pk"`
+	RequestId            uint64
+	Info                 string   // free form text for the reply
+	Account              *Account `orm:"rel(fk)"` // Account which should receive the join reply
+	RequesterKey         string   // the key to identify which account made the request
+	Status               string
+	JoiningIA            string
+	IsCore               string // whether the new AS joins as core
+	RespondIA            string
+	Certificate          string `orm:"type(text)"` // certificate of the newly joining AS
+	RespondIACertificate string `orm:"type(text)"` // certificate of the responding AS
+	TRC                  string `orm:"type(text)"`
 }
 
 func FindJoinReply(acc *Account, req_id uint64) (*JoinReply, error) {
