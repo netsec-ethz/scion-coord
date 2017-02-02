@@ -14,21 +14,28 @@
 
 package models
 
+import (
+	"fmt"
+	"github.com/astaxie/beego/orm"
+)
+
 const (
 	PENDING  = "PENDING"
 	APPROVED = "APPROVED"
 )
 
 type JoinRequest struct {
-	Id        uint64 `orm:"column(id);auto;pk"`
-	RequestId uint64
-	Info      string // free form text for the reply
-	IsdToJoin uint64
-	Account   *Account `orm:"rel(fk)"`
-	RespondIA string
-	SigKey    string
-	EncKey    string
-	Status    string
+	Id            uint64 `orm:"column(id);auto;pk"`
+	RequestId     uint64
+	Info          string // free form text for the reply
+	IsdToJoin     uint64
+	JoinAsACoreAS string   // whether to join the ISD as a core AS
+	Account       *Account `orm:"rel(fk)"` // the account which sending the request
+	RequesterKey  string   // the key to identify which account made the request
+	RespondIA     string   // the ISD-AS which should respond to the request
+	SigPubKey     string   // signing public key
+	EncPubKey     string   // encryption public key
+	Status        string
 }
 
 func FindOpenJoinRequestsByIsdAs(isdas string) ([]JoinRequest, error) {
@@ -71,16 +78,17 @@ func DeleteJoinRequest(acc *Account, req_id uint64) error {
 }
 
 type JoinReply struct {
-	Id          uint64 `orm:"column(id);auto;pk"`
-	RequestId   uint64
-	Info        string   // free form text for the reply
-	Account     *Account `orm:"rel(fk)"`
-	Status      string
-	JoiningIA   string
-	IsCore      string // whether the new AS joins as core
-	RespondIA   string
-	Certificate string `orm:"type(text)"` // certificate generated for the newly joining AS
-	TRC         string `orm:"type(text)"`
+	Id           uint64 `orm:"column(id);auto;pk"`
+	RequestId    uint64
+	Info         string   // free form text for the reply
+	Account      *Account `orm:"rel(fk)"` // Account which should receive the join reply
+	RequesterKey string   // the key to identify which account made the request
+	Status       string
+	JoiningIA    string
+	IsCore       string // whether the new AS joins as core
+	RespondIA    string
+	Certificate  string `orm:"type(text)"` // certificate generated for the newly joining AS
+	TRC          string `orm:"type(text)"`
 }
 
 func FindJoinReply(acc *Account, req_id uint64) (*JoinReply, error) {
@@ -90,7 +98,15 @@ func FindJoinReply(acc *Account, req_id uint64) (*JoinReply, error) {
 }
 
 func (jr *JoinReply) Insert() error {
-	_, err := o.Insert(jr)
+	existing_jr := new(JoinReply)
+	// should always return with orm.ErrNoRows
+	err := o.QueryTable(jr).Filter("Account", jr.Account).Filter("RequestId", jr.RequestId).RelatedSel().One(existing_jr)
+	if err == nil {
+		return fmt.Errorf("Join Reply Already Exists for this request")
+	} else if err != orm.ErrNoRows { // some other error occurred during lookup
+		return err
+	}
+	_, err = o.Insert(jr)
 	return err
 }
 
@@ -108,7 +124,7 @@ func DeleteJoinReply(acc *Account, req_id uint64) error {
 type ConnRequest struct {
 	Id                   uint64 `orm:"column(id);auto;pk"`
 	RequestId            uint64
-	Account              *Account `orm:"rel(fk)"`
+	Account              *Account `orm:"rel(fk)"` // account sending the connection request
 	Status               string
 	RequestIA            string
 	RespondIA            string
@@ -155,7 +171,7 @@ type ConnReply struct {
 	Id          uint64 `orm:"column(id);auto;pk"`
 	RequestId   uint64
 	Info        string   // free form text for the reply
-	Account     *Account `orm:"rel(fk)"`
+	Account     *Account `orm:"rel(fk)"` // account which should receive the connection reply
 	Status      string
 	RespondIA   string
 	RequestIA   string
@@ -174,7 +190,15 @@ func FindConnRepliesByRequestIA(isdas string) ([]ConnReply, error) {
 }
 
 func (cr *ConnReply) Insert() error {
-	_, err := o.Insert(cr)
+	existing_cr := new(ConnReply)
+	// should always return with orm.ErrNoRows
+	err := o.QueryTable(cr).Filter("Account", cr.Account).Filter("RequestId", cr.RequestId).RelatedSel().One(existing_cr)
+	if err == nil {
+		return fmt.Errorf("Connection Reply Already Exists for this request")
+	} else if err != orm.ErrNoRows { // means some other error occurred during lookup
+		return err
+	}
+	_, err = o.Insert(cr)
 	return err
 }
 

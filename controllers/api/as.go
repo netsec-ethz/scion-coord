@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/astaxie/beego/orm"
 	"github.com/gorilla/mux"
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/models"
@@ -58,22 +59,25 @@ type ConnReply struct {
 }
 
 type JoinRequest struct {
-	RequestId uint64
-	Info      string // free form text motivation for the request
-	IsdToJoin uint64
-	SigKey    string // signing public key
-	EncKey    string // encryption public key
+	RequestId     uint64
+	Info          string // free form text motivation for the request
+	IsdToJoin     uint64 // the ISD that the sender wants to join
+	JoinAsACoreAS string // whether to join the ISD as a core AS
+	RequesterKey  string // the key the identify which account made the request
+	SigPubKey     string // signing public key
+	EncPubKey     string // encryption public key
 }
 
 type JoinReply struct {
-	RequestId   uint64
-	Status      string
-	Info        string // free form text for the reply
-	JoiningIA   string
-	IsCore      string // whether the new AS joins as core
-	RespondIA   string
-	Certificate string `orm:"type(text)"` // certificate generated for the newly joining AS
-	TRC         string `orm:"type(text)"`
+	RequestId    uint64
+	Status       string
+	Info         string // free form text for the reply
+	JoiningIA    string
+	IsCore       string // whether the new AS joins as core
+	RequesterKey string // the key the identify which account made the request
+	RespondIA    string
+	Certificate  string `orm:"type(text)"` // certificate generated for the newly joining AS
+	TRC          string `orm:"type(text)"`
 }
 
 func FindAccountByRequest(r *http.Request) (*models.Account, error) {
@@ -114,49 +118,6 @@ func (c *ASController) Exists(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintln(w, "{}")
-}
-
-func (c *ASController) Insert(w http.ResponseWriter, r *http.Request) {
-	var as struct {
-		IsdAs string `json:"isdas"`
-		Core  bool   `json:"core"`
-	}
-
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&as); err != nil {
-		c.BadRequest(err, w, r)
-		return
-	}
-
-	// get the account from the key and secret
-	account, err := FindAccountByRequest(r)
-	if err != nil {
-		c.Error500(err, w, r)
-		return
-	}
-
-	isd, err := models.IsdAsToIsd(as.IsdAs)
-	if err != nil {
-		c.BadRequest(err, w, r)
-		return
-	}
-	// create a new DB model
-	finalAs := models.As{
-		IsdAs:   as.IsdAs,
-		Isd:     isd,
-		Core:    as.Core,
-		Account: account,
-		Created: time.Now().UTC(),
-	}
-
-	// upsert it
-	if err := finalAs.Insert(); err != nil {
-		c.Error500(err, w, r)
-		return
-	}
-
-	// we can decide whether to return the data back or a simple 200
 	fmt.Fprintln(w, "{}")
 }
 
@@ -216,14 +177,16 @@ func (c *ASController) UploadJoinRequest(w http.ResponseWriter, r *http.Request)
 	// TODO(ercanucan): Send the request to ALL core ASes in this ISD.
 	core_as := core_ases[0]
 	join_request := models.JoinRequest{
-		RequestId: request.RequestId,
-		Info:      request.Info,
-		IsdToJoin: request.IsdToJoin,
-		Account:   account,
-		RespondIA: core_as.IsdAs,
-		SigKey:    request.SigKey,
-		EncKey:    request.EncKey,
-		Status:    models.PENDING,
+		RequestId:     request.RequestId,
+		Info:          request.Info,
+		IsdToJoin:     request.IsdToJoin,
+		JoinAsACoreAS: request.JoinAsACoreAS,
+		Account:       account,
+		RequesterKey:  mux.Vars(r)["key"],
+		RespondIA:     core_as.ToStr(),
+		SigPubKey:     request.SigPubKey,
+		EncPubKey:     request.EncPubKey,
+		Status:        models.PENDING,
 	}
 	// insert into the join_requests table in the database
 	if err := join_request.Insert(); err != nil {
@@ -231,6 +194,8 @@ func (c *ASController) UploadJoinRequest(w http.ResponseWriter, r *http.Request)
 		c.Error500(err, w, r)
 		return
 	}
+	log.Printf("Join request successfully received. ISDToJoin: %v Account: %v RequesterKey: %v",
+		isd_to_join, account, join_request.RequesterKey)
 	fmt.Fprintln(w, "{}")
 }
 
@@ -242,19 +207,22 @@ func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 		c.BadRequest(err, w, r)
 		return
 	}
-	account, err := c.findAndValidateAccount(w, r, reply.JoiningIA)
+	account, err := models.FindAccountByKey(reply.RequesterKey)
 	if err != nil {
+		log.Printf("Error finding account by key. Key: %v, Request ID: %v ISD-AS: %v, %v",
+			reply.RequesterKey, reply.RequestId, reply.RespondIA, err)
 		return
 	}
 	joinReply := models.JoinReply{
-		RequestId:   reply.RequestId,
-		Account:     account,
-		Status:      reply.Status,
-		JoiningIA:   reply.JoiningIA,
-		IsCore:      reply.IsCore,
-		RespondIA:   reply.RespondIA,
-		Certificate: reply.Certificate,
-		TRC:         reply.TRC,
+		RequestId:    reply.RequestId,
+		Account:      account,
+		RequesterKey: reply.RequesterKey,
+		Status:       reply.Status,
+		JoiningIA:    reply.JoiningIA,
+		IsCore:       reply.IsCore,
+		RespondIA:    reply.RespondIA,
+		Certificate:  reply.Certificate,
+		TRC:          reply.TRC,
 	}
 	if err := joinReply.Insert(); err != nil {
 		log.Printf("Error inserting join reply. Account: %v Request ID: %v ISD-AS: %v, %v",
@@ -280,28 +248,24 @@ func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Received a join reply. Account: %v Request ID: %v ISD-AS: %v Status: %v",
 		account, joinReply.RequestId, reply.RespondIA, reply.Status)
 	if reply.Status == models.APPROVED {
-		isd, err := models.IsdAsToIsd(joinReply.JoiningIA)
+		isd, as, err := models.ParseIsdAs(joinReply.JoiningIA)
 		if err != nil {
-			log.Printf("Error extracting ISD from ISD-AS %v, %v ", joinReply.JoiningIA, err)
+			log.Printf("Error parsing ISD-AS %v, %v ", joinReply.JoiningIA, err)
 			c.Error500(err, w, r)
 			return
 		}
-		var is_core bool
-		if strings.ToLower(joinReply.IsCore) == "true" {
-			is_core = true
-		} else {
-			is_core = false
-		}
+		is_core := strings.Compare(strings.ToLower(joinReply.IsCore), "true") == 0
+
 		new_as := models.As{
-			IsdAs:   joinReply.JoiningIA,
 			Isd:     isd,
+			As:      as,
 			Core:    is_core,
 			Account: account,
 			Created: time.Now().UTC(),
 		}
 		if new_as.Insert(); err != nil {
 			log.Printf("Error inserting new AS: %v Account: %v Request ID: %v, %v",
-				new_as.IsdAs, account, reply.RequestId, err)
+				new_as.ToStr(), account, reply.RequestId, err)
 			c.Error500(err, w, r)
 			return
 		}
@@ -327,10 +291,15 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	joinReply, err := models.FindJoinReply(account, request.RequestId)
-	if err != nil {
-		log.Printf("Join reply not found. Account: %v Request ID: %v, %v",
+	if err == orm.ErrNoRows {
+		log.Printf("No join reply for Account: %v Request ID: %v", account,
+			request.RequestId)
+		fmt.Fprintln(w, "{}")
+		return
+	} else if err != nil {
+		log.Printf("Error duing Join Reply lookup. Account: %v Request ID: %v, %v",
 			account, request.RequestId, err)
-		c.NotFound(err, w, r)
+		c.Error500(err, w, r)
 		return
 	}
 	reply := JoinReply{
@@ -400,10 +369,14 @@ func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 		c.BadRequest(err, w, r)
 		return
 	}
-	account, err := c.findAndValidateAccount(w, r, reply.RequestIA)
+	as, err := models.FindAsByIsdAs(reply.RequestIA)
 	if err != nil {
+		log.Printf("Error finding the RequestIA. Request ID: %v RequestIA: %v, RespondIA: %v, %v",
+			reply.RequestId, reply.RequestIA, reply.RespondIA, err)
+		c.Error500(err, w, r)
 		return
 	}
+	account := as.Account
 	connReply := models.ConnReply{
 		RequestId:   reply.RequestId,
 		Account:     account,
@@ -452,11 +425,13 @@ func (c *ASController) prepJoinRequests(in []models.JoinRequest) []JoinRequest {
 	out := make([]JoinRequest, len(in))
 	for i, v := range in {
 		out[i] = JoinRequest{
-			RequestId: v.RequestId,
-			Info:      v.Info,
-			IsdToJoin: v.IsdToJoin,
-			SigKey:    v.SigKey,
-			EncKey:    v.EncKey,
+			RequestId:     v.RequestId,
+			Info:          v.Info,
+			IsdToJoin:     v.IsdToJoin,
+			JoinAsACoreAS: v.JoinAsACoreAS,
+			SigPubKey:     v.SigPubKey,
+			EncPubKey:     v.EncPubKey,
+			RequesterKey:  v.RequesterKey,
 		}
 	}
 	return out

@@ -15,14 +15,18 @@
 package models
 
 import (
+	"fmt"
+	"github.com/astaxie/beego/orm"
+	"log"
 	"strconv"
 	"strings"
 	"time"
 )
 
 type As struct {
-	IsdAs   string   `orm:"index;pk"`
+	Id      uint64   `orm:"column(id);auto;pk"`
 	Isd     uint64   `orm:"index"`
+	As      uint64   `orm:"index"`
 	Core    bool     `orm:"default(false)"`
 	Account *Account `orm:"rel(fk);index"`
 	Created time.Time
@@ -34,22 +38,20 @@ func FindCoreASesByIsd(isd uint64) ([]As, error) {
 	return ases, err
 }
 
-func FindCoreAsByIsdAs(isd uint64, isd_as string) (*As, error) {
+func FindAsByIsdAs(isdas string) (*As, error) {
+	isd_nr, err := IsdAsToIsd(isdas)
+	if err != nil {
+		// logging is already done in the called function
+		return nil, err
+	}
+	as_nr, err := IsdAsToAs(isdas)
+	if err != nil {
+		// logging is already done in the called function
+		return nil, err
+	}
 	as := new(As)
-	err := o.QueryTable("as").Filter("Isd", isd).Filter("IsdAs", isd_as).Filter("Core", true).RelatedSel().One(as)
+	err = o.QueryTable(as).Filter("Isd", isd_nr).Filter("As", as_nr).RelatedSel().One(as)
 	return as, err
-}
-
-func FindAsByIsdAs(isd_as string) (*As, error) {
-	as := new(As)
-	err := o.QueryTable(as).Filter("IsdAs", isd_as).RelatedSel().One(as)
-	return as, err
-}
-
-func AllASes() ([]As, error) {
-	var ASes []As
-	_, err := o.QueryTable("as").All(&ASes)
-	return ASes, err
 }
 
 func (as *As) deleteAs() error {
@@ -58,14 +60,50 @@ func (as *As) deleteAs() error {
 }
 
 func (as *As) Insert() error {
-	_, err := o.Insert(as)
+	// First check whether this AS already exists, duplicates are not allowed.
+	existing_as := new(As)
+	// should always return with orm.ErrNoRows
+	err := o.QueryTable(as).Filter("Isd", as.Isd).Filter("As", as.As).RelatedSel().One(existing_as)
+	if err == nil {
+		log.Printf("ISD-AS (%v-%v) already exists, will not be re-inserted", as.Isd, as.As)
+		return fmt.Errorf("ISD-AS (%v-%v) already exists, will not be re-inserted", as.Isd, as.As)
+	} else if err != orm.ErrNoRows { // some other error occurred during lookup
+		return err
+	}
+	_, err = o.Insert(as)
 	return err
 }
 
-func IsdAsToIsd(isdas string) (uint64, error) {
-	return strconv.ParseUint(strings.Split(isdas, "-")[0], 10, 64)
+func (as *As) ToStr() string {
+	return fmt.Sprintf("%v-%v", as.Isd, as.As)
 }
 
-func FindNumAsInIsd(isd uint64) (int64, error) {
-	return o.QueryTable("as").Filter("Isd", isd).Count()
+func IsdAsToIsd(isdas string) (uint64, error) {
+	isd, err := strconv.ParseUint(strings.Split(isdas, "-")[0], 10, 64)
+	if err != nil {
+		log.Printf("Error extracting ISD from ISD-AS: %v, %v", isdas, err)
+		return 0, err
+	}
+	return isd, nil
+}
+
+func IsdAsToAs(isdas string) (uint64, error) {
+	as, err := strconv.ParseUint(strings.Split(isdas, "-")[1], 10, 64)
+	if err != nil {
+		log.Printf("Error extracting AS from ISD-AS: %v, %v", isdas, err)
+		return 0, err
+	}
+	return as, nil
+}
+
+func ParseIsdAs(isdas string) (uint64, uint64, error) {
+	isd_nr, err := IsdAsToIsd(isdas)
+	if err != nil {
+		return 0, 0, nil
+	}
+	as_nr, err := IsdAsToAs(isdas)
+	if err != nil {
+		return 0, 0, nil
+	}
+	return isd_nr, as_nr, nil
 }

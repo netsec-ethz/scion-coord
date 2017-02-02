@@ -32,8 +32,8 @@ func createTestUser(t *testing.T) *user {
 
 func TestJoinRequest(t *testing.T) {
 	u := createTestUser(t)
-	jReqIn := &JoinRequest{RequestId: 777, RespondIA: "100-100", SigKey: "sigkey",
-		Account: u.Account, EncKey: "enckey", Status: PENDING}
+	jReqIn := &JoinRequest{RequestId: 777, RespondIA: "100-100", SigPubKey: "sigkey",
+		Account: u.Account, EncPubKey: "enckey", Status: PENDING}
 	if err := jReqIn.Insert(); err != nil {
 		t.Error("Failed to insert the test join request.", err)
 	}
@@ -44,8 +44,8 @@ func TestJoinRequest(t *testing.T) {
 	assert.Equal(t, jReqIn.RequestId, jReqOut.RequestId)
 	assert.Equal(t, jReqIn.RespondIA, jReqOut.RespondIA)
 	assert.Equal(t, jReqIn.Account.Name, jReqOut.Account.Name)
-	assert.Equal(t, jReqIn.SigKey, jReqOut.SigKey)
-	assert.Equal(t, jReqIn.EncKey, jReqOut.EncKey)
+	assert.Equal(t, jReqIn.SigPubKey, jReqOut.SigPubKey)
+	assert.Equal(t, jReqIn.EncPubKey, jReqOut.EncPubKey)
 	assert.Equal(t, jReqIn.Status, jReqOut.Status)
 	if err := DeleteJoinRequest(u.Account, jReqIn.RequestId); err != nil {
 		t.Error("Failed to delete the test join request.", err)

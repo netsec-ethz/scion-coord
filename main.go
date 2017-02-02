@@ -74,7 +74,6 @@ func main() {
 	// ==========================================================
 	// API
 	router.Handle("/api/as/exists/{as_id}/{key}/{secret}", apiChain.ThenFunc(asController.Exists))
-	router.Handle("/api/as/insert/{key}/{secret}", apiChain.ThenFunc(asController.Insert))
 
 	// ISD join request
 	router.Handle("/api/as/uploadJoinRequest/{key}/{secret}", apiChain.ThenFunc(asController.UploadJoinRequest))
