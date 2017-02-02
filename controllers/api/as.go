@@ -513,7 +513,7 @@ func (c *ASController) PollEvents(w http.ResponseWriter, r *http.Request) {
 		c.BadRequest(err, w, r)
 		return
 	}
-	connRequests, err := models.FindConnRequestsByRespondIA(isdas)
+	connRequests, err := models.FindOpenConnRequestsByRespondIA(isdas)
 	if err != nil {
 		log.Printf("Error while retrieving connection requests. Account: %v, ISD-AS: %v",
 			account, isdas)

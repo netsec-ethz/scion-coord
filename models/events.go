@@ -141,9 +141,9 @@ type ConnRequest struct {
 	Signature            string
 }
 
-func FindConnRequestsByRespondIA(isdas string) ([]ConnRequest, error) {
+func FindOpenConnRequestsByRespondIA(isdas string) ([]ConnRequest, error) {
 	var requests []ConnRequest
-	_, err := o.QueryTable("conn_request").Filter("RespondIA", isdas).All(&requests)
+	_, err := o.QueryTable("conn_request").Filter("RespondIA", isdas).Filter("Status", PENDING).All(&requests)
 	return requests, err
 }
 
