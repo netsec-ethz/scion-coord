@@ -17,16 +17,15 @@ package models
 import (
 	"fmt"
 	"github.com/astaxie/beego/orm"
+	"github.com/netsec-ethz/scion/go/lib/addr"
 	"log"
-	"strconv"
-	"strings"
 	"time"
 )
 
 type As struct {
 	Id      uint64   `orm:"column(id);auto;pk"`
-	Isd     uint64   `orm:"index"`
-	As      uint64   `orm:"index"`
+	Isd     int      `orm:"index"`
+	As      int      `orm:"index"`
 	Core    bool     `orm:"default(false)"`
 	Account *Account `orm:"rel(fk);index"`
 	Created time.Time
@@ -39,18 +38,12 @@ func FindCoreASesByIsd(isd uint64) ([]As, error) {
 }
 
 func FindAsByIsdAs(isdas string) (*As, error) {
-	isd_nr, err := IsdAsToIsd(isdas)
+	ia, err := addr.IAFromString(isdas)
 	if err != nil {
-		// logging is already done in the called function
-		return nil, err
-	}
-	as_nr, err := IsdAsToAs(isdas)
-	if err != nil {
-		// logging is already done in the called function
 		return nil, err
 	}
 	as := new(As)
-	err = o.QueryTable(as).Filter("Isd", isd_nr).Filter("As", as_nr).RelatedSel().One(as)
+	err = o.QueryTable(as).Filter("Isd", ia.I).Filter("As", ia.A).RelatedSel().One(as)
 	return as, err
 }
 
@@ -74,36 +67,6 @@ func (as *As) Insert() error {
 	return err
 }
 
-func (as *As) ToStr() string {
+func (as *As) String() string {
 	return fmt.Sprintf("%v-%v", as.Isd, as.As)
-}
-
-func IsdAsToIsd(isdas string) (uint64, error) {
-	isd, err := strconv.ParseUint(strings.Split(isdas, "-")[0], 10, 64)
-	if err != nil {
-		log.Printf("Error extracting ISD from ISD-AS: %v, %v", isdas, err)
-		return 0, err
-	}
-	return isd, nil
-}
-
-func IsdAsToAs(isdas string) (uint64, error) {
-	as, err := strconv.ParseUint(strings.Split(isdas, "-")[1], 10, 64)
-	if err != nil {
-		log.Printf("Error extracting AS from ISD-AS: %v, %v", isdas, err)
-		return 0, err
-	}
-	return as, nil
-}
-
-func ParseIsdAs(isdas string) (uint64, uint64, error) {
-	isd_nr, err := IsdAsToIsd(isdas)
-	if err != nil {
-		return 0, 0, nil
-	}
-	as_nr, err := IsdAsToAs(isdas)
-	if err != nil {
-		return 0, 0, nil
-	}
-	return isd_nr, as_nr, nil
 }

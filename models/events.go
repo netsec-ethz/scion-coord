@@ -25,17 +25,17 @@ const (
 )
 
 type JoinRequest struct {
-	Id            uint64 `orm:"column(id);auto;pk"`
-	RequestId     uint64
-	Info          string // free form text for the reply
-	IsdToJoin     uint64
-	JoinAsACoreAS string   // whether to join the ISD as a core AS
-	Account       *Account `orm:"rel(fk)"` // the account which sending the request
-	RequesterKey  string   // the key to identify which account made the request
-	RespondIA     string   // the ISD-AS which should respond to the request
-	SigPubKey     string   // signing public key
-	EncPubKey     string   // encryption public key
-	Status        string
+	Id                  uint64 `orm:"column(id);auto;pk"`
+	RequestId           uint64
+	Info                string // free form text for the reply
+	IsdToJoin           uint64
+	JoinAsACoreAS       bool     // whether to join the ISD as a core AS
+	AccountId           *Account `orm:"rel(fk)"` // the account which sending the request
+	RequesterIdentifier string   // the key to identify which account made the request
+	RespondIA           string   // the ISD-AS which should respond to the request
+	SigPubKey           string   // signing public key
+	EncPubKey           string   // encryption public key
+	Status              string
 }
 
 func FindOpenJoinRequestsByIsdAs(isdas string) ([]JoinRequest, error) {
@@ -56,20 +56,20 @@ func (jr *JoinRequest) Update() error {
 
 func FindJoinRequest(acc *Account, req_id uint64) (*JoinRequest, error) {
 	req := new(JoinRequest)
-	err := o.QueryTable(req).Filter("Account", acc).Filter("RequestId", req_id).RelatedSel().One(req)
+	err := o.QueryTable(req).Filter("AccountId", acc).Filter("RequestId", req_id).RelatedSel().One(req)
 	return req, err
 }
 
 func FindConnRequest(acc *Account, req_id uint64) (*ConnRequest, error) {
 	req := new(ConnRequest)
-	err := o.QueryTable(req).Filter("Account", acc).Filter("RequestId", req_id).RelatedSel().One(req)
+	err := o.QueryTable(req).Filter("AccountId", acc).Filter("RequestId", req_id).RelatedSel().One(req)
 	return req, err
 }
 
 func DeleteJoinRequest(acc *Account, req_id uint64) error {
 	// orm beego can only delete with the primary key
 	req := new(JoinRequest)
-	err := o.QueryTable(req).Filter("Account", acc).Filter("RequestId", req_id).RelatedSel().One(req)
+	err := o.QueryTable(req).Filter("AccountId", acc).Filter("RequestId", req_id).RelatedSel().One(req)
 	if err != nil {
 		return err
 	}
@@ -81,27 +81,27 @@ type JoinReply struct {
 	Id                   uint64 `orm:"column(id);auto;pk"`
 	RequestId            uint64
 	Info                 string   // free form text for the reply
-	Account              *Account `orm:"rel(fk)"` // Account which should receive the join reply
-	RequesterKey         string   // the key to identify which account made the request
+	AccountId            *Account `orm:"rel(fk)"` // Account which should receive the join reply
+	RequesterIdentifier  string   // the key to identify which account made the request
 	Status               string
 	JoiningIA            string
-	IsCore               string // whether the new AS joins as core
+	IsCore               bool // whether the new AS joins as core
 	RespondIA            string
-	Certificate          string `orm:"type(text)"` // certificate of the newly joining AS
+	JoiningIACertificate string `orm:"type(text)"` // certificate of the newly joining AS
 	RespondIACertificate string `orm:"type(text)"` // certificate of the responding AS
 	TRC                  string `orm:"type(text)"`
 }
 
 func FindJoinReply(acc *Account, req_id uint64) (*JoinReply, error) {
 	jr := new(JoinReply)
-	err := o.QueryTable(jr).Filter("Account", acc).Filter("RequestId", req_id).RelatedSel().One(jr)
+	err := o.QueryTable(jr).Filter("AccountId", acc).Filter("RequestId", req_id).RelatedSel().One(jr)
 	return jr, err
 }
 
 func (jr *JoinReply) Insert() error {
 	existing_jr := new(JoinReply)
 	// should always return with orm.ErrNoRows
-	err := o.QueryTable(jr).Filter("Account", jr.Account).Filter("RequestId", jr.RequestId).RelatedSel().One(existing_jr)
+	err := o.QueryTable(jr).Filter("AccountId", jr.AccountId).Filter("RequestId", jr.RequestId).RelatedSel().One(existing_jr)
 	if err == nil {
 		return fmt.Errorf("Join Reply Already Exists for this request")
 	} else if err != orm.ErrNoRows { // some other error occurred during lookup
@@ -114,7 +114,7 @@ func (jr *JoinReply) Insert() error {
 func DeleteJoinReply(acc *Account, req_id uint64) error {
 	// orm beego can only delete with the primary key
 	rep := new(JoinReply)
-	err := o.QueryTable(rep).Filter("Account", acc).Filter("RequestId", req_id).RelatedSel().One(rep)
+	err := o.QueryTable(rep).Filter("AccountId", acc).Filter("RequestId", req_id).RelatedSel().One(rep)
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func DeleteJoinReply(acc *Account, req_id uint64) error {
 type ConnRequest struct {
 	Id                   uint64 `orm:"column(id);auto;pk"`
 	RequestId            uint64
-	Account              *Account `orm:"rel(fk)"` // account sending the connection request
+	AccountId            *Account `orm:"rel(fk)"` // account sending the connection request
 	Status               string
 	RequestIA            string
 	RespondIA            string
@@ -160,7 +160,7 @@ func (cr *ConnRequest) Update() error {
 func DeleteConnRequest(acc *Account, req_id uint64) error {
 	// orm beego can only delete with the primary key
 	req := new(ConnRequest)
-	err := o.QueryTable(req).Filter("Account", acc).Filter("RequestId", req_id).RelatedSel().One(req)
+	err := o.QueryTable(req).Filter("AccountId", acc).Filter("RequestId", req_id).RelatedSel().One(req)
 	if err != nil {
 		return err
 	}
@@ -172,7 +172,7 @@ type ConnReply struct {
 	Id          uint64 `orm:"column(id);auto;pk"`
 	RequestId   uint64
 	Info        string   // free form text for the reply
-	Account     *Account `orm:"rel(fk)"` // account which should receive the connection reply
+	AccountId   *Account `orm:"rel(fk)"` // account which should receive the connection reply
 	Status      string
 	RespondIA   string
 	RequestIA   string
@@ -193,7 +193,7 @@ func FindConnRepliesByRequestIA(isdas string) ([]ConnReply, error) {
 func (cr *ConnReply) Insert() error {
 	existing_cr := new(ConnReply)
 	// should always return with orm.ErrNoRows
-	err := o.QueryTable(cr).Filter("Account", cr.Account).Filter("RequestId", cr.RequestId).RelatedSel().One(existing_cr)
+	err := o.QueryTable(cr).Filter("AccountId", cr.AccountId).Filter("RequestId", cr.RequestId).RelatedSel().One(existing_cr)
 	if err == nil {
 		return fmt.Errorf("Connection Reply Already Exists for this request")
 	} else if err != orm.ErrNoRows { // means some other error occurred during lookup
@@ -206,7 +206,7 @@ func (cr *ConnReply) Insert() error {
 func DeleteConnReply(acc *Account, req_id uint64) error {
 	// orm beego can only delete with the primary key
 	rep := new(ConnReply)
-	err := o.QueryTable(rep).Filter("Account", acc).Filter("RequestId", req_id).RelatedSel().One(rep)
+	err := o.QueryTable(rep).Filter("AccountId", acc).Filter("RequestId", req_id).RelatedSel().One(rep)
 	if err != nil {
 		return err
 	}
