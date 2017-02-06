@@ -29,12 +29,11 @@ type JoinRequest struct {
 	RequestId           uint64
 	Info                string // free form text for the reply
 	IsdToJoin           uint64
-	JoinAsACoreAS       bool     // whether to join the ISD as a core AS
-	AccountId           *Account `orm:"rel(fk)"` // the account which sending the request
-	RequesterIdentifier string   // the key to identify which account made the request
-	RespondIA           string   // the ISD-AS which should respond to the request
-	SigPubKey           string   // signing public key
-	EncPubKey           string   // encryption public key
+	JoinAsACoreAS       bool   // whether to join the ISD as a core AS
+	RequesterIdentifier string // the key to identify which account made the request
+	RespondIA           string // the ISD-AS which should respond to the request
+	SigPubKey           string // signing public key
+	EncPubKey           string // encryption public key
 	Status              string
 }
 
@@ -54,9 +53,9 @@ func (jr *JoinRequest) Update() error {
 	return err
 }
 
-func FindJoinRequest(acc *Account, req_id uint64) (*JoinRequest, error) {
+func FindJoinRequest(requester string, req_id uint64) (*JoinRequest, error) {
 	req := new(JoinRequest)
-	err := o.QueryTable(req).Filter("AccountId", acc).Filter("RequestId", req_id).RelatedSel().One(req)
+	err := o.QueryTable(req).Filter("RequesterIdentifier", requester).Filter("RequestId", req_id).RelatedSel().One(req)
 	return req, err
 }
 
@@ -66,10 +65,10 @@ func FindConnRequest(acc *Account, req_id uint64) (*ConnRequest, error) {
 	return req, err
 }
 
-func DeleteJoinRequest(acc *Account, req_id uint64) error {
+func DeleteJoinRequest(requester string, req_id uint64) error {
 	// orm beego can only delete with the primary key
 	req := new(JoinRequest)
-	err := o.QueryTable(req).Filter("AccountId", acc).Filter("RequestId", req_id).RelatedSel().One(req)
+	err := o.QueryTable(req).Filter("RequesterIdentifier", requester).Filter("RequestId", req_id).RelatedSel().One(req)
 	if err != nil {
 		return err
 	}
@@ -80,9 +79,8 @@ func DeleteJoinRequest(acc *Account, req_id uint64) error {
 type JoinReply struct {
 	Id                   uint64 `orm:"column(id);auto;pk"`
 	RequestId            uint64
-	Info                 string   // free form text for the reply
-	AccountId            *Account `orm:"rel(fk)"` // Account which should receive the join reply
-	RequesterIdentifier  string   // the key to identify which account made the request
+	Info                 string // free form text for the reply
+	RequesterIdentifier  string // the key to identify which account made the request
 	Status               string
 	JoiningIA            string
 	IsCore               bool // whether the new AS joins as core
@@ -92,16 +90,16 @@ type JoinReply struct {
 	TRC                  string `orm:"type(text)"`
 }
 
-func FindJoinReply(acc *Account, req_id uint64) (*JoinReply, error) {
+func FindJoinReply(requester string, req_id uint64) (*JoinReply, error) {
 	jr := new(JoinReply)
-	err := o.QueryTable(jr).Filter("AccountId", acc).Filter("RequestId", req_id).RelatedSel().One(jr)
+	err := o.QueryTable(jr).Filter("RequesterIdentifier", requester).Filter("RequestId", req_id).RelatedSel().One(jr)
 	return jr, err
 }
 
 func (jr *JoinReply) Insert() error {
 	existing_jr := new(JoinReply)
 	// should always return with orm.ErrNoRows
-	err := o.QueryTable(jr).Filter("AccountId", jr.AccountId).Filter("RequestId", jr.RequestId).RelatedSel().One(existing_jr)
+	err := o.QueryTable(jr).Filter("RequesterIdentifier", jr.RequesterIdentifier).Filter("RequestId", jr.RequestId).RelatedSel().One(existing_jr)
 	if err == nil {
 		return fmt.Errorf("Join Reply Already Exists for this request")
 	} else if err != orm.ErrNoRows { // some other error occurred during lookup
@@ -111,10 +109,10 @@ func (jr *JoinReply) Insert() error {
 	return err
 }
 
-func DeleteJoinReply(acc *Account, req_id uint64) error {
+func DeleteJoinReply(requester string, req_id uint64) error {
 	// orm beego can only delete with the primary key
 	rep := new(JoinReply)
-	err := o.QueryTable(rep).Filter("AccountId", acc).Filter("RequestId", req_id).RelatedSel().One(rep)
+	err := o.QueryTable(rep).Filter("RequesterIdentifier", requester).Filter("RequestId", req_id).RelatedSel().One(rep)
 	if err != nil {
 		return err
 	}

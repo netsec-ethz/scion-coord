@@ -27,6 +27,11 @@
 			"Rev": "527bcd55aab2e53314f1a150922560174b493034"
 		},
 		{
+			"ImportPath": "github.com/go-stack/stack",
+			"Comment": "v1.5.2",
+			"Rev": "100eb0c0a9c5b306ca2fb4f165df21d80ada4b82"
+		},
+		{
 			"ImportPath": "github.com/gorilla/context",
 			"Rev": "50c25fb3b2b3b3cc724e9b6ac75fb44b3bccd0da"
 		},
@@ -47,6 +52,37 @@
 		{
 			"ImportPath": "github.com/gorilla/sessions",
 			"Rev": "aa5e036e6c44aec69a32eb41097001978b29ad31"
+		},
+		{
+			"ImportPath": "github.com/inconshreveable/log15",
+			"Comment": "v2.3-80-gf1f14b4",
+			"Rev": "f1f14b426c23e20a73468078b52d0713a16a132a"
+		},
+		{
+			"ImportPath": "github.com/inconshreveable/log15/term",
+			"Comment": "v2.3-80-gf1f14b4",
+			"Rev": "f1f14b426c23e20a73468078b52d0713a16a132a"
+		},
+		{
+			"ImportPath": "github.com/kormat/fmt15",
+			"Rev": "44b8429a893df043d0a63b715c107deb599b6a0c"
+		},
+		{
+			"ImportPath": "github.com/mattn/go-colorable",
+			"Comment": "v0.0.6",
+			"Rev": "ed8eb9e318d7a84ce5915b495b7d35e0cfe7b5a8"
+		},
+		{
+			"ImportPath": "github.com/mattn/go-isatty",
+			"Rev": "30a891c33c7cde7b02a981314b4228ec99380cca"
+		},
+		{
+			"ImportPath": "github.com/netsec-ethz/scion/go/lib/addr",
+			"Rev": "4b28e86e0a561cf7a998213ea95269746df0c352"
+		},
+		{
+			"ImportPath": "github.com/netsec-ethz/scion/go/lib/common",
+			"Rev": "4b28e86e0a561cf7a998213ea95269746df0c352"
 		},
 		{
 			"ImportPath": "github.com/pborman/uuid",
@@ -77,6 +113,10 @@
 		{
 			"ImportPath": "golang.org/x/crypto/scrypt",
 			"Rev": "b76c864ef1dca1d8f271f917c290cddcce3d9e0d"
+		},
+		{
+			"ImportPath": "golang.org/x/sys/unix",
+			"Rev": "7a6e5648d140666db5d920909e082ca00a87ba2c"
 		}
 	]
 }

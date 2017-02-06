@@ -182,7 +182,6 @@ func (c *ASController) UploadJoinRequest(w http.ResponseWriter, r *http.Request)
 		Info:                request.Info,
 		IsdToJoin:           request.IsdToJoin,
 		JoinAsACoreAS:       request.JoinAsACoreAS,
-		AccountId:           account,
 		RequesterIdentifier: mux.Vars(r)["key"],
 		RespondIA:           core_as.String(),
 		SigPubKey:           request.SigPubKey,
@@ -216,7 +215,6 @@ func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 	}
 	joinReply := models.JoinReply{
 		RequestId:            reply.RequestId,
-		AccountId:            account,
 		RequesterIdentifier:  reply.RequesterIdentifier,
 		Status:               reply.Status,
 		JoiningIA:            reply.JoiningIA,
@@ -233,7 +231,7 @@ func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Change the join req's status to approved/rejected.
-	join_req, err := models.FindJoinRequest(account, joinReply.RequestId)
+	join_req, err := models.FindJoinRequest(account.Key, joinReply.RequestId)
 	if err != nil {
 		log.Printf("Error finding join req. Account: %v Request ID: %v ISD-AS: %v, %v",
 			account, joinReply.RequestId, reply.RespondIA, err)
@@ -290,7 +288,7 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 		c.BadRequest(err, w, r)
 		return
 	}
-	joinReply, err := models.FindJoinReply(account, request.RequestId)
+	joinReply, err := models.FindJoinReply(account.Key, request.RequestId)
 	if err == orm.ErrNoRows {
 		log.Printf("No join reply for Account: %v Request ID: %v", account,
 			request.RequestId)
