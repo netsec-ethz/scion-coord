@@ -5,16 +5,16 @@ SCION Coordination service
 
 The application uses go vendoring, so you need at least Go 1.6
 
-First you need to get the dependencies and the `vendor` folder via:
+First you need to get the dependencies and populate the `vendor` folder via:
+`go get github.com/stretchr/testify/assert`
+(Godep save does not bring this particular library automatically.)
 
-```
-go get ./...
-godep save
-godep save ./...
-```
+and then by running:
+`godep save ./...`
 
+After this step, all the dependencies will be populated in the `vendor` folder.
 Afterwards, you can run `go run main.go` from the root folder.
-Otherwise run:
+Otherwise you can also run the application via:
 
 ```
 go build
