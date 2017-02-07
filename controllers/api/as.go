@@ -28,6 +28,29 @@ import (
 	"time"
 )
 
+type JoinRequest struct {
+	RequestId     uint64
+	Info          string // free form text motivation for the request
+	IsdToJoin     uint64 // the ISD that the sender wants to join
+	JoinAsACoreAS bool   // whether to join the ISD as a core AS
+	RequesterId   string // the string to identify which account made the request
+	SigPubKey     string // signing public key
+	EncPubKey     string // encryption public key
+}
+
+type JoinReply struct {
+	RequestId            uint64
+	Status               string
+	Info                 string // free form text for the reply
+	JoiningIA            string
+	IsCore               bool   // whether the new AS joins as core
+	RequesterId          string // the string to identify which account made the request
+	RespondIA            string
+	JoiningIACertificate string `orm:"type(text)"` // certificate of the newly joining AS
+	RespondIACertificate string `orm:"type(text)"` // certificate of the responding AS
+	TRC                  string `orm:"type(text)"`
+}
+
 type ConnRequest struct {
 	RequestId   uint64
 	Info        string // free form text motivation for the request
@@ -58,39 +81,16 @@ type ConnReply struct {
 	Certificate string // certificate of the responding AS
 }
 
-type JoinRequest struct {
-	RequestId           uint64
-	Info                string // free form text motivation for the request
-	IsdToJoin           uint64 // the ISD that the sender wants to join
-	JoinAsACoreAS       bool   // whether to join the ISD as a core AS
-	RequesterIdentifier string // the key the identify which account made the request
-	SigPubKey           string // signing public key
-	EncPubKey           string // encryption public key
-}
-
-type JoinReply struct {
-	RequestId            uint64
-	Status               string
-	Info                 string // free form text for the reply
-	JoiningIA            string
-	IsCore               bool   // whether the new AS joins as core
-	RequesterIdentifier  string // the key the identify which account made the request
-	RespondIA            string
-	JoiningIACertificate string `orm:"type(text)"` // certificate of the newly joining AS
-	RespondIACertificate string `orm:"type(text)"` // certificate of the responding AS
-	TRC                  string `orm:"type(text)"`
-}
-
 func FindAccountByRequest(r *http.Request) (*models.Account, error) {
-	key := mux.Vars(r)["key"]
+	account_id := mux.Vars(r)["account_id"]
 
-	// get the account from the key and secret
-	if key == "" {
-		key = r.URL.Query().Get("key")
+	// get the account from the account_id and secret
+	if account_id == "" {
+		account_id = r.URL.Query().Get("account_id")
 	}
 
 	// find the account belonging to the request
-	return models.FindAccountByKey(key)
+	return models.FindAccountByAccountId(account_id)
 }
 
 func ValidateAccountOwnsIsdAs(account *models.Account, isdas string) (bool, error) {
@@ -122,14 +122,14 @@ func (c *ASController) Exists(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "{}")
 }
 
-// Find the account using the 'key' in the request
+// Find the account using the 'account_id' in the request
 // and ensure the account owns the concerned ISD-AS
 func (c *ASController) findAndValidateAccount(w http.ResponseWriter, r *http.Request,
 	isdas string) (*models.Account, error) {
 
 	account, err := FindAccountByRequest(r)
 	if err != nil {
-		log.Printf("Error finding account. Key: %v, Request: %v: %v", mux.Vars(r)["key"], r, err)
+		log.Printf("Error finding account. AccountId: %v, Request: %v: %v", mux.Vars(r)["account_id"], r, err)
 		c.BadRequest(err, w, r)
 		return nil, err
 	}
@@ -178,15 +178,15 @@ func (c *ASController) UploadJoinRequest(w http.ResponseWriter, r *http.Request)
 	// TODO(ercanucan): Send the request to ALL core ASes in this ISD.
 	core_as := core_ases[0]
 	join_request := models.JoinRequest{
-		RequestId:           request.RequestId,
-		Info:                request.Info,
-		IsdToJoin:           request.IsdToJoin,
-		JoinAsACoreAS:       request.JoinAsACoreAS,
-		RequesterIdentifier: mux.Vars(r)["key"],
-		RespondIA:           core_as.String(),
-		SigPubKey:           request.SigPubKey,
-		EncPubKey:           request.EncPubKey,
-		Status:              models.PENDING,
+		RequestId:     request.RequestId,
+		Info:          request.Info,
+		IsdToJoin:     request.IsdToJoin,
+		JoinAsACoreAS: request.JoinAsACoreAS,
+		RequesterId:   mux.Vars(r)["account_id"],
+		RespondIA:     core_as.String(),
+		SigPubKey:     request.SigPubKey,
+		EncPubKey:     request.EncPubKey,
+		Status:        models.PENDING,
 	}
 	// insert into the join_requests table in the database
 	if err := join_request.Insert(); err != nil {
@@ -195,7 +195,7 @@ func (c *ASController) UploadJoinRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	log.Printf("Join request successfully received. ISDToJoin: %v Account: %v "+
-		"RequesterIdentifier: %v", isd_to_join, account, join_request.RequesterIdentifier)
+		"RequesterId: %v", isd_to_join, account, join_request.RequesterId)
 	fmt.Fprintln(w, "{}")
 }
 
@@ -207,15 +207,15 @@ func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 		c.BadRequest(err, w, r)
 		return
 	}
-	account, err := models.FindAccountByKey(reply.RequesterIdentifier)
+	account, err := models.FindAccountByAccountId(reply.RequesterId)
 	if err != nil {
-		log.Printf("Error finding account by key. Key: %v, Request ID: %v ISD-AS: %v, %v",
-			reply.RequesterIdentifier, reply.RequestId, reply.RespondIA, err)
+		log.Printf("Error finding account by AccountId. AccountId: %v, Request ID: %v ISD-AS: %v, %v",
+			reply.RequesterId, reply.RequestId, reply.RespondIA, err)
 		return
 	}
 	joinReply := models.JoinReply{
 		RequestId:            reply.RequestId,
-		RequesterIdentifier:  reply.RequesterIdentifier,
+		RequesterId:          reply.RequesterId,
 		Status:               reply.Status,
 		JoiningIA:            reply.JoiningIA,
 		IsCore:               reply.IsCore,
@@ -231,7 +231,7 @@ func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Change the join req's status to approved/rejected.
-	join_req, err := models.FindJoinRequest(account.Key, joinReply.RequestId)
+	join_req, err := models.FindJoinRequest(account.AccountId, joinReply.RequestId)
 	if err != nil {
 		log.Printf("Error finding join req. Account: %v Request ID: %v ISD-AS: %v, %v",
 			account, joinReply.RequestId, reply.RespondIA, err)
@@ -288,7 +288,7 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 		c.BadRequest(err, w, r)
 		return
 	}
-	joinReply, err := models.FindJoinReply(account.Key, request.RequestId)
+	joinReply, err := models.FindJoinReply(account.AccountId, request.RequestId)
 	if err == orm.ErrNoRows {
 		log.Printf("No join reply for Account: %v Request ID: %v", account,
 			request.RequestId)
@@ -424,13 +424,13 @@ func (c *ASController) prepJoinRequests(in []models.JoinRequest) []JoinRequest {
 	out := make([]JoinRequest, len(in))
 	for i, v := range in {
 		out[i] = JoinRequest{
-			RequestId:           v.RequestId,
-			Info:                v.Info,
-			IsdToJoin:           v.IsdToJoin,
-			JoinAsACoreAS:       v.JoinAsACoreAS,
-			SigPubKey:           v.SigPubKey,
-			EncPubKey:           v.EncPubKey,
-			RequesterIdentifier: v.RequesterIdentifier,
+			RequestId:     v.RequestId,
+			Info:          v.Info,
+			IsdToJoin:     v.IsdToJoin,
+			JoinAsACoreAS: v.JoinAsACoreAS,
+			SigPubKey:     v.SigPubKey,
+			EncPubKey:     v.EncPubKey,
+			RequesterId:   v.RequesterId,
 		}
 	}
 	return out

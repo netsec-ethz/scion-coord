@@ -33,21 +33,21 @@ func createTestUser(t *testing.T) *user {
 func TestJoinRequest(t *testing.T) {
 	u := createTestUser(t)
 	jReqIn := &JoinRequest{RequestId: 777, RespondIA: "100-100", SigPubKey: "sigkey",
-		RequesterIdentifier: u.Account.Key, EncPubKey: "enckey", Status: PENDING}
+		RequesterId: u.Account.AccountId, EncPubKey: "enckey", Status: PENDING}
 	if err := jReqIn.Insert(); err != nil {
 		t.Error("Failed to insert the test join request.", err)
 	}
-	jReqOut, err := FindJoinRequest(u.Account.Key, jReqIn.RequestId)
+	jReqOut, err := FindJoinRequest(u.Account.AccountId, jReqIn.RequestId)
 	if err != nil {
 		t.Error("Failed to retrieve the test join request.", err)
 	}
 	assert.Equal(t, jReqIn.RequestId, jReqOut.RequestId)
 	assert.Equal(t, jReqIn.RespondIA, jReqOut.RespondIA)
-	assert.Equal(t, jReqIn.RequesterIdentifier, jReqOut.RequesterIdentifier)
+	assert.Equal(t, jReqIn.RequesterId, jReqOut.RequesterId)
 	assert.Equal(t, jReqIn.SigPubKey, jReqOut.SigPubKey)
 	assert.Equal(t, jReqIn.EncPubKey, jReqOut.EncPubKey)
 	assert.Equal(t, jReqIn.Status, jReqOut.Status)
-	if err := DeleteJoinRequest(u.Account.Key, jReqIn.RequestId); err != nil {
+	if err := DeleteJoinRequest(u.Account.AccountId, jReqIn.RequestId); err != nil {
 		t.Error("Failed to delete the test join request.", err)
 	}
 	if err := u.Delete(); err != nil {
@@ -58,23 +58,23 @@ func TestJoinRequest(t *testing.T) {
 func TestJoinReply(t *testing.T) {
 	u := createTestUser(t)
 	jRepIn := &JoinReply{RequestId: 1234, JoiningIA: "123-123", RespondIA: "321-312",
-		RequesterIdentifier: u.Account.Key, JoiningIACertificate: "cert1",
+		RequesterId: u.Account.AccountId, JoiningIACertificate: "cert1",
 		RespondIACertificate: "cert2", TRC: "trc"}
 	if err := jRepIn.Insert(); err != nil {
 		t.Error("Failed to insert the test join reply.", err)
 	}
-	jRepOut, err := FindJoinReply(u.Account.Key, jRepIn.RequestId)
+	jRepOut, err := FindJoinReply(u.Account.AccountId, jRepIn.RequestId)
 	if err != nil {
 		t.Error("Failed to retrieve the test join reply.", err)
 	}
 	assert.Equal(t, jRepIn.Id, jRepOut.Id)
 	assert.Equal(t, jRepIn.JoiningIA, jRepOut.JoiningIA)
 	assert.Equal(t, jRepIn.RespondIA, jRepOut.RespondIA)
-	assert.Equal(t, jRepIn.RequesterIdentifier, jRepOut.RequesterIdentifier)
+	assert.Equal(t, jRepIn.RequesterId, jRepOut.RequesterId)
 	assert.Equal(t, jRepIn.JoiningIACertificate, jRepOut.JoiningIACertificate)
 	assert.Equal(t, jRepIn.RespondIACertificate, jRepOut.RespondIACertificate)
 	assert.Equal(t, jRepIn.TRC, jRepOut.TRC)
-	if err := DeleteJoinReply(u.Account.Key, jRepIn.RequestId); err != nil {
+	if err := DeleteJoinReply(u.Account.AccountId, jRepIn.RequestId); err != nil {
 		t.Error("Failed to delete the test join reply.", err)
 	}
 	if err := u.Delete(); err != nil {

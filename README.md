@@ -4,7 +4,16 @@ SCION Coordination service
 ### How to run it
 
 The application uses go vendoring, so you need at least Go 1.6
-It's enough to run `go run main.go` from the root folder.
+
+First you need to get the dependencies and the `vendor` folder via:
+
+```
+go get ./...
+godep save
+godep save ./...
+```
+
+Afterwards, you can run `go run main.go` from the root folder.
 Otherwise run:
 
 ```

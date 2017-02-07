@@ -40,7 +40,7 @@ type user struct {
 	LastName     string
 	Account      string
 	Organisation string
-	Key          string
+	AccountId    string
 	Secret       string
 }
 
@@ -78,7 +78,7 @@ func (c *LoginController) Me(w http.ResponseWriter, r *http.Request) {
 		LastName:     storedUser.LastName,
 		Account:      storedUser.Account.Name,
 		Organisation: storedUser.Account.Organisation,
-		Key:          storedUser.Account.Key,
+		AccountId:    storedUser.Account.AccountId,
 		Secret:       storedUser.Account.Secret,
 	}
 
