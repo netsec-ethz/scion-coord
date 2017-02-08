@@ -3,16 +3,13 @@ SCION Coordination service
 
 ### How to run it
 
-The application uses go vendoring, so you need at least Go 1.6
+The application uses govendor. You need to install govendor via:
+`go get github.com/kardianos/govendor`
 
-First you need to get the dependencies and populate the `vendor` folder via:
-`go get github.com/stretchr/testify/assert`
-(Godep save does not bring this particular library automatically.)
+After this step, you can populate the dependencies in the `vendor` folder using:
+`govendor sync`
 
-and then by running:
-`godep save ./...`
 
-After this step, all the dependencies will be populated in the `vendor` folder.
 Afterwards, you can run `go run main.go` from the root folder.
 Otherwise you can also run the application via:
 
