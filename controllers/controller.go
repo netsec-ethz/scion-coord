@@ -77,14 +77,14 @@ func (c HTTPController) BadRequest(err error, w http.ResponseWriter, r *http.Req
 	http.Error(w, err.Error(), http.StatusBadRequest)
 }
 
-func (c HTTPController) NotFound(err string, w http.ResponseWriter, r *http.Request) {
+func (c HTTPController) NotFound(err error, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
-	http.Error(w, err, http.StatusNotFound)
+	http.Error(w, err.Error(), http.StatusNotFound)
 }
 
 func (c HTTPController) Forbidden(err error, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
-	http.Error(w, err.Error(), http.StatusNotFound)
+	http.Error(w, err.Error(), http.StatusForbidden)
 }
 
 func (C HTTPController) Render(tpl *template.Template, data interface{}, w http.ResponseWriter, r *http.Request) {

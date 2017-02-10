@@ -41,7 +41,7 @@ func main() {
 	// public chain does not require authentication but serves back the XSRF Token
 	xsrfChain := middleware.New(middleware.LoggingHandler, middleware.XSRFHandler)
 
-	// Api chain goes through the authentication handler, which verifies either the session or the key.secret
+	// Api chain goes through the authentication handler, which verifies either the session or the account_id.secret
 	// combination
 	apiChain := middleware.New(middleware.LoggingHandler, middleware.AuthHandler)
 
@@ -73,21 +73,19 @@ func main() {
 
 	// ==========================================================
 	// API
-	router.Handle("/api/as/exists/{as_id}/{key}/{secret}", apiChain.ThenFunc(asController.Exists))
-	router.Handle("/api/as/insert/{key}/{secret}", apiChain.ThenFunc(asController.Insert))
+	router.Handle("/api/as/exists/{as_id}/{account_id}/{secret}", apiChain.ThenFunc(asController.Exists))
 
 	// ISD join request
-	router.Handle("/api/as/uploadJoinRequest/{key}/{secret}", apiChain.ThenFunc(asController.UploadJoinRequest))
-	router.Handle("/api/as/uploadJoinReply/{key}/{secret}", apiChain.ThenFunc(asController.UploadJoinReply))
-	router.Handle("/api/as/pollJoinReply/{key}/{secret}", apiChain.ThenFunc(asController.PollJoinReply))
+	router.Handle("/api/as/uploadJoinRequest/{account_id}/{secret}", apiChain.ThenFunc(asController.UploadJoinRequest))
+	router.Handle("/api/as/uploadJoinReply/{account_id}/{secret}", apiChain.ThenFunc(asController.UploadJoinReply))
+	router.Handle("/api/as/pollJoinReply/{account_id}/{secret}", apiChain.ThenFunc(asController.PollJoinReply))
 
 	// AS connection request
-	router.Handle("/api/as/uploadConnRequests/{key}/{secret}", apiChain.ThenFunc(asController.UploadConnRequest))
-	router.Handle("/api/as/uploadConnReplies/{key}/{secret}", apiChain.ThenFunc(asController.UploadConnReplies))
-	router.Handle("/api/as/pollConnReplies/{key}/{secret}", apiChain.ThenFunc(asController.PollConnReplies))
+	router.Handle("/api/as/uploadConnRequest/{account_id}/{secret}", apiChain.ThenFunc(asController.UploadConnRequest))
+	router.Handle("/api/as/uploadConnReply/{account_id}/{secret}", apiChain.ThenFunc(asController.UploadConnReply))
 
 	// show all request TO this AS
-	router.Handle("/api/as/pollEvents/{key}/{secret}", apiChain.ThenFunc(asController.PollEvents))
+	router.Handle("/api/as/pollEvents/{account_id}/{secret}", apiChain.ThenFunc(asController.PollEvents))
 
 	// serve static files
 	static := http.StripPrefix("/public/", http.FileServer(http.Dir("public")))

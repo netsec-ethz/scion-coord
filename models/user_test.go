@@ -61,8 +61,8 @@ func TestCreateUser(t *testing.T) {
 		t.Error("Empty account org")
 	}
 
-	if user.Account.Key == "" {
-		t.Error("Empty account key")
+	if user.Account.AccountId == "" {
+		t.Error("Empty AccountId ")
 	}
 
 	if user.Account.Secret == "" {

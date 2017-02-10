@@ -3,9 +3,15 @@ SCION Coordination service
 
 ### How to run it
 
-The application uses go vendoring, so you need at least Go 1.6
-It's enough to run `go run main.go` from the root folder.
-Otherwise run:
+The application uses govendor. You need to install govendor via:
+`go get github.com/kardianos/govendor`
+
+After this step, you can populate the dependencies in the `vendor` folder using:
+`govendor sync`
+
+
+Afterwards, you can run `go run main.go` from the root folder.
+Otherwise you can also run the application via:
 
 ```
 go build
