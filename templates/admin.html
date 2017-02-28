@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>Scion Coordinator</title>
+    <title>SCION Coordination Service</title>
     <meta name="description" content="">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="/public/css/style.css">
@@ -25,22 +25,22 @@
 </head>
 
 <body>
-<div class="container">    
+<div class="container">
     <div class="header clearfix" ng-controller="headerCtrl">
         <nav>
-            <ul class="nav nav-pills pull-right">                
+            <ul class="nav nav-pills pull-right">
                 <li role="presentation" ng-if="!isActive('/admin')" ng-class="{ active: isActive('/login') }"><a href="#/login">Login</a></li>
                 <li role="presentation" ng-if="!isActive('/admin')" ng-class="{ active: isActive('/register') }"><a href="#/register">Register</a></li>
                 <li role="presentation" ng-if="isActive('/admin')"><a target="_self" href="" ng-click="logout()">Logout</a></li>
             </ul>
         </nav>
-        <h3 class="text-muted">Scion Coordinator</h3>
+        <h3 class="text-muted">SCION Coordination Service</h3>
     </div>
     <div ng-view></div>
 
 
     <footer class="footer">
-        <p>&copy; Scion 2016</p>
+        <p>&copy; SCION 2017</p>
     </footer>
 
 </div>
