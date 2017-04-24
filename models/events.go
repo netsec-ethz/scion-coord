@@ -28,7 +28,7 @@ type JoinRequest struct {
 	Id            uint64 `orm:"column(id);auto;pk"`
 	RequestId     uint64
 	Info          string // free form text for the reply
-	IsdToJoin     uint64
+	IsdToJoin     int    // the ISD that the sender wants to join
 	JoinAsACoreAS bool   // whether to join the ISD as a core AS
 	RequesterId   string // the key to identify which account made the request
 	RespondIA     string // the ISD-AS which should respond to the request

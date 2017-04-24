@@ -31,7 +31,7 @@ import (
 type JoinRequest struct {
 	RequestId     uint64
 	Info          string // free form text motivation for the request
-	IsdToJoin     uint64 // the ISD that the sender wants to join
+	IsdToJoin     int    // the ISD that the sender wants to join
 	JoinAsACoreAS bool   // whether to join the ISD as a core AS
 	RequesterId   string // the string to identify which account made the request
 	SigPubKey     string // signing public key
@@ -533,6 +533,61 @@ func (c *ASController) PollEvents(w http.ResponseWriter, r *http.Request) {
 	resp.ConnRequests = c.prepConnRequests(connRequests)
 	resp.ConnReplies = c.prepConnReplies(connReplies)
 
+	b, err := json.Marshal(resp)
+	if err != nil {
+		log.Printf("Error during JSON Marshaling. Account: %v, ISD-AS: %v, %v", account, isdas,
+			err)
+		c.Error500(err, w, r)
+		return
+	}
+	fmt.Fprintln(w, string(b))
+}
+
+// Converts the list of DB AS objects into a list of strings.
+// Adds all the ASes to the response except from the requesting AS itself.
+func (c *ASController) prepASListResponse(in []models.As, ownIA *addr.ISD_AS) []string {
+	out := make([]string, 0)
+	if in == nil || len(in) <= 1 {
+		return out
+	}
+	for _, v := range in {
+		if !(v.Isd == ownIA.I && v.As == ownIA.A) {
+			out = append(out, v.String())
+		}
+	}
+	return out
+}
+
+// API end-point to serve the list of ASes available for an AS to connect to.
+// Responds back with a list of ASes in the ISD that the AS belongs to.
+func (c *ASController) ListASes(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		IsdAs string
+	}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&req); err != nil {
+		log.Printf("Error decoding JSON: %v, %v", r.Body, err)
+		c.BadRequest(err, w, r)
+		return
+	}
+	isdas := req.IsdAs
+	account, err := c.findAndValidateAccount(w, r, isdas)
+	if err != nil {
+		return
+	}
+	ia, err := addr.IAFromString(isdas)
+	if err != nil {
+		log.Printf("Error parsing ISD-AS %v, %v ", isdas, err)
+		c.Error500(err, w, r)
+		return
+	}
+	ases, err := models.FindASesByIsd(ia.I)
+	if err != nil {
+		log.Printf("Error while retrieving list of ASes. Account: %v, ISD-AS: %v", account, isdas)
+		c.BadRequest(err, w, r)
+		return
+	}
+	resp := c.prepASListResponse(ases, ia)
 	b, err := json.Marshal(resp)
 	if err != nil {
 		log.Printf("Error during JSON Marshaling. Account: %v, ISD-AS: %v, %v", account, isdas,
