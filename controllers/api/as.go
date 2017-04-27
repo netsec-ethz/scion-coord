@@ -141,7 +141,7 @@ func (c *ASController) findAndValidateAccount(w http.ResponseWriter, r *http.Req
 	}
 	if !owns {
 		log.Printf("Account %v and AS %v do not match.", account, isdas)
-		c.BadRequest(fmt.Errorf("Account %v and AS %v do not match.", account, isdas), w, r)
+		c.Forbidden(fmt.Errorf("Account %v and AS %v do not match.", account, isdas), w, r)
 		return nil, err
 	}
 	return account, nil
@@ -330,6 +330,7 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 	}
 	account, err := c.findAndValidateAccount(w, r, cr.RequestIA)
 	if err != nil {
+		// findAndValidateAccount logs the error and writes back the response
 		return
 	}
 	connRequest := models.ConnRequest{
@@ -497,9 +498,11 @@ func (c *ASController) PollEvents(w http.ResponseWriter, r *http.Request) {
 		c.BadRequest(err, w, r)
 		return
 	}
+
 	isdas := req.IsdAs
 	account, err := c.findAndValidateAccount(w, r, isdas)
 	if err != nil {
+		// findAndValidateAccount logs the error and writes back the response
 		return
 	}
 	joinRequests, err := models.FindOpenJoinRequestsByIsdAs(isdas)
@@ -573,6 +576,7 @@ func (c *ASController) ListASes(w http.ResponseWriter, r *http.Request) {
 	isdas := req.IsdAs
 	account, err := c.findAndValidateAccount(w, r, isdas)
 	if err != nil {
+		// findAndValidateAccount logs the error and writes back the response
 		return
 	}
 	ia, err := addr.IAFromString(isdas)
