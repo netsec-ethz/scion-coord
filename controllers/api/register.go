@@ -57,6 +57,7 @@ func (c *RegistrationController) RegisterPage(w http.ResponseWriter, r *http.Req
 	c.Render(t, userSession, w, r)
 }
 
+
 // Method used to validate the registration request
 func (r *registrationRequest) isValid() (bool, error) {
 	// check if any of this is empty
@@ -77,6 +78,36 @@ func (r *registrationRequest) isValid() (bool, error) {
 
 	return true, nil
 }
+
+// Method used to validate email address
+func (c *RegistrationController) Validate(w http.ResponseWriter, r *http.Request) {
+	
+
+	//load validation page
+	t, err := template.ParseFiles("templates/validate.html")
+	if err != nil {
+		c.Error500(err, w, r)
+		return
+	}
+	c.Render(t, nil, w, r)
+
+	//print params
+
+	 email := r.URL.Query().Get("email")
+	 fmt.Println("-------------------")
+	 fmt.Println("Email address is:", r.URL.Query().Get("email"))
+ 	 fmt.Println("Hash is:", r.URL.Query().Get("hash"))
+	 fmt.Println("-------------------")
+
+	 if email == "claude.haehni@ethz.ch" {
+		fmt.Println("in");
+		//update user
+		user, _ := models.FindUserByEmail(email)
+		user.UpdateVerified(true)
+	 }
+
+}
+
 
 // This method is used to register a new account via the standard form
 func (c *RegistrationController) RegisterPost(w http.ResponseWriter, r *http.Request) {

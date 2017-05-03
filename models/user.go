@@ -290,3 +290,10 @@ func validUserPassword(storedPassHex, storedSaltHex, password string) bool {
 
 	return bytes.Equal(derivedPass, storedPass)
 }
+
+func (u *user) UpdateVerified (value bool){
+		
+		u.Verified = value
+		o.Update(u, "Verified")
+}
+
