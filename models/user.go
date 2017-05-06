@@ -61,6 +61,12 @@ type user struct {
 	// TODO: add the 2 factor authentication
 }
 
+type EmailVerification struct {
+	Email	string
+	Hash	string
+	Created time.Time
+}
+
 func generateSalt() ([]byte, error) {
 	salt := make([]byte, SALT_LENGTH)
 	var saltErr error

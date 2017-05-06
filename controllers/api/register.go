@@ -21,6 +21,7 @@ import (
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/models"
+	"github.com/njern/gogmail"
 	"html/template"
 	"log"
 	"net/http"
@@ -156,6 +157,13 @@ func (c *RegistrationController) RegisterPost(w http.ResponseWriter, r *http.Req
 	} else {
 		c.JSON(&user, w, r)
 	}
+
+	//Send email address confirmation link
+	gmail := gogmail.GmailConnection("sendingfromgo@gmail.com", "simplepassword")
+	if err := gmail.SendMail([]string{regRequest.Email}, "Confirm your email address", "http://127.0.0.1:8080/api/validateEmail/" + regRequest.Email + "/" ); err != nil {
+		fmt.Println(err);
+	}
+
 }
 
 // This method is used to register a new account via the standard form
@@ -194,5 +202,11 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 		return
 	} else {
 		c.JSON(&user, w, r)
+	}
+
+	//Send email address confirmation link
+	gmail := gogmail.GmailConnection("sendingfromgo@gmail.com", "simplepassword")
+	if err := gmail.SendMail([]string{regRequest.Email}, "Confirm your email address", "http://127.0.0.1:8080/api/validateEmail/" + regRequest.Email + "/" ); err != nil {
+		fmt.Println(err);
 	}
 }
