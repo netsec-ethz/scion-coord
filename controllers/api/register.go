@@ -18,13 +18,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
+	"log"
+	"net/http"
+
+	"github.com/gorilla/mux"
+	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/models"
 	"github.com/njern/gogmail"
-	"html/template"
-	"log"
-	"net/http"
 )
 
 type RegistrationController struct {
@@ -58,7 +61,6 @@ func (c *RegistrationController) RegisterPage(w http.ResponseWriter, r *http.Req
 	c.Render(t, userSession, w, r)
 }
 
-
 // Method used to validate the registration request
 func (r *registrationRequest) isValid() (bool, error) {
 	// check if any of this is empty
@@ -82,7 +84,6 @@ func (r *registrationRequest) isValid() (bool, error) {
 
 // Method used to validate email address
 func (c *RegistrationController) Validate(w http.ResponseWriter, r *http.Request) {
-	
 
 	//load validation page
 	t, err := template.ParseFiles("templates/validate.html")
@@ -92,23 +93,31 @@ func (c *RegistrationController) Validate(w http.ResponseWriter, r *http.Request
 	}
 	c.Render(t, nil, w, r)
 
-	//print params
+	//retrieve submitted email and hash
+	email := mux.Vars(r)["email_address"]
+	hash := mux.Vars(r)["hash"]
+	fmt.Println("-------------------")
+	fmt.Println("Email address is:", email)
+	fmt.Println("Hash is:", hash)
+	fmt.Println("-------------------")
 
-	 email := r.URL.Query().Get("email")
-	 fmt.Println("-------------------")
-	 fmt.Println("Email address is:", r.URL.Query().Get("email"))
- 	 fmt.Println("Hash is:", r.URL.Query().Get("hash"))
-	 fmt.Println("-------------------")
+	//validate email/hash
+	e, err := models.FindEmailVerificationByEmail(email)
 
-	 if email == "claude.haehni@ethz.ch" {
-		fmt.Println("in");
-		//update user
-		user, _ := models.FindUserByEmail(email)
-		user.UpdateVerified(true)
-	 }
+	if err != nil {
+		//TODO: throw email not found error
+		return
+	} else if e.Hash != hash {
+		//TODO: throw wrong hash error
+		return
+	}
+
+	//update user and delete DB entry
+	user, _ := models.FindUserByEmail(email)
+	user.UpdateVerified(true)
+	e.Delete()
 
 }
-
 
 // This method is used to register a new account via the standard form
 func (c *RegistrationController) RegisterPost(w http.ResponseWriter, r *http.Request) {
@@ -159,9 +168,17 @@ func (c *RegistrationController) RegisterPost(w http.ResponseWriter, r *http.Req
 	}
 
 	//Send email address confirmation link
+	e, err := models.FindEmailVerificationByEmail(regRequest.Email)
+	hash := e.Hash
+	if err != nil {
+		//TODO: error handling
+		return
+	}
+
 	gmail := gogmail.GmailConnection("sendingfromgo@gmail.com", "simplepassword")
-	if err := gmail.SendMail([]string{regRequest.Email}, "Confirm your email address", "http://127.0.0.1:8080/api/validateEmail/" + regRequest.Email + "/" ); err != nil {
-		fmt.Println(err);
+	if err := gmail.SendMail([]string{regRequest.Email}, "Confirm your email address", "http://"+config.HTTP_HOST+":"+config.HTTP_PORT+"/api/validateEmail/"+regRequest.Email+"/"+string(hash), false); err != nil {
+		//TODO: error handling
+		return
 	}
 
 }
@@ -205,8 +222,16 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 	}
 
 	//Send email address confirmation link
+	e, err := models.FindEmailVerificationByEmail(regRequest.Email)
+	hash := e.Hash
+	if err != nil {
+		//TODO: error handling
+		return
+	}
+
 	gmail := gogmail.GmailConnection("sendingfromgo@gmail.com", "simplepassword")
-	if err := gmail.SendMail([]string{regRequest.Email}, "Confirm your email address", "http://127.0.0.1:8080/api/validateEmail/" + regRequest.Email + "/" ); err != nil {
-		fmt.Println(err);
+	if err := gmail.SendMail([]string{regRequest.Email}, "Confirm your email address", "http://"+config.HTTP_HOST+":"+config.HTTP_PORT+"/api/validateEmail/"+regRequest.Email+"/"+string(hash), false); err != nil {
+		//TODO: error handling
+		return
 	}
 }

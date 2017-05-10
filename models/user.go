@@ -22,11 +22,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"time"
+
 	"github.com/astaxie/beego/orm"
 	uuid "github.com/pborman/uuid"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/crypto/scrypt"
-	"time"
 )
 
 const (
@@ -62,10 +63,12 @@ type user struct {
 }
 
 type EmailVerification struct {
-	Email	string
-	Hash	string
+	Email   string `orm:"pk"`
+	Hash    string
 	Created time.Time
 }
+
+//var seedRand *mrand.Rand = mrand.New(mrand.NewSource(time.Now().UnixNano()))
 
 func generateSalt() ([]byte, error) {
 	salt := make([]byte, SALT_LENGTH)
@@ -158,7 +161,18 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 		u.Account = a
 		u.Created = time.Now().UTC()
 
-		_, err = o.Insert(u)
+		if _, err := o.Insert(u); err != nil {
+			return u, err
+		}
+
+		//create emailVerification
+		e := new(EmailVerification)
+		e.Email = email
+		e.Hash = uuid.New()
+		e.Created = time.Now().UTC()
+
+		_, err = o.Insert(e)
+
 		return u, err
 
 	}
@@ -297,9 +311,19 @@ func validUserPassword(storedPassHex, storedSaltHex, password string) bool {
 	return bytes.Equal(derivedPass, storedPass)
 }
 
-func (u *user) UpdateVerified (value bool){
-		
-		u.Verified = value
-		o.Update(u, "Verified")
+func (u *user) UpdateVerified(value bool) {
+
+	u.Verified = value
+	o.Update(u, "Verified")
 }
 
+func FindEmailVerificationByEmail(email string) (*EmailVerification, error) {
+	e := new(EmailVerification)
+	err := o.QueryTable(e).Filter("Email", email).One(e)
+	return e, err
+}
+
+func (e *EmailVerification) Delete() error {
+	_, err := o.Delete(e)
+	return err
+}

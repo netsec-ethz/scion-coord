@@ -15,14 +15,15 @@
 package main
 
 import (
+	"log"
+	"net/http"
+
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/controllers/api"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
-	"log"
-	"net/http"
 )
 
 func main() {
@@ -72,7 +73,7 @@ func main() {
 	router.Handle("/api/me", loggingChain.ThenFunc(loginController.Me))
 
 	//email validation
-	router.Handle("/api/validate", loggingChain.ThenFunc(registrationController.Validate))
+	router.Handle("/api/validateEmail/{email_address}/{hash}", loggingChain.ThenFunc(registrationController.Validate))
 
 	// ==========================================================
 	// API
