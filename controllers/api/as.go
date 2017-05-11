@@ -31,7 +31,7 @@ import (
 type JoinRequest struct {
 	RequestId     uint64
 	Info          string // free form text motivation for the request
-	IsdToJoin     uint64 // the ISD that the sender wants to join
+	IsdToJoin     int    // the ISD that the sender wants to join
 	JoinAsACoreAS bool   // whether to join the ISD as a core AS
 	RequesterId   string // the string to identify which account made the request
 	SigPubKey     string // signing public key
@@ -141,7 +141,7 @@ func (c *ASController) findAndValidateAccount(w http.ResponseWriter, r *http.Req
 	}
 	if !owns {
 		log.Printf("Account %v and AS %v do not match.", account, isdas)
-		c.BadRequest(fmt.Errorf("Account %v and AS %v do not match.", account, isdas), w, r)
+		c.Forbidden(fmt.Errorf("Account %v and AS %v do not match.", account, isdas), w, r)
 		return nil, err
 	}
 	return account, nil
@@ -330,6 +330,7 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 	}
 	account, err := c.findAndValidateAccount(w, r, cr.RequestIA)
 	if err != nil {
+		// findAndValidateAccount logs the error and writes back the response
 		return
 	}
 	connRequest := models.ConnRequest{
@@ -497,9 +498,11 @@ func (c *ASController) PollEvents(w http.ResponseWriter, r *http.Request) {
 		c.BadRequest(err, w, r)
 		return
 	}
+
 	isdas := req.IsdAs
 	account, err := c.findAndValidateAccount(w, r, isdas)
 	if err != nil {
+		// findAndValidateAccount logs the error and writes back the response
 		return
 	}
 	joinRequests, err := models.FindOpenJoinRequestsByIsdAs(isdas)
@@ -536,6 +539,59 @@ func (c *ASController) PollEvents(w http.ResponseWriter, r *http.Request) {
 	b, err := json.Marshal(resp)
 	if err != nil {
 		log.Printf("Error during JSON Marshaling. Account: %v, ISD-AS: %v, %v", account, isdas,
+			err)
+		c.Error500(err, w, r)
+		return
+	}
+	fmt.Fprintln(w, string(b))
+}
+
+// Converts the list of DB AS objects into a list of strings.
+func (c *ASController) prepASListResponse(in []models.As) []string {
+	var out []string
+	if len(in) == 0 {
+		return out
+	}
+	for _, v := range in {
+		out = append(out, v.String())
+	}
+	return out
+}
+
+// API end-point to serve the list of ASes available for an AS to connect to.
+// Responds back with a list of ASes in the ISD that the AS belongs to.
+func (c *ASController) ListASes(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		IsdAs string
+	}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&req); err != nil {
+		log.Printf("Error decoding JSON: %v, %v", r.Body, err)
+		c.BadRequest(err, w, r)
+		return
+	}
+	account, err := c.findAndValidateAccount(w, r, req.IsdAs)
+	if err != nil {
+		// findAndValidateAccount logs the error and writes back the response
+		return
+	}
+	ia, err := addr.IAFromString(req.IsdAs)
+	if err != nil {
+		log.Printf("Error parsing ISD-AS %v, %v ", req.IsdAs, err)
+		c.Error500(err, w, r)
+		return
+	}
+	ases, err := models.FindASesByIsd(ia.I)
+	if err != nil {
+		log.Printf("Error while retrieving list of ASes. Account: %v, ISD-AS: %v", account,
+			req.IsdAs)
+		c.BadRequest(err, w, r)
+		return
+	}
+	resp := c.prepASListResponse(ases)
+	b, err := json.Marshal(resp)
+	if err != nil {
+		log.Printf("Error during JSON Marshaling. Account: %v, ISD-AS: %v, %v", account, req.IsdAs,
 			err)
 		c.Error500(err, w, r)
 		return
