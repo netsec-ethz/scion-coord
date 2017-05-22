@@ -83,39 +83,29 @@ func (r *registrationRequest) isValid() (bool, error) {
 }
 
 // Method used to validate email address
-func (c *RegistrationController) Validate(w http.ResponseWriter, r *http.Request) {
+func (c *RegistrationController) Verify(w http.ResponseWriter, r *http.Request) {
 
 	//load validation page
-	t, err := template.ParseFiles("templates/validate.html")
+	t, err := template.ParseFiles("templates/layout.html", "templates/verified.html")
 	if err != nil {
 		c.Error500(err, w, r)
 		return
 	}
 	c.Render(t, nil, w, r)
 
-	//retrieve submitted email and hash
-	email := mux.Vars(r)["email_address"]
-	hash := mux.Vars(r)["hash"]
-	fmt.Println("-------------------")
-	fmt.Println("Email address is:", email)
-	fmt.Println("Hash is:", hash)
-	fmt.Println("-------------------")
+	//retrieve submitted uuid
+	link := mux.Vars(r)["link"]
 
-	//validate email/hash
-	e, err := models.FindEmailVerificationByEmail(email)
+	//validate link
+	u, err := models.FindUserByEmailLink(link)
 
 	if err != nil {
-		//TODO: throw email not found error
-		return
-	} else if e.Hash != hash {
-		//TODO: throw wrong hash error
+		//TODO: throw link not found exception
 		return
 	}
 
 	//update user and delete DB entry
-	user, _ := models.FindUserByEmail(email)
-	user.UpdateVerified(true)
-	e.Delete()
+	u.UpdateVerified(true)
 
 }
 
@@ -159,8 +149,10 @@ func (c *RegistrationController) RegisterPost(w http.ResponseWriter, r *http.Req
 	}
 
 	// register the user
-	if user, err := models.RegisterUser(regRequest.Account, regRequest.Organisation,
-		regRequest.Email, regRequest.Password, regRequest.First, regRequest.Last); err != nil {
+	user, err := models.RegisterUser(regRequest.Account, regRequest.Organisation,
+		regRequest.Email, regRequest.Password, regRequest.First, regRequest.Last)
+
+	if err != nil {
 		c.Error500(errors.New("{}"), w, r)
 		return
 	} else {
@@ -168,15 +160,10 @@ func (c *RegistrationController) RegisterPost(w http.ResponseWriter, r *http.Req
 	}
 
 	//Send email address confirmation link
-	e, err := models.FindEmailVerificationByEmail(regRequest.Email)
-	hash := e.Hash
-	if err != nil {
-		//TODO: error handling
-		return
-	}
+	link := user.EmailLink
 
 	gmail := gogmail.GmailConnection("sendingfromgo@gmail.com", "simplepassword")
-	if err := gmail.SendMail([]string{regRequest.Email}, "Confirm your email address", "http://"+config.HTTP_HOST+":"+config.HTTP_PORT+"/api/validateEmail/"+regRequest.Email+"/"+string(hash), false); err != nil {
+	if err := gmail.SendMail([]string{regRequest.Email}, "Confirm your email address", "http://"+config.HTTP_HOST+":"+config.HTTP_PORT+"/api/verify/"+link, false); err != nil {
 		//TODO: error handling
 		return
 	}
@@ -212,25 +199,21 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 	}
 
 	// register the user
-	if user, err := models.RegisterUser(regRequest.Account, regRequest.Organisation,
-		regRequest.Email, regRequest.Password, regRequest.First, regRequest.Last); err != nil {
-		log.Println(err)
-		c.Error500(err, w, r)
+	user, err := models.RegisterUser(regRequest.Account, regRequest.Organisation,
+		regRequest.Email, regRequest.Password, regRequest.First, regRequest.Last)
+
+	if err != nil {
+		c.Error500(errors.New("{}"), w, r)
 		return
 	} else {
 		c.JSON(&user, w, r)
 	}
 
 	//Send email address confirmation link
-	e, err := models.FindEmailVerificationByEmail(regRequest.Email)
-	hash := e.Hash
-	if err != nil {
-		//TODO: error handling
-		return
-	}
+	link := user.EmailLink
 
 	gmail := gogmail.GmailConnection("sendingfromgo@gmail.com", "simplepassword")
-	if err := gmail.SendMail([]string{regRequest.Email}, "Confirm your email address", "http://"+config.HTTP_HOST+":"+config.HTTP_PORT+"/api/validateEmail/"+regRequest.Email+"/"+string(hash), false); err != nil {
+	if err := gmail.SendMail([]string{regRequest.Email}, "Confirm your email address", "http://"+config.HTTP_HOST+":"+config.HTTP_PORT+"/api/verify/"+link, false); err != nil {
 		//TODO: error handling
 		return
 	}

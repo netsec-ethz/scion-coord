@@ -56,16 +56,11 @@ type user struct {
 	FirstName string
 	LastName  string
 	Verified  bool     // whether the user verified the email
+	EmailLink string   // uuid sent to user to verify email
 	Account   *Account `orm:"rel(fk);index"`
 	Created   time.Time
 	Updated   time.Time
 	// TODO: add the 2 factor authentication
-}
-
-type EmailVerification struct {
-	Email   string `orm:"pk"`
-	Hash    string
-	Created time.Time
 }
 
 //var seedRand *mrand.Rand = mrand.New(mrand.NewSource(time.Now().UnixNano()))
@@ -153,6 +148,7 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 		u.LastName = last
 		u.Password = hex.EncodeToString(derivedPassword)
 		u.Salt = hex.EncodeToString(salt)
+		u.EmailLink = uuid.New()
 		//u.TwoFA = false // set it to false
 		u.Created = time.Now().UTC()
 		u.Updated = time.Now().UTC()
@@ -161,18 +157,7 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 		u.Account = a
 		u.Created = time.Now().UTC()
 
-		if _, err := o.Insert(u); err != nil {
-			return u, err
-		}
-
-		//create emailVerification
-		e := new(EmailVerification)
-		e.Email = email
-		e.Hash = uuid.New()
-		e.Created = time.Now().UTC()
-
-		_, err = o.Insert(e)
-
+		_, err = o.Insert(u)
 		return u, err
 
 	}
@@ -202,6 +187,12 @@ func FindAccount(name string) (*Account, error) {
 func FindUserByEmail(email string) (*user, error) {
 	u := new(user)
 	err := o.QueryTable(u).Filter("Email", email).RelatedSel().One(u)
+	return u, err
+}
+
+func FindUserByEmailLink(link string) (*user, error) {
+	u := new(user)
+	err := o.QueryTable(u).Filter("EmailLink", link).One(u)
 	return u, err
 }
 
@@ -253,7 +244,15 @@ func (u *user) Authenticate(password string) error {
 
 	// the user did less than N login attempts
 	//if u.FailedAttempts <= MAX_LOGIN_ATTEMPTS {
-	return u.checkPassword(password)
+	if err := u.checkPassword(password); err != nil {
+		return err
+	}
+
+	if err := u.CheckVerified(); err != nil {
+		return err
+	}
+
+	return nil
 	//}
 
 	// this means the user tried to log in more than 15 minutes ago
@@ -283,7 +282,14 @@ func (u *user) checkPassword(password string) error {
 	// 	return err
 	// }
 
-	return errors.New("Failed to login")
+	return errors.New("Password invalid")
+}
+
+func (u *user) CheckVerified() error {
+	if !u.Verified {
+		return errors.New("Email is not verified")
+	}
+	return nil
 }
 
 func validUserPassword(storedPassHex, storedSaltHex, password string) bool {
@@ -312,18 +318,7 @@ func validUserPassword(storedPassHex, storedSaltHex, password string) bool {
 }
 
 func (u *user) UpdateVerified(value bool) {
-
 	u.Verified = value
+	u.Updated = time.Now().UTC()
 	o.Update(u, "Verified")
-}
-
-func FindEmailVerificationByEmail(email string) (*EmailVerification, error) {
-	e := new(EmailVerification)
-	err := o.QueryTable(e).Filter("Email", email).One(e)
-	return e, err
-}
-
-func (e *EmailVerification) Delete() error {
-	_, err := o.Delete(e)
-	return err
 }

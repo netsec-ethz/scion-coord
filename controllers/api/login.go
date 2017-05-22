@@ -16,12 +16,14 @@ package api
 
 import (
 	"encoding/json"
-	"github.com/netsec-ethz/scion-coord/controllers"
-	"github.com/netsec-ethz/scion-coord/controllers/middleware"
-	"github.com/netsec-ethz/scion-coord/models"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
+
+	"github.com/netsec-ethz/scion-coord/controllers"
+	"github.com/netsec-ethz/scion-coord/controllers/middleware"
+	"github.com/netsec-ethz/scion-coord/models"
 )
 
 const (
@@ -161,6 +163,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 
 	// if the authentication fails
 	if err := dbUser.Authenticate(password); err != nil {
+		fmt.Println(err)
 		log.Println(err)
 		c.Forbidden(err, w, r)
 		return

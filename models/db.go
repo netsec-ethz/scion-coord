@@ -16,6 +16,7 @@ package models
 
 import (
 	"fmt"
+
 	"github.com/astaxie/beego/orm"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/netsec-ethz/scion-coord/config"
@@ -35,7 +36,7 @@ func init() {
 	orm.Debug = false
 
 	// register the models
-	orm.RegisterModel(new(user), new(Account), new(EmailVerification), new(As), new(JoinRequest), new(ConnRequest),
+	orm.RegisterModel(new(user), new(Account), new(As), new(JoinRequest), new(ConnRequest),
 		new(JoinReply), new(ConnReply))
 
 	// print verbose logs when generating the tables
