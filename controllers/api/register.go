@@ -27,7 +27,6 @@ import (
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/models"
-	"github.com/njern/gogmail"
 )
 
 type RegistrationController struct {
@@ -85,14 +84,6 @@ func (r *registrationRequest) isValid() (bool, error) {
 // Method used to validate email address
 func (c *RegistrationController) Verify(w http.ResponseWriter, r *http.Request) {
 
-	//load validation page
-	t, err := template.ParseFiles("templates/layout.html", "templates/verified.html")
-	if err != nil {
-		c.Error500(err, w, r)
-		return
-	}
-	c.Render(t, nil, w, r)
-
 	//retrieve submitted uuid
 	link := mux.Vars(r)["link"]
 
@@ -100,12 +91,25 @@ func (c *RegistrationController) Verify(w http.ResponseWriter, r *http.Request) 
 	u, err := models.FindUserByEmailLink(link)
 
 	if err != nil {
-		//TODO: throw link not found exception
+		c.BadRequest(errors.New("invalid link"), w, r)
 		return
 	}
 
-	//update user and delete DB entry
+	if u.Verified {
+		c.BadRequest(errors.New("user alreday verified"), w, r)
+		return
+	}
+
+	//update user
 	u.UpdateVerified(true)
+
+	//load validation page
+	t, err := template.ParseFiles("templates/layout.html", "templates/verified.html")
+	if err != nil {
+		c.Error500(err, w, r)
+		return
+	}
+	c.Render(t, nil, w, r)
 
 }
 
@@ -162,10 +166,16 @@ func (c *RegistrationController) RegisterPost(w http.ResponseWriter, r *http.Req
 	//Send email address confirmation link
 	link := user.EmailLink
 
-	gmail := gogmail.GmailConnection("sendingfromgo@gmail.com", "simplepassword")
-	if err := gmail.SendMail([]string{regRequest.Email}, "Confirm your email address", "http://"+config.HTTP_HOST+":"+config.HTTP_PORT+"/api/verify/"+link, false); err != nil {
-		//TODO: error handling
-		return
+	mail := new(models.EMail)
+	mail.From = "test@example.com"
+	mail.To = []string{regRequest.Email}
+	mail.Subject = "Verify email address"
+	mail.Body = "http://" + config.HTTP_HOST + ":" + config.HTTP_PORT + "/api/verify/" + link
+
+	server := &email.SMTPServer{Host: "127.0.0.1", Port: 25}
+
+	if err := email.Send(mail, server); err != nil {
+		c.Error500(err, w, r)
 	}
 
 }
@@ -212,9 +222,15 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 	//Send email address confirmation link
 	link := user.EmailLink
 
-	gmail := gogmail.GmailConnection("sendingfromgo@gmail.com", "simplepassword")
-	if err := gmail.SendMail([]string{regRequest.Email}, "Confirm your email address", "http://"+config.HTTP_HOST+":"+config.HTTP_PORT+"/api/verify/"+link, false); err != nil {
-		//TODO: error handling
-		return
+	mail := new(models.EMail)
+	mail.From = "test@example.com"
+	mail.To = []string{regRequest.Email}
+	mail.Subject = "Verify email address"
+	mail.Body = "http://" + config.HTTP_HOST + ":" + config.HTTP_PORT + "/api/verify/" + link
+
+	server := &email.SMTPServer{Host: "127.0.0.1", Port: 25}
+
+	if err := email.Send(mail, server); err != nil {
+		c.Error500(err, w, r)
 	}
 }

@@ -16,7 +16,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -163,7 +162,6 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 
 	// if the authentication fails
 	if err := dbUser.Authenticate(password); err != nil {
-		fmt.Println(err)
 		log.Println(err)
 		c.Forbidden(err, w, r)
 		return
