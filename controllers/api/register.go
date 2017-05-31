@@ -166,15 +166,15 @@ func (c *RegistrationController) RegisterPost(w http.ResponseWriter, r *http.Req
 	//Send email address confirmation link
 	link := user.EmailLink
 
-	mail := new(models.EMail)
+	mail := new(models.Email)
 	mail.From = "test@example.com"
 	mail.To = []string{regRequest.Email}
 	mail.Subject = "Verify email address"
 	mail.Body = "http://" + config.HTTP_HOST + ":" + config.HTTP_PORT + "/api/verify/" + link
 
-	server := &email.SMTPServer{Host: "127.0.0.1", Port: 25}
+	server := &models.SMTPServer{Host: "127.0.0.1", Port: 25}
 
-	if err := email.Send(mail, server); err != nil {
+	if err := models.Send(mail, server); err != nil {
 		c.Error500(err, w, r)
 	}
 
@@ -222,15 +222,15 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 	//Send email address confirmation link
 	link := user.EmailLink
 
-	mail := new(models.EMail)
+	mail := new(models.Email)
 	mail.From = "test@example.com"
 	mail.To = []string{regRequest.Email}
 	mail.Subject = "Verify email address"
 	mail.Body = "http://" + config.HTTP_HOST + ":" + config.HTTP_PORT + "/api/verify/" + link
 
-	server := &email.SMTPServer{Host: "127.0.0.1", Port: 25}
+	server := &models.SMTPServer{Host: "127.0.0.1", Port: 25}
 
-	if err := email.Send(mail, server); err != nil {
+	if err := models.Send(mail, server); err != nil {
 		c.Error500(err, w, r)
 	}
 }
