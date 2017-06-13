@@ -1,0 +1,17 @@
+<!DOCTYPE html> 
+
+<html>
+
+</head>
+
+<body>
+<div style="max-width: 800px; margin: 10% auto 5% auto; padding: 50px 50px; background: #cccccc">
+    <p>Hello {{.FirstName}} {{.LastName}}</p>
+    <p>Thank you for signing up with SCION Coordinatinon Service. To use the service you have to confirm your email address by clicking the link below.</p>
+    <p>If you did not expect this email, please delete it.</p>
+   <p> <a href="http://{{.Host}}:{{.Port}}/api/verify/{{.EmailLink}}">Confirm email address</a></p>
+</div>
+    
+</body>
+
+</html>

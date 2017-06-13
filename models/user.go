@@ -15,7 +15,6 @@
 package models
 
 import (
-	//"crypto"
 	"bufio"
 	"bytes"
 	"crypto/rand"
@@ -62,8 +61,6 @@ type user struct {
 	Updated   time.Time
 	// TODO: add the 2 factor authentication
 }
-
-//var seedRand *mrand.Rand = mrand.New(mrand.NewSource(time.Now().UnixNano()))
 
 func generateSalt() ([]byte, error) {
 	salt := make([]byte, SALT_LENGTH)
@@ -192,7 +189,7 @@ func FindUserByEmail(email string) (*user, error) {
 
 func FindUserByEmailLink(link string) (*user, error) {
 	u := new(user)
-	err := o.QueryTable(u).Filter("EmailLink", link).One(u)
+	err := o.QueryTable(u).Filter("EmailLink", link).RelatedSel().One(u)
 	return u, err
 }
 

@@ -162,7 +162,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 
 	// if the authentication fails
 	if err := dbUser.Authenticate(password); err != nil {
-		log.Println(err)
+		log.Printf("Authentication failed for user %v: %v", dbUser.Email, err)
 		c.Forbidden(err, w, r)
 		return
 	}

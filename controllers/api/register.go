@@ -15,6 +15,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,6 +27,7 @@ import (
 	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
+	"github.com/netsec-ethz/scion-coord/email"
 	"github.com/netsec-ethz/scion-coord/models"
 )
 
@@ -47,6 +49,7 @@ type registrationRequest struct {
 func (c *RegistrationController) RegisterPage(w http.ResponseWriter, r *http.Request) {
 	t, err := template.ParseFiles("templates/layout.html", "templates/register.html")
 	if err != nil {
+		log.Printf("Error parsing HTML files: %v", err)
 		c.Error500(err, w, r)
 		return
 	}
@@ -65,7 +68,7 @@ func (r *registrationRequest) isValid() (bool, error) {
 	// check if any of this is empty
 	if r.Email == "" || r.Organisation == "" || r.Password == "" || r.PasswordConfirmation == "" ||
 		r.First == "" || r.Last == "" || r.Account == "" {
-		return false, fmt.Errorf("%s\n", "Email, Organisation, Password, Password confirmation, Firts and Last name and Account are all mandatory fields")
+		return false, fmt.Errorf("%s\n", "Email, Organisation, Password, Password confirmation, First and Last name and Account are all mandatory fields")
 	}
 
 	// check if the password match and that the length is at least 8 chars
@@ -91,12 +94,14 @@ func (c *RegistrationController) Verify(w http.ResponseWriter, r *http.Request) 
 	u, err := models.FindUserByEmailLink(link)
 
 	if err != nil {
+		log.Printf("Error verifying email address. %v is not a valid UUID", link)
 		c.BadRequest(errors.New("invalid link"), w, r)
 		return
 	}
 
 	if u.Verified {
-		c.BadRequest(errors.New("user alreday verified"), w, r)
+		log.Printf("Error verifying email address. User %v is already verified", u.Email)
+		c.BadRequest(errors.New("user already verified"), w, r)
 		return
 	}
 
@@ -106,10 +111,11 @@ func (c *RegistrationController) Verify(w http.ResponseWriter, r *http.Request) 
 	//load validation page
 	t, err := template.ParseFiles("templates/layout.html", "templates/verified.html")
 	if err != nil {
+		log.Printf("Error parsing HTML files: %v", err)
 		c.Error500(err, w, r)
 		return
 	}
-	c.Render(t, nil, w, r)
+	c.Render(t, u, w, r)
 
 }
 
@@ -164,17 +170,8 @@ func (c *RegistrationController) RegisterPost(w http.ResponseWriter, r *http.Req
 	}
 
 	//Send email address confirmation link
-	link := user.EmailLink
-
-	mail := new(models.Email)
-	mail.From = "test@example.com"
-	mail.To = []string{regRequest.Email}
-	mail.Subject = "Verify email address"
-	mail.Body = "http://" + config.HTTP_HOST + ":" + config.HTTP_PORT + "/api/verify/" + link
-
-	server := &models.SMTPServer{Host: "127.0.0.1", Port: 25}
-
-	if err := models.Send(mail, server); err != nil {
+	if err := sendMail(user.Id); err != nil {
+		log.Printf("Error sending verification email: %v", err)
 		c.Error500(err, w, r)
 	}
 
@@ -213,24 +210,57 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 		regRequest.Email, regRequest.Password, regRequest.First, regRequest.Last)
 
 	if err != nil {
-		c.Error500(errors.New("{}"), w, r)
+		log.Printf("Error registering the user: %v", err)
+		c.Error500(err, w, r)
 		return
 	} else {
 		c.JSON(&user, w, r)
 	}
 
 	//Send email address confirmation link
-	link := user.EmailLink
-
-	mail := new(models.Email)
-	mail.From = "test@example.com"
-	mail.To = []string{regRequest.Email}
-	mail.Subject = "Verify email address"
-	mail.Body = "http://" + config.HTTP_HOST + ":" + config.HTTP_PORT + "/api/verify/" + link
-
-	server := &models.SMTPServer{Host: "127.0.0.1", Port: 25}
-
-	if err := models.Send(mail, server); err != nil {
+	if err := sendMail(user.Id); err != nil {
+		log.Printf("Error sending verification email: %v", err)
 		c.Error500(err, w, r)
 	}
+
+}
+
+func sendMail(userID uint64) error {
+
+	id := fmt.Sprintf("%v", userID)
+	user, err := models.FindUserById(id)
+	if err != nil {
+		return err
+	}
+
+	tmpl, err := template.ParseFiles("email/templates/verification.html")
+	if err != nil {
+		return err
+	}
+
+	data := struct {
+		FirstName string
+		LastName  string
+		Host      string
+		Port      string
+		EmailLink string
+	}{user.FirstName, user.LastName, config.HTTP_HOST, config.HTTP_PORT, user.EmailLink}
+
+	buf := new(bytes.Buffer)
+	tmpl.Execute(buf, data)
+	body := buf.String()
+
+	mail := new(email.Email)
+	mail.From = config.Email_From
+	mail.To = []string{user.Email}
+	mail.Subject = "Verify your email address for SCIONLab Coordination Service"
+	mail.Body = body
+
+	server := &email.SMTPServer{Host: config.Email_Host, Port: config.Email_Port}
+
+	if err := email.Send(mail, server); err != nil {
+		return err
+	}
+
+	return nil
 }
