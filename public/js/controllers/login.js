@@ -10,9 +10,8 @@ angular.module('scionApp')
                         $location.path('/admin');
                     },
                     function(response) {
-                        $scope.error = "Login error. Please try again.";
                         console.log(response);
-                        $scope.error = "Wrong email or password. Try again."
+                        $scope.error = "Failed to log you in: Make sure your email address and password are correct and your email is verified."
                     });  
             };
 

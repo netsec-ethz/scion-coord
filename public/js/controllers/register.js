@@ -11,9 +11,9 @@ angular.module('scionApp')
                 
                 registerService.register(user).then(
                     function(data) {                    
-                        //$scope.message = "Registration completed successfully.\nYou will be soon redirected to the home page.";
+                        $scope.message = "Registration completed successfully. We sent you an email to your inbox with a link to verify your account.";
+			            $scope.error = ""
                         $scope.user = data;
-                        $location.path('/login');
                         
                     },
                     function(response) {
