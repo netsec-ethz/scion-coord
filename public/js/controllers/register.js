@@ -13,11 +13,12 @@ angular.module('scionApp')
                     function(data) {                    
                         $scope.message = "Registration completed successfully. We sent you an email to your inbox with a link to verify your account.";
 			            $scope.error = ""
-                        $scope.user = data;
+                        $scope.user = {};
                         
                     },
                     function(response) {
                         $scope.error = response.data;
+			            $scope.message = ""
                         console.log(response);
                     });  
             };
