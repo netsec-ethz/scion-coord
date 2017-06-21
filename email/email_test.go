@@ -1,4 +1,4 @@
-// Copyright 2016 ETH Zurich
+// Copyright 2017 ETH Zurich
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,51 +15,59 @@
 package email
 
 import (
+	"fmt"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestBuildMessage(t *testing.T) {
+var (
+	mail   = Email{From: "sender@test.com", To: []string{"receiver@example.com"}, Subject: "Testing emails", Body: "This is a test"}
+	server = SMTPServer{Host: "mail.server.com", Port: 25}
+)
 
-	mail := new(Email)
-	mail.From = "sender@test.com"
-	mail.To = []string{"receiver@example.com"}
-	mail.Subject = "Testing emails"
-	mail.Body = "This is a test"
+func init() {
+	timeNow = func() time.Time {
+		t, _ := time.Parse("2006-01-02 15:04:05", "2017-01-20 01:02:03")
+		return t
+	}
+}
 
-	server := new(SMTPServer)
-	server.Host = "mail.server.com"
-	server.Port = 25
+func TestBuildMessageSingle(t *testing.T) {
 
 	// Testing buildMessage with one receiver
-	if message := mail.buildMessage(); message !=
+	message := mail.buildMessage()
+	assert.Equal(t,
 		"From: sender@test.com\r\n"+
 			"To: receiver@example.com\r\n"+
-			"MIME-Version: 1.0\r\n"+
-			"Content-Type: text/html\r\n"+
 			"Subject: Testing emails\r\n"+
+			"MIME-Version: 1.0\r\n"+
+			"Content-Type: multipart/mixed; boundary=gc0p4Jq0M25Tf08jU534c0p; charset=utf-8\r\n"+
+			"Date :"+fmt.Sprintf(timeNow().Format("02 Jan 2006 15:04:05 -0700"))+"\r\n"+
 			"\r\n"+
-			"This is a test" {
+			"This is a test", message)
+}
 
-		t.Error("Error building message for one receiver")
-	}
+func TestBuildMessageMulti(t *testing.T) {
 
 	// Testing buildMessage with multiple receivers
 	mail.To = append(mail.To, "receiver2@domain2.com", "receiver3@domain3.com", "receiver4@domain4.com", "receiver5@domain5.com")
-	if message := mail.buildMessage(); message !=
+	message := mail.buildMessage()
+	assert.Equal(t,
 		"From: sender@test.com\r\n"+
 			"To: receiver@example.com,receiver2@domain2.com,receiver3@domain3.com,receiver4@domain4.com,receiver5@domain5.com\r\n"+
-			"MIME-Version: 1.0\r\n"+
-			"Content-Type: text/html\r\n"+
 			"Subject: Testing emails\r\n"+
+			"MIME-Version: 1.0\r\n"+
+			"Content-Type: multipart/mixed; boundary=gc0p4Jq0M25Tf08jU534c0p; charset=utf-8\r\n"+
+			"Date :"+fmt.Sprintf(timeNow().Format("02 Jan 2006 15:04:05 -0700"))+"\r\n"+
 			"\r\n"+
-			"This is a test" {
+			"This is a test", message)
+}
 
-		t.Error("Error building message for multiple receivers")
-	}
+func TestServerName(t *testing.T) {
 
 	// Testing serverName function
-	if name := server.serverName(); name != "mail.server.com:25" {
-		t.Error("Error building servername")
-	}
-
+	name := server.serverName()
+	assert.Equal(t, "mail.server.com:25", name)
 }

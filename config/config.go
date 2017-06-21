@@ -21,9 +21,9 @@ import (
 var (
 	HTTP_HOST                = goconf.AppConf.DefaultString("http.host", "127.0.0.1")
 	HTTP_PORT                = goconf.AppConf.DefaultString("http.port", "8080")
-	Email_Host               = goconf.AppConf.DefaultString("email.host", "127.0.0.1")
-	Email_Port               = goconf.AppConf.DefaultInt("email.port", 25)
-	Email_From               = goconf.AppConf.DefaultString("email.from", "no-reply@coord.scionproto.net")
+	EMAIL_HOST               = goconf.AppConf.DefaultString("email.host", "127.0.0.1")
+	EMAIL_PORT               = goconf.AppConf.DefaultInt("email.port", 25)
+	EMAIL_FROM               = goconf.AppConf.DefaultString("email.from", "no-reply@coord.scionproto.net")
 	SESSION_PATH             = goconf.AppConf.DefaultString("session.path", "tmp")
 	SESSION_ENCRYPTION_KEY   = goconf.AppConf.DefaultString("session.encryption_key", "x290jdxmcam9q2dci:LWC92cqwop,011DMWCMWD")
 	SESSION_VERIFICATION_KEY = goconf.AppConf.DefaultString("session.verification_key", "c23omc2o,pb45,-34l=12ms21odmx1;f230fm22fm")
