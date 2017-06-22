@@ -16,12 +16,15 @@ package api
 
 import (
 	"encoding/json"
-	"github.com/netsec-ethz/scion-coord/controllers"
-	"github.com/netsec-ethz/scion-coord/controllers/middleware"
-	"github.com/netsec-ethz/scion-coord/models"
+	"errors"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
+
+	"github.com/netsec-ethz/scion-coord/controllers"
+	"github.com/netsec-ethz/scion-coord/controllers/middleware"
+	"github.com/netsec-ethz/scion-coord/models"
 )
 
 const (
@@ -134,7 +137,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 
 		// check if the parsing succeeded
 		if err := decoder.Decode(&user); err != nil {
-			c.Forbidden(err, w, r)
+			c.Forbidden(fmt.Errorf("%v: Decoding JSON failed", err), w, r)
 			return
 		}
 
@@ -144,7 +147,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 
 		// make sure they are not empty
 		if email == "" || password == "" {
-			c.Forbidden(err, w, r)
+			c.Forbidden(errors.New("email or password empty"), w, r)
 			return
 		}
 
