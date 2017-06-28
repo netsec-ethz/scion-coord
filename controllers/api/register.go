@@ -95,20 +95,20 @@ func (c *RegistrationController) VerifyEmail(w http.ResponseWriter, r *http.Requ
 
 	if err != nil {
 		log.Printf("Error verifying email address. %v is not a valid UUID", link)
-		c.BadRequest(errors.New("invalid link"), w, r)
+		c.BadRequest(fmt.Errorf("%v is not a valid identifier", link), w, r)
 		return
 	}
 
 	if u.Verified {
 		log.Printf("Error verifying email address. User %v is already verified", u.Email)
-		c.BadRequest(errors.New("user already verified"), w, r)
+		c.BadRequest(fmt.Errorf("user %v is already verified", u.Email), w, r)
 		return
 	}
 
-	//update user
+	// update user
 	u.UpdateVerified(true)
 
-	//load validation page
+	// load validation page
 	t, err := template.ParseFiles("templates/layout.html", "templates/verified.html")
 	if err != nil {
 		log.Printf("Error parsing HTML files: %v", err)
@@ -169,7 +169,7 @@ func (c *RegistrationController) RegisterPost(w http.ResponseWriter, r *http.Req
 		c.JSON(&user, w, r)
 	}
 
-	//Send email address confirmation link
+	// Send email address confirmation link
 	if err := sendMail(user.Id); err != nil {
 		log.Printf("Error sending verification email: %v", err)
 		c.Error500(err, w, r)
@@ -217,7 +217,7 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 		c.JSON(&user, w, r)
 	}
 
-	//Send email address confirmation link
+	// Send email address confirmation link
 	if err := sendMail(user.Id); err != nil {
 		log.Printf("Error sending verification email: %v", err)
 		c.Error500(err, w, r)
@@ -225,6 +225,7 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 
 }
 
+// Helper functin which creates the email and server objects used to send emails to users
 func sendMail(userID uint64) error {
 
 	id := fmt.Sprintf("%v", userID)
