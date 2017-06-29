@@ -106,7 +106,11 @@ func (c *RegistrationController) VerifyEmail(w http.ResponseWriter, r *http.Requ
 	}
 
 	// update user
-	u.UpdateVerified(true)
+	if err := u.UpdateVerified(true); err != nil {
+		log.Printf("Error verifying email address for user %v: %v", u.Email, err)
+		c.Error500(fmt.Errorf("Error verifying email address for user %v: %v", u.Email, err), w, r)
+		return
+	}
 
 	// load validation page
 	t, err := template.ParseFiles("templates/layout.html", "templates/verified.html")

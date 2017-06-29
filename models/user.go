@@ -314,8 +314,9 @@ func validUserPassword(storedPassHex, storedSaltHex, password string) bool {
 	return bytes.Equal(derivedPass, storedPass)
 }
 
-func (u *user) UpdateVerified(value bool) {
+func (u *user) UpdateVerified(value bool) error {
 	u.Verified = value
 	u.Updated = time.Now().UTC()
-	o.Update(u, "Verified")
+	_, err := o.Update(u, "Verified")
+	return err
 }
