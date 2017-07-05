@@ -16,6 +16,8 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -135,7 +137,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 
 		// check if the parsing succeeded
 		if err := decoder.Decode(&user); err != nil {
-			c.Forbidden(err, w, r)
+			c.Forbidden(fmt.Errorf("Decoding JSON failed: %v", err), w, r)
 			return
 		}
 
@@ -145,7 +147,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 
 		// make sure they are not empty
 		if email == "" || password == "" {
-			c.Forbidden(err, w, r)
+			c.Forbidden(errors.New("email or password empty"), w, r)
 			return
 		}
 
