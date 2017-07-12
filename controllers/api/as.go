@@ -334,6 +334,14 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 		// findAndValidateAccount logs the error and writes back the response
 		return
 	}
+
+	// Check if the AS has enough credits for that connection and
+	// update new credits for both ASes
+	if err := c.checkAndUpdateCredits(w, r, &cr); err != nil {
+		// The function itself takes care of logging eventual errors and writing back the response
+		return
+	}
+
 	connRequest := models.ConnRequest{
 		RequestId:            cr.RequestId,
 		AccountId:            account,
@@ -355,6 +363,8 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 		log.Printf("Error inserting Connection Request. Account %v AS %v: %v", account,
 			cr.RequestIA, err)
 		c.Error500(err, w, r)
+		// The credits will be granted in foresight and must be removed in case of an error (now)
+		c.rollBackCreditUpdate(w, r, &cr)
 		return
 	}
 	log.Printf("Connection Request Successfully Received: %v Request ID: %v",
@@ -412,6 +422,15 @@ func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 		c.Error500(err, w, r)
 		return
 	}
+
+	// Add / subtract the credits for the request depending on the ConnReply.Status
+	// APPROVED = add credits to the receiver
+	// DENIED = give credits back to the initiator
+	if err := c.checkAndUpdateCreditsAtResponse(w, r, cr, reply); err != nil {
+		// The function itself takes care of logging eventual errors and writing back the response
+		return
+	}
+
 	log.Printf("Connection Reply Successfully Received. Account: %v Request ID: %v "+
 		"Requesting AS: %v Replying AS: %v Status: %v", account, reply.RequestId, reply.RequestIA,
 		reply.RespondIA, reply.Status)
