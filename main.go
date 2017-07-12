@@ -226,6 +226,12 @@ func main() {
 	router.Handle("/api/as/listASes/{account_id}/{secret}", apiChain.ThenFunc(
 		asController.ListASes))
 
+	// ==========================================================
+	// Virtual currency API
+
+	router.Handle("/api/listASConnections/{account_id}/{secret}/{isdas}",
+		apiChain.ThenFunc(asController.ListASesConnectionsWithCredits))
+
 	// serve static files
 	static := http.StripPrefix("/public/", http.FileServer(http.Dir("public")))
 	router.PathPrefix("/public/").Handler(xsrfChain.Then(static))

@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/astaxie/beego/orm"
+	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion/go/lib/addr"
 )
 
@@ -30,6 +31,7 @@ type As struct {
 	As      int      `orm:"index"`
 	Core    bool     `orm:"default(false)"`
 	Account *Account `orm:"rel(fk);index"`
+	Credits int64
 	Created time.Time
 }
 
@@ -77,6 +79,7 @@ func (as *As) Insert() error {
 	} else if err != orm.ErrNoRows { // some other error occurred during lookup
 		return err
 	}
+	as.Credits = config.VIRTUAL_CREDIT_START_CREDITS
 	_, err = o.Insert(as)
 	return err
 }
