@@ -411,6 +411,14 @@ func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 		c.Error500(err, w, r)
 		return
 	}
+	// TODO: Refactor this to a central place in the repository
+	err = as.UpdateCurrency(connReply.Bandwidth / 10)
+	if err != nil {
+		log.Printf("Error updating the credits. AS: %v, %v",	as, err)
+		c.Error500(err, w, r)
+		return
+	}
+
 	log.Printf("Connection Reply Successfully Received. Account: %v Request ID: %v "+
 		"Requesting AS: %v Replying AS: %v Status: %v", account, reply.RequestId, reply.RequestIA,
 		reply.RespondIA, reply.Status)

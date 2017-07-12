@@ -28,6 +28,7 @@ type As struct {
 	As      int      `orm:"index"`
 	Core    bool     `orm:"default(false)"`
 	Account *Account `orm:"rel(fk);index"`
+	Credits uint64
 	Created time.Time
 }
 
@@ -70,6 +71,12 @@ func (as *As) Insert() error {
 		return err
 	}
 	_, err = o.Insert(as)
+	return err
+}
+
+func (as *As) UpdateCurrency(Credits uint64) error {
+	as.Credits += Credits
+	_, err := o.Update(as, "Credits")
 	return err
 }
 
