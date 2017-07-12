@@ -32,6 +32,7 @@ func main() {
 	loginController := api.LoginController{}
 	asController := api.ASController{}
 	adminController := api.AdminController{}
+	currenyController := api.CurrencyController{}
 
 	// router
 	router := mux.NewRouter()
@@ -89,6 +90,12 @@ func main() {
 
 	// list the ASes the requesting AS can connect to
 	router.Handle("/api/as/listASes/{account_id}/{secret}", apiChain.ThenFunc(asController.ListASes))
+
+	// Virtual currency API
+	// list valid reservations of the ISD-AS
+	router.Handle("/api/currency/{account_id}/{secret}/{isd-as}", apiChain.ThenFunc(currenyController.GetValidReservation)).Methods("GET")
+	router.Handle("/api/currency/{account_id}/{secret}", apiChain.ThenFunc(currenyController.PostCreateReservation)).Methods("POST")
+	// ==========================================================
 
 	// serve static files
 	static := http.StripPrefix("/public/", http.FileServer(http.Dir("public")))
