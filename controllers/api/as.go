@@ -411,8 +411,8 @@ func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 		c.Error500(err, w, r)
 		return
 	}
-	// TODO: Refactor this to a central place in the repository
-	err = as.UpdateCurrency(connReply.Bandwidth / 10)
+	// Seconds per day / 16 => with this credit system the AS can reserve the complete day 10 mbits each possible slot
+	err = as.UpdateCurrency(5400); // 
 	if err != nil {
 		log.Printf("Error updating the credits. AS: %v, %v",	as, err)
 		c.Error500(err, w, r)
