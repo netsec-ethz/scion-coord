@@ -37,13 +37,12 @@ func init() {
 func TestBuildMessageSingle(t *testing.T) {
 
 	// Testing buildMessage with one receiver
-	message := mail.buildMessage()
+	message, _ := mail.buildMessage()
 	assert.Equal(t,
 		"From: sender@test.com\r\n"+
 			"To: receiver@example.com\r\n"+
 			"Subject: Testing emails\r\n"+
-			"MIME-Version: 1.0\r\n"+
-			"Content-Type: multipart/mixed; boundary=gc0p4Jq0M25Tf08jU534c0p; charset=utf-8\r\n"+
+			"Content-Type: text/plain; charset=utf-8\r\n"+
 			"Date :"+fmt.Sprintf(timeNow().Format("02 Jan 2006 15:04:05 -0700"))+"\r\n"+
 			"\r\n"+
 			"This is a test", message)
@@ -53,13 +52,12 @@ func TestBuildMessageMulti(t *testing.T) {
 
 	// Testing buildMessage with multiple receivers
 	mail.To = append(mail.To, "receiver2@domain2.com", "receiver3@domain3.com", "receiver4@domain4.com", "receiver5@domain5.com")
-	message := mail.buildMessage()
+	message, _ := mail.buildMessage()
 	assert.Equal(t,
 		"From: sender@test.com\r\n"+
 			"To: receiver@example.com,receiver2@domain2.com,receiver3@domain3.com,receiver4@domain4.com,receiver5@domain5.com\r\n"+
 			"Subject: Testing emails\r\n"+
-			"MIME-Version: 1.0\r\n"+
-			"Content-Type: multipart/mixed; boundary=gc0p4Jq0M25Tf08jU534c0p; charset=utf-8\r\n"+
+			"Content-Type: text/plain; charset=utf-8\r\n"+
 			"Date :"+fmt.Sprintf(timeNow().Format("02 Jan 2006 15:04:05 -0700"))+"\r\n"+
 			"\r\n"+
 			"This is a test", message)

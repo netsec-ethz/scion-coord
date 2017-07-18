@@ -16,6 +16,7 @@
 package email
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/smtp"
@@ -41,21 +42,22 @@ var timeNow = time.Now
 
 // Concatenates the hostname and port to get the servername as needed in the Send function
 func (s *SMTPServer) serverName() string {
-	return s.Host + ":" + fmt.Sprintf("%d", s.Port)
+	return fmt.Sprintf("%s:%d", s.Host, s.Port)
 }
 
 // Composes the message to be sent using the fields specified in Email
-func (mail *Email) buildMessage() string {
-	message := fmt.Sprintf("From: %s\r\n", mail.From)
-	if len(mail.To) > 0 {
-		message += fmt.Sprintf("To: %s\r\n", strings.Join(mail.To, ","))
+func (mail *Email) buildMessage() (string, error) {
+	if len(mail.To) == 0 {
+		return "", errors.New("No recipients specified")
 	}
+	message := fmt.Sprintf("From: %s\r\n", mail.From)
+	message += fmt.Sprintf("To: %s\r\n", strings.Join(mail.To, ","))
 	message += fmt.Sprintf("Subject: %s\r\n", mail.Subject)
-	message += "MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=gc0p4Jq0M25Tf08jU534c0p; charset=utf-8\r\n"
+	message += "Content-Type: text/plain; charset=utf-8\r\n"
 	message += "Date :" + fmt.Sprintf(timeNow().Format("02 Jan 2006 15:04:05 -0700")) + "\r\n"
 	message += "\r\n" + mail.Body
 
-	return message
+	return message, nil
 }
 
 // Send connects to the specified server and sends the email
@@ -88,8 +90,15 @@ func Send(mail *Email, server *SMTPServer) (err error) {
 		return
 	}
 
-	//write the message
-	if _, err = wc.Write([]byte(mail.buildMessage())); err != nil {
+	// build the message
+	message, err := mail.buildMessage()
+	if err != nil {
+		log.Printf("Error building message: %v", err)
+		return
+	}
+
+	// write the message
+	if _, err = wc.Write([]byte(message)); err != nil {
 		log.Printf("Error writing email body: %v", err)
 		return
 	}

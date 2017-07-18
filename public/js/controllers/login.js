@@ -11,7 +11,7 @@ angular.module('scionApp')
                     },
                     function(response) {
                         console.log(response);
-                        $scope.error = "Failed to log you in: Make sure your email address and password are correct and your email is verified."
+                        $scope.error = "Failed to log you in: Make sure your email address and password are correct and your email address is verified."
                     });  
             };
 

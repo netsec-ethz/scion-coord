@@ -48,17 +48,17 @@ type Account struct {
 }
 
 type user struct {
-	Id        uint64
-	Email     string `orm:"index"`
-	Password  string
-	Salt      string
-	FirstName string
-	LastName  string
-	Verified  bool     // whether the user verified the email
-	EmailLink string   // uuid sent to user to verify email
-	Account   *Account `orm:"rel(fk);index"`
-	Created   time.Time
-	Updated   time.Time
+	Id               uint64
+	Email            string `orm:"index"`
+	Password         string
+	Salt             string
+	FirstName        string
+	LastName         string
+	Verified         bool     // whether the user verified the email
+	VerificationUUID string   // uuid sent to user to verify email
+	Account          *Account `orm:"rel(fk);index"`
+	Created          time.Time
+	Updated          time.Time
 	// TODO: add the 2 factor authentication
 }
 
@@ -145,7 +145,7 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 		u.LastName = last
 		u.Password = hex.EncodeToString(derivedPassword)
 		u.Salt = hex.EncodeToString(salt)
-		u.EmailLink = uuid.New()
+		u.VerificationUUID = uuid.New()
 		//u.TwoFA = false // set it to false
 		u.Created = time.Now().UTC()
 		u.Updated = time.Now().UTC()
@@ -187,9 +187,9 @@ func FindUserByEmail(email string) (*user, error) {
 	return u, err
 }
 
-func FindUserByEmailLink(link string) (*user, error) {
+func FindUserByVerificationUUID(link string) (*user, error) {
 	u := new(user)
-	err := o.QueryTable(u).Filter("EmailLink", link).RelatedSel().One(u)
+	err := o.QueryTable(u).Filter("VerificationUUID", link).RelatedSel().One(u)
 	return u, err
 }
 

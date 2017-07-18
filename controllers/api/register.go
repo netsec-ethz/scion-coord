@@ -88,14 +88,14 @@ func (r *registrationRequest) isValid() (bool, error) {
 func (c *RegistrationController) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 
 	//retrieve submitted uuid
-	link := mux.Vars(r)["link"]
+	uuid := mux.Vars(r)["uuid"]
 
 	//validate link
-	u, err := models.FindUserByEmailLink(link)
+	u, err := models.FindUserByVerificationUUID(uuid)
 
 	if err != nil {
-		log.Printf("Error verifying email address. %v is not a valid UUID", link)
-		c.BadRequest(fmt.Errorf("%v is not a valid identifier", link), w, r)
+		log.Printf("Error verifying email address. %v is not a valid UUID", uuid)
+		c.BadRequest(fmt.Errorf("%v is not a valid identifier", uuid), w, r)
 		return
 	}
 
@@ -108,7 +108,8 @@ func (c *RegistrationController) VerifyEmail(w http.ResponseWriter, r *http.Requ
 	// update user
 	if err := u.UpdateVerified(true); err != nil {
 		log.Printf("Error verifying email address for user %v: %v", u.Email, err)
-		c.Error500(fmt.Errorf("Error verifying email address for user %v: %v", u.Email, err), w, r)
+		// TODO: Pass the user a unique error ID which links to the specific error and allows for debugging
+		c.Error500(fmt.Errorf("Error verifying email address for user %v", u.Email), w, r)
 		return
 	}
 
@@ -229,11 +230,10 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 
 }
 
-// Helper functin which creates the email and server objects used to send emails to users
+// Helper function which creates the email and server objects used to send emails to users
 func sendMail(userID uint64) error {
 
-	id := fmt.Sprintf("%v", userID)
-	user, err := models.FindUserById(id)
+	user, err := models.FindUserById(fmt.Sprintf("%v", userID))
 	if err != nil {
 		return err
 	}
@@ -244,12 +244,12 @@ func sendMail(userID uint64) error {
 	}
 
 	data := struct {
-		FirstName string
-		LastName  string
-		Host      string
-		Port      string
-		EmailLink string
-	}{user.FirstName, user.LastName, config.HTTP_HOST, config.HTTP_PORT, user.EmailLink}
+		FirstName        string
+		LastName         string
+		Host             string
+		Port             string
+		VerificationUUID string
+	}{user.FirstName, user.LastName, config.HTTP_HOST, config.HTTP_PORT, user.VerificationUUID}
 
 	buf := new(bytes.Buffer)
 	tmpl.Execute(buf, data)

@@ -73,7 +73,7 @@ func main() {
 	router.Handle("/api/me", loggingChain.ThenFunc(loginController.Me))
 
 	//email validation
-	router.Handle("/api/verifyEmail/{link}", loggingChain.ThenFunc(registrationController.VerifyEmail))
+	router.Handle("/api/verifyEmail/{uuid}", loggingChain.ThenFunc(registrationController.VerifyEmail))
 
 	// ==========================================================
 	// API
