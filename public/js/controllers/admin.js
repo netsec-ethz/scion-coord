@@ -20,5 +20,5 @@ angular.module('scionApp')
             $scope.me();
 
 
-        }
+     }
     ]);

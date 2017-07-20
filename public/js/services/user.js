@@ -10,7 +10,7 @@ angular.module('scionApp')
             set: function(value) {
                 user = value;
             }
-        };  
+        };
     };
     return userService;
 }]);
