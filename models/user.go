@@ -15,18 +15,18 @@
 package models
 
 import (
-	//"crypto"
 	"bufio"
 	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"time"
+
 	"github.com/astaxie/beego/orm"
 	uuid "github.com/pborman/uuid"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/crypto/scrypt"
-	"time"
 )
 
 const (
@@ -48,16 +48,17 @@ type Account struct {
 }
 
 type user struct {
-	Id        uint64
-	Email     string `orm:"index"`
-	Password  string
-	Salt      string
-	FirstName string
-	LastName  string
-	Verified  bool     // whether the user verified the email
-	Account   *Account `orm:"rel(fk);index"`
-	Created   time.Time
-	Updated   time.Time
+	Id               uint64
+	Email            string `orm:"index"`
+	Password         string
+	Salt             string
+	FirstName        string
+	LastName         string
+	Verified         bool     // whether the user verified the email
+	VerificationUUID string   // uuid sent to user to verify email
+	Account          *Account `orm:"rel(fk);index"`
+	Created          time.Time
+	Updated          time.Time
 	// TODO: add the 2 factor authentication
 }
 
@@ -144,6 +145,7 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 		u.LastName = last
 		u.Password = hex.EncodeToString(derivedPassword)
 		u.Salt = hex.EncodeToString(salt)
+		u.VerificationUUID = uuid.New()
 		//u.TwoFA = false // set it to false
 		u.Created = time.Now().UTC()
 		u.Updated = time.Now().UTC()
@@ -182,6 +184,12 @@ func FindAccount(name string) (*Account, error) {
 func FindUserByEmail(email string) (*user, error) {
 	u := new(user)
 	err := o.QueryTable(u).Filter("Email", email).RelatedSel().One(u)
+	return u, err
+}
+
+func FindUserByVerificationUUID(link string) (*user, error) {
+	u := new(user)
+	err := o.QueryTable(u).Filter("VerificationUUID", link).RelatedSel().One(u)
 	return u, err
 }
 
@@ -233,7 +241,15 @@ func (u *user) Authenticate(password string) error {
 
 	// the user did less than N login attempts
 	//if u.FailedAttempts <= MAX_LOGIN_ATTEMPTS {
-	return u.checkPassword(password)
+	if err := u.checkPassword(password); err != nil {
+		return err
+	}
+
+	if err := u.CheckVerified(); err != nil {
+		return err
+	}
+
+	return nil
 	//}
 
 	// this means the user tried to log in more than 15 minutes ago
@@ -263,7 +279,14 @@ func (u *user) checkPassword(password string) error {
 	// 	return err
 	// }
 
-	return errors.New("Failed to login")
+	return errors.New("Password invalid")
+}
+
+func (u *user) CheckVerified() error {
+	if !u.Verified {
+		return errors.New("Email is not verified")
+	}
+	return nil
 }
 
 func validUserPassword(storedPassHex, storedSaltHex, password string) bool {
@@ -289,4 +312,11 @@ func validUserPassword(storedPassHex, storedSaltHex, password string) bool {
 	}
 
 	return bytes.Equal(derivedPass, storedPass)
+}
+
+func (u *user) UpdateVerified(value bool) error {
+	u.Verified = value
+	u.Updated = time.Now().UTC()
+	_, err := o.Update(u, "Verified")
+	return err
 }

@@ -1,10 +1,10 @@
 'use strict';
- 
+
 angular.module('scionApp', [
   'ngRoute'
 
 ]).config(function ($routeProvider, $locationProvider, $httpProvider) {
-    $routeProvider      
+    $routeProvider
       .when('/register', {
         templateUrl: '/public/partials/register.html',
         controller: 'registerCtrl'
@@ -25,12 +25,12 @@ angular.module('scionApp', [
 
           $httpProvider.interceptors.push(function() {
               return {
-                  response: function(response) {                    
+                  response: function(response) {
                     console.log(response.headers('X-Xsrf-Token'));
                       $httpProvider.defaults.headers.common['X-Xsrf-Token'] = response.headers('X-Xsrf-Token');
                       return response;
                   }
-              }    
+              }
           });
 
 
