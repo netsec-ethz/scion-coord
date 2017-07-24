@@ -15,15 +15,20 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/netsec-ethz/scion-coord/controllers"
-	"github.com/netsec-ethz/scion-coord/controllers/middleware"
-	"github.com/netsec-ethz/scion-coord/models"
 	"html/template"
 	"log"
 	"net/http"
+
+	"github.com/gorilla/mux"
+	"github.com/netsec-ethz/scion-coord/config"
+	"github.com/netsec-ethz/scion-coord/controllers"
+	"github.com/netsec-ethz/scion-coord/controllers/middleware"
+	"github.com/netsec-ethz/scion-coord/email"
+	"github.com/netsec-ethz/scion-coord/models"
 )
 
 type RegistrationController struct {
@@ -44,6 +49,7 @@ type registrationRequest struct {
 func (c *RegistrationController) RegisterPage(w http.ResponseWriter, r *http.Request) {
 	t, err := template.ParseFiles("templates/layout.html", "templates/register.html")
 	if err != nil {
+		log.Printf("Error parsing HTML files: %v", err)
 		c.Error500(err, w, r)
 		return
 	}
@@ -62,7 +68,7 @@ func (r *registrationRequest) isValid() (bool, error) {
 	// check if any of this is empty
 	if r.Email == "" || r.Organisation == "" || r.Password == "" || r.PasswordConfirmation == "" ||
 		r.First == "" || r.Last == "" || r.Account == "" {
-		return false, fmt.Errorf("%s\n", "Email, Organisation, Password, Password confirmation, Firts and Last name and Account are all mandatory fields")
+		return false, fmt.Errorf("%s\n", "Email, Organisation, Password, Password confirmation, First and Last name and Account are all mandatory fields")
 	}
 
 	// check if the password match and that the length is at least 8 chars
@@ -76,6 +82,46 @@ func (r *registrationRequest) isValid() (bool, error) {
 	}
 
 	return true, nil
+}
+
+// Method used to validate email address
+func (c *RegistrationController) VerifyEmail(w http.ResponseWriter, r *http.Request) {
+
+	//retrieve submitted uuid
+	uuid := mux.Vars(r)["uuid"]
+
+	//validate link
+	u, err := models.FindUserByVerificationUUID(uuid)
+
+	if err != nil {
+		log.Printf("Error verifying email address. %v is not a valid UUID", uuid)
+		c.BadRequest(fmt.Errorf("%v is not a valid identifier", uuid), w, r)
+		return
+	}
+
+	if u.Verified {
+		log.Printf("Error verifying email address. User %v is already verified", u.Email)
+		c.BadRequest(fmt.Errorf("user %v is already verified", u.Email), w, r)
+		return
+	}
+
+	// update user
+	if err := u.UpdateVerified(true); err != nil {
+		log.Printf("Error verifying email address for user %v: %v", u.Email, err)
+		// TODO: Pass the user a unique error ID which links to the specific error and allows for debugging
+		c.Error500(fmt.Errorf("Error verifying email address for user %v", u.Email), w, r)
+		return
+	}
+
+	// load validation page
+	t, err := template.ParseFiles("templates/layout.html", "templates/verified.html")
+	if err != nil {
+		log.Printf("Error parsing HTML files: %v", err)
+		c.Error500(err, w, r)
+		return
+	}
+	c.Render(t, u, w, r)
+
 }
 
 // This method is used to register a new account via the standard form
@@ -118,13 +164,22 @@ func (c *RegistrationController) RegisterPost(w http.ResponseWriter, r *http.Req
 	}
 
 	// register the user
-	if user, err := models.RegisterUser(regRequest.Account, regRequest.Organisation,
-		regRequest.Email, regRequest.Password, regRequest.First, regRequest.Last); err != nil {
+	user, err := models.RegisterUser(regRequest.Account, regRequest.Organisation,
+		regRequest.Email, regRequest.Password, regRequest.First, regRequest.Last)
+
+	if err != nil {
 		c.Error500(errors.New("{}"), w, r)
 		return
 	} else {
 		c.JSON(&user, w, r)
 	}
+
+	// Send email address confirmation link
+	if err := sendMail(user.Id); err != nil {
+		log.Printf("Error sending verification email: %v", err)
+		c.Error500(err, w, r)
+	}
+
 }
 
 // This method is used to register a new account via the standard form
@@ -156,12 +211,61 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 	}
 
 	// register the user
-	if user, err := models.RegisterUser(regRequest.Account, regRequest.Organisation,
-		regRequest.Email, regRequest.Password, regRequest.First, regRequest.Last); err != nil {
-		log.Println(err)
+	user, err := models.RegisterUser(regRequest.Account, regRequest.Organisation,
+		regRequest.Email, regRequest.Password, regRequest.First, regRequest.Last)
+
+	if err != nil {
+		log.Printf("Error registering the user: %v", err)
 		c.Error500(err, w, r)
 		return
 	} else {
 		c.JSON(&user, w, r)
 	}
+
+	// Send email address confirmation link
+	if err := sendMail(user.Id); err != nil {
+		log.Printf("Error sending verification email: %v", err)
+		c.Error500(err, w, r)
+	}
+
+}
+
+// Helper function which creates the email and server objects used to send emails to users
+func sendMail(userID uint64) error {
+
+	user, err := models.FindUserById(fmt.Sprintf("%v", userID))
+	if err != nil {
+		return err
+	}
+
+	tmpl, err := template.ParseFiles("email/templates/verification.html")
+	if err != nil {
+		return err
+	}
+
+	data := struct {
+		FirstName        string
+		LastName         string
+		Host             string
+		Port             string
+		VerificationUUID string
+	}{user.FirstName, user.LastName, config.HTTP_HOST, config.HTTP_PORT, user.VerificationUUID}
+
+	buf := new(bytes.Buffer)
+	tmpl.Execute(buf, data)
+	body := buf.String()
+
+	mail := new(email.Email)
+	mail.From = config.EMAIL_FROM
+	mail.To = []string{user.Email}
+	mail.Subject = "Verify your email address for SCIONLab Coordination Service"
+	mail.Body = body
+
+	server := &email.SMTPServer{Host: config.EMAIL_HOST, Port: config.EMAIL_PORT}
+
+	if err := email.Send(mail, server); err != nil {
+		return err
+	}
+
+	return nil
 }

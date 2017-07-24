@@ -70,6 +70,12 @@ func TestCreateUser(t *testing.T) {
 	}
 
 	// check authentication
+	if err := user.Authenticate(password); err.Error() != "Email is not verified" {
+		t.Error(err)
+	}
+
+	//verify user and authenticate again
+	user.UpdateVerified(true)
 	if err := user.Authenticate(password); err != nil {
 		t.Error("Could not authenticate")
 	}
