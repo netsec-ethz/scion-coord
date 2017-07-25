@@ -23,8 +23,9 @@ import (
 )
 
 type As struct {
-	Id      uint64   `orm:"column(id);auto;pk"`
-	Isd     int      `orm:"index"`
+	Id  uint64 `orm:"column(id);auto;pk"`
+	Isd int    `orm:"index"`
+	// TODO (ercanucan): This field should be renamed to AS ID!
 	As      int      `orm:"index"`
 	Core    bool     `orm:"default(false)"`
 	Account *Account `orm:"rel(fk);index"`
@@ -51,6 +52,12 @@ func FindAsByIsdAs(isdas string) (*As, error) {
 	as := new(As)
 	err = o.QueryTable(as).Filter("Isd", ia.I).Filter("As", ia.A).RelatedSel().One(as)
 	return as, err
+}
+
+func FindAllASes() ([]As, error) {
+	var ases []As
+	_, err := o.QueryTable("as").All(&ases)
+	return ases, err
 }
 
 func (as *As) deleteAs() error {

@@ -1,8 +1,35 @@
 <!-- Site wrapper -->
 <div class="wrapper">
 
+  <br/>
+  <br/>
+  <p>Welcome to SCIONLab! Your account credentials are the following:</p>
+
   <p><b>AccountId:</b> {{user.AccountId}}</p>
   <p><b>Secret:</b> {{user.Secret}}</p>
+
+  <br/>
+  <br/>
+  <p><font color="red">When you fill out and submit the form below, your SCIONLab VM configuration for connecting to SCIONLab AS 1-7 will be packaged
+  and downloaded. Please extract the downloaded tarball in a desired location and refer to the README file inside for instructions.</font></p>
+
+  <p><font color="red"><b>Please note:</b> SCIONLab currently requires that your machine has a public IP address and can receive UDP traffic at port 50000.</font></p>
+
+  <ng-form name="scionLabVMForm" ng-submit="submit()">
+    <div class="form-group has-feedback">
+      <input type="text" class="form-control" ng-model="user.scionLabVMIP" name="scionLabVMIP" placeholder="My host's public IP address" ng-required="true">
+      <span class="form-control-feedback"></span>
+    </div>
+    <div class="row">
+      <div class="col-xs-12">
+        <button ng-click="scionLabVM(user)" type="button" class="btn btn-primary btn-block btn-flat">Create and Download SCIONLab VM Configuration</button>
+      </div>
+      <!-- /.col -->
+    </div>
+    <div ng-show="error" ng-model="error" class="alert alert-danger alert-dismissible">
+      {{error}}
+    </div>
+  </form>
 
 </div>
 <!-- ./wrapper -->
