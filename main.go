@@ -33,6 +33,7 @@ func main() {
 	registrationController := api.RegistrationController{}
 	loginController := api.LoginController{}
 	asController := api.ASController{}
+	scionLabVMController := api.SCIONLabVMController{}
 	adminController := api.AdminController{}
 
 	// router
@@ -75,6 +76,15 @@ func main() {
 
 	//email validation
 	router.Handle("/api/verifyEmail/{uuid}", loggingChain.ThenFunc(registrationController.VerifyEmail))
+
+	// generates a SCIONLab VM
+	// TODO(ercanucan): fix the authentication
+	router.Handle("/api/as/generateVM", apiChain.ThenFunc(scionLabVMController.GenerateSCIONLabVM))
+	router.Handle("/api/as/downloads", apiChain.ThenFunc(scionLabVMController.ReturnTarball))
+	router.Handle("/api/as/getNewScionLabVMASes/{account_id}/{secret}",
+		apiChain.ThenFunc(scionLabVMController.GetNewScionLabVMASes))
+	router.Handle("/api/as/confirmActivatedScionLabVMASes/{account_id}/{secret}",
+		apiChain.ThenFunc(scionLabVMController.ConfirmActivatedScionLabVMASes))
 
 	// ==========================================================
 	// API
