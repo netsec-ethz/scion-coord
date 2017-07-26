@@ -246,10 +246,9 @@ func sendMail(userID uint64) error {
 	data := struct {
 		FirstName        string
 		LastName         string
-		Host             string
-		Port             string
+		HostAddress      string
 		VerificationUUID string
-	}{user.FirstName, user.LastName, config.HTTP_HOST, config.HTTP_PORT, user.VerificationUUID}
+	}{user.FirstName, user.LastName, config.HTTP_HOST_ADDRESS, user.VerificationUUID}
 
 	buf := new(bytes.Buffer)
 	tmpl.Execute(buf, data)

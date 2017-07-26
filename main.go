@@ -15,6 +15,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -99,5 +100,5 @@ func main() {
 	router.PathPrefix("/public/").Handler(xsrfChain.Then(static))
 
 	// listen to HTTP requests
-	log.Fatal(http.ListenAndServe(config.HTTP_HOST+":"+config.HTTP_PORT, handlers.CompressHandler(router)))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", config.HTTP_BIND_ADDRESS, config.HTTP_BIND_PORT), handlers.CompressHandler(router)))
 }

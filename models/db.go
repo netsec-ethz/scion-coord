@@ -29,7 +29,7 @@ var (
 func init() {
 	orm.RegisterDriver("mysql", orm.DRMySQL)
 	orm.RegisterDataBase("default", "mysql",
-		fmt.Sprintf("%s:%s@(%s:%s)/%s?charset=utf8&parseTime=true",
+		fmt.Sprintf("%s:%s@(%s:%d)/%s?charset=utf8&parseTime=true",
 			config.DB_USER, config.DB_PASS, config.DB_HOST, config.DB_PORT, config.DB_NAME), config.DB_MAX_CONNECTIONS, config.DB_MAX_IDLE)
 
 	// prints the queries
