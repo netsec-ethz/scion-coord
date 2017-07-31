@@ -61,7 +61,6 @@ type ScionLabVM struct {
 // API end-point to serve the list of new SCIONLabVMs to the requsting SCIONLab AS
 func (s *SCIONLabVMController) GetNewScionLabVMASes(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Inside GetNewScionLabVMASes = %v", r.URL.Query())
-	log.Printf("Query = %v", r.URL.Query())
 	// TODO (ercanucan): proper error handling, otherwise panic!!
 	scionLabAS := r.URL.Query().Get("scionLabAS")
 	vms, err := models.FindScionLabVMsByRemoteIA(scionLabAS)
@@ -124,7 +123,6 @@ func (s *SCIONLabVMController) ConfirmActivatedScionLabVMASes(w http.ResponseWri
 
 func (s *SCIONLabVMController) ReturnTarball(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Inside ReturnTarball = %v", r.URL.Query())
-	log.Printf("Query = %v", r.URL.Query())
 	file_name := r.URL.Query().Get("filename")
 	file_path := filepath.Join(package_path, file_name)
 	data, err := ioutil.ReadFile(file_path)
@@ -138,26 +136,74 @@ func (s *SCIONLabVMController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 	http.ServeContent(w, r, "/api/as/downloads/"+file_name, time.Now(), bytes.NewReader(data))
 }
 
+type SCIONLabVMInfo struct {
+	IsNewUser  bool               // denotes whether this is a new user.
+	UserEmail  string             // the email address of the user.
+	ISD_ID     int                // ISD
+	AS_ID      int                // asID of the SCIONLab VM
+	IP         string             // the public IP address of the SCIONLab VM
+	RemoteIA   string             // the SCIONLab AS the VM connects to
+	RemoteIP   string             // the IP address of the SCIONLab AS it connects to
+	RemotePort int                // port number of the remote SCIONLab AS being connected to
+	SVM        *models.ScionLabVM // if exists, the DB object that belongs to this VM
+}
+
 // Generates a SCIONLab VM
-// TODO (ercanucan): Refactor this function into smaller pieces!!!
 func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http.Request) {
-	// parse the form value
-	if err := r.ParseForm(); err != nil {
-		log.Printf("Error while parsing the form: %v", err)
+	// parse the arguments
+	scionLabVMIP, userEmail, err := s.parseURLParameters(r)
+	if err != nil {
+		// TODO (ercanucan): error handling
+		s.BadRequest(err, w, r)
+		return
+	}
+	// Target ScionLab IA to connect to is fixed for now
+	targetIA := "1-7"
+	isdID := 1
+	svmInfo, err := s.getSCIONLabVMInfo(scionLabVMIP, userEmail, targetIA, isdID)
+	if err != nil {
+		// TODO (ercanucan): return a better error
 		s.Error500(err, w, r)
 		return
 	}
-	// TODO (ercanucan): proper parsind and error handling here
+	// Generate topology file
+	s.generateTopologyFile(svmInfo)
+	// Generate local gen
+	s.generateLocalGen(svmInfo)
+	// Package the VM
+	fileName := s.packageSCIONLabVM(svmInfo.UserEmail)
+	// Persist the relevant data in the DB
+	err = s.updateDB(svmInfo)
+	if err != nil {
+		// TODO (ercanucan): error handling
+		s.Error500(err, w, r)
+		return
+	}
+	fmt.Fprintln(w, fileName)
+}
+
+func (s *SCIONLabVMController) parseURLParameters(r *http.Request) (string, string, error) {
+	if err := r.ParseForm(); err != nil {
+		log.Printf("Error while parsing the form: %v", err)
+		// TODO (ercanucan): return a better error
+		return "", "", err
+	}
+	// TODO (ercanucan): proper parsing and error handling here
 	log.Printf("form is %v", r.Form)
 	scionLabVMIP := r.Form["scionLabVMIP"][0]
 	userEmail := r.Form["userEmail"][0]
 	if scionLabVMIP == "undefined" {
 		log.Printf("Empty IP address field for user %v", userEmail)
-		s.BadRequest(fmt.Errorf("%s\n", "IP address field can not be empty."), w, r)
-		return
+		// TODO (ercanucan): return a better error
+		return "", "", fmt.Errorf("%s\n", "IP address field can not be empty.")
 	}
 	log.Printf("scionLabVMIP = %v", scionLabVMIP)
 	log.Printf("userEmail = %v", userEmail)
+	return scionLabVMIP, userEmail, nil
+}
+
+func (s *SCIONLabVMController) getSCIONLabVMInfo(scionLabVMIP, userEmail, targetIA string,
+	isdID int) (*SCIONLabVMInfo, error) {
 	var newUser bool
 	var asID int
 	remotePort := -1
@@ -170,8 +216,8 @@ func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http
 			asID, _ = s.getNewSCIONLabVMASID()
 		} else {
 			log.Printf("Error looking up SCIONLab VM from DB %v: %v", userEmail, err)
-			http.Error(w, "{}", http.StatusInternalServerError)
-			return
+			// TODO (ercanucan): return a better error here
+			return nil, err
 		}
 	} else {
 		newUser = false
@@ -180,15 +226,12 @@ func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http
 		remotePort = svm.RemoteIAPort
 	}
 
-	// Target ScionLab IA to connect to is fixed for now
-	targetIA := "1-7"
-	isdID := 1
 	log.Printf("AS ID = %v", asID)
 	scionLabServer, err := models.FindScionLabServer(targetIA)
 	if err != nil {
 		log.Printf("Error while retrieving scionLabServer for %v: %v", targetIA, err)
-		http.Error(w, "{}", http.StatusInternalServerError)
-		return
+		// TODO (ercanucan): return a better error here
+		return nil, err
 	}
 
 	log.Printf("scionLabServerIP = %v", scionLabServer.IP)
@@ -199,30 +242,36 @@ func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http
 		scionLabServer.LastAssignedPort = remotePort
 		if err := scionLabServer.Update(); err != nil {
 			log.Printf("Error Updating ScionLabServerTable for ScionLab AS: %v : %v", targetIA, err)
-			s.Error500(err, w, r)
-			return
+			// TODO (ercanucan): return a better error here
+			return nil, err
 		}
 	}
-	// Generate topology file
-	// TODO (ercanucan): Fix the parameters (i.e do not send isdID and asID separately)
-	s.generateTopologyFile(scionLabVMIP, strconv.Itoa(isdID), strconv.Itoa(asID), targetIA,
-		remoteIP, strconv.Itoa(remotePort))
-	// Generate local gen
-	s.generateLocalGen(strconv.Itoa(isdID), strconv.Itoa(asID), userEmail)
-	// Package the VM
-	file_name := s.packageSCIONLabVM(userEmail)
+	return &SCIONLabVMInfo{
+		IsNewUser:  newUser,
+		UserEmail:  userEmail,
+		ISD_ID:     isdID,
+		AS_ID:      asID,
+		RemoteIA:   targetIA,
+		IP:         scionLabVMIP,
+		RemoteIP:   remoteIP,
+		RemotePort: remotePort,
+		SVM:        svm,
+	}, nil
+}
 
-	if newUser {
+// Updates the relevant database tables related to SCIONLab VM creation.
+func (s *SCIONLabVMController) updateDB(svmInfo *SCIONLabVMInfo) error {
+	if svmInfo.IsNewUser {
 		// update the AS table
-		user, err := models.FindUserByEmail(userEmail)
+		user, err := models.FindUserByEmail(svmInfo.UserEmail)
 		if err != nil {
-			log.Printf("Error finding the user by email %v: %v", userEmail, err)
-			http.Error(w, "{}", http.StatusInternalServerError)
-			return
+			log.Printf("Error finding the user by email %v: %v", svmInfo.UserEmail, err)
+			// TODO (ercanucan): return a better error here
+			return err
 		}
 		new_as := &models.As{
-			Isd:     isdID,
-			As:      asID,
+			Isd:     svmInfo.ISD_ID,
+			As:      svmInfo.AS_ID,
 			Core:    false,
 			Account: user.Account,
 			Created: time.Now().UTC(),
@@ -230,28 +279,27 @@ func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http
 		if err = new_as.Insert(); err != nil {
 			log.Printf("Error inserting new AS: %v User: %v Account: %v, %v",
 				new_as.String(), user, err)
-			s.Error500(err, w, r)
-			return
+			// TODO (ercanucan): return a better error here
+			return err
 		}
 		log.Printf("New SCIONLab VM AS successfully created. User: %v new AS: %v", user, new_as.String())
 		new_svm := models.ScionLabVM{
-			UserEmail:    userEmail,
-			IP:           scionLabVMIP,
+			UserEmail:    svmInfo.UserEmail,
+			IP:           svmInfo.IP,
 			IA:           new_as,
-			RemoteIAPort: remotePort,
+			RemoteIAPort: svmInfo.RemotePort,
 			Activated:    false,
-			RemoteIA:     targetIA,
+			RemoteIA:     svmInfo.RemoteIA,
 		}
 		// TODO (ercanucan): error handling
 		new_svm.Insert()
 	} else {
 		// Update the SCIONLabVM Table
 		// TODO (ercanucan): error handling
-		svm.IP = scionLabVMIP
-		svm.Update()
+		svmInfo.SVM.IP = svmInfo.IP
+		svmInfo.SVM.Update()
 	}
-
-	fmt.Fprintln(w, file_name)
+	return nil
 }
 
 func (s *SCIONLabVMController) getNewSCIONLabVMASID() (int, error) {
@@ -269,9 +317,8 @@ func (s *SCIONLabVMController) getNewSCIONLabVMASID() (int, error) {
 	return asID + 1, nil
 }
 
-func (s *SCIONLabVMController) generateTopologyFile(publicIP, isdID, asID, targetIA, remoteIP, remotePort string) {
+func (s *SCIONLabVMController) generateTopologyFile(svmInfo *SCIONLabVMInfo) {
 	log.Printf("Generating topology file for SCIONLab VM")
-
 	t, err := template.ParseFiles("templates/simple_config_topo.tmpl")
 	if err != nil {
 		log.Print(err)
@@ -285,23 +332,25 @@ func (s *SCIONLabVMController) generateTopologyFile(publicIP, isdID, asID, targe
 	}
 	// Topo file parameters
 	config := map[string]string{
-		"IP":           publicIP,
-		"ISD_ID":       isdID,
-		"AS_ID":        asID,
-		"TARGET_ISDAS": targetIA,
-		"REMOTE_ADDR":  remoteIP,
-		"REMOTE_PORT":  remotePort,
+		"IP":           svmInfo.IP,
+		"ISD_ID":       strconv.Itoa(svmInfo.ISD_ID),
+		"AS_ID":        strconv.Itoa(svmInfo.AS_ID),
+		"TARGET_ISDAS": svmInfo.RemoteIA,
+		"REMOTE_ADDR":  svmInfo.RemoteIP,
+		"REMOTE_PORT":  strconv.Itoa(svmInfo.RemotePort),
 	}
-	err = t.Execute(f, config)
-	if err != nil {
+	if err = t.Execute(f, config); err != nil {
 		log.Print("execute: ", err)
 		return
 	}
 	f.Close()
 }
 
-func (s *SCIONLabVMController) generateLocalGen(isdID, asID, userEmail string) {
+func (s *SCIONLabVMController) generateLocalGen(svmInfo *SCIONLabVMInfo) {
 	log.Printf("Creating gen folder for SCIONLab VM")
+	asID := strconv.Itoa(svmInfo.AS_ID)
+	isdID := strconv.Itoa(svmInfo.ISD_ID)
+	userEmail := svmInfo.UserEmail
 	log.Printf("Calling create local gen. ISD-ID: %v, AS-ID: %v, UserEmail: %v", isdID, asID, userEmail)
 	cmd := exec.Command("python3", local_gen_path, "--topo_file="+topo_path, "--user_id="+userEmail,
 		"--joining_ia="+isdID+"-"+asID)
@@ -310,10 +359,9 @@ func (s *SCIONLabVMController) generateLocalGen(isdID, asID, userEmail string) {
 	cmd.Env = env
 	cmdOut, _ := cmd.StdoutPipe()
 	cmdErr, _ := cmd.StderrPipe()
-	startErr := cmd.Start()
-	if startErr != nil {
-		// TODO(ercanucan): fix error logging
-		log.Printf("Command could not start!!")
+	if startErr := cmd.Start(); startErr != nil {
+		// TODO(ercanucan): better error reporting
+		log.Printf("Generate local gen command could not start.")
 		return
 	}
 	// read stdout and stderr
@@ -332,20 +380,17 @@ func (s *SCIONLabVMController) packageSCIONLabVM(userEmail string) (file_path st
 		src := filepath.Join(vagrant_path, obj.Name())
 		dst := filepath.Join(user_package_path, obj.Name())
 		if !obj.IsDir() {
-			err = CopyFile(src, dst)
-			if err != nil {
+			if err = CopyFile(src, dst); err != nil {
 				fmt.Println(err)
 			}
 		}
 	}
 	cmd := exec.Command("tar", "zcvf", userEmail+".tar.gz", userEmail)
 	cmd.Dir = package_path
-	startErr := cmd.Start()
-	if startErr != nil {
+	if startErr := cmd.Start(); startErr != nil {
 		log.Printf("Failed to create the SCIONLabVM file")
 		return
 	}
-
 	file_path = userEmail + ".tar.gz"
 	return
 }
