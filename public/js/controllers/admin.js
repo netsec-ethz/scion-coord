@@ -10,7 +10,6 @@ angular.module('scionApp')
                         $scope.user = data;
                     },
                     function(response) {
-                        console.log("RESPONSE is:");
                         console.log(response);
                         //$location.path('/');
                     });
@@ -25,12 +24,10 @@ angular.module('scionApp')
 
                 adminService.scionLabVM(user).then(
                     function(data) {
-                        console.log("DATA is:");
                         console.log(data);
                         window.location.assign('/api/as/downloads?filename=' + data);
                     },
                     function(response) {
-                        console.log("RESPONSE is:");
                         console.log(response);
                         $scope.error = response.data;
                     });

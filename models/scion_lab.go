@@ -14,63 +14,64 @@
 
 package models
 
-type ScionLabServer struct {
+type SCIONLabServer struct {
 	Id               uint64 `orm:"column(id);auto;pk"`
 	IA               string `orm:"unique"` // ISD-AS in which the server is located
 	IP               string // IP address of the machine
 	LastAssignedPort int    // the last given out port number
 }
 
-func (sls *ScionLabServer) Insert() error {
+func (sls *SCIONLabServer) Insert() error {
 	_, err := o.Insert(sls)
 	return err
 }
 
-func (sls *ScionLabServer) Update() error {
+func (sls *SCIONLabServer) Update() error {
 	_, err := o.Update(sls)
 	return err
 }
 
-func FindScionLabServer(ia string) (*ScionLabServer, error) {
-	s := new(ScionLabServer)
+func FindSCIONLabServer(ia string) (*SCIONLabServer, error) {
+	s := new(SCIONLabServer)
 	err := o.QueryTable(s).Filter("IA", ia).One(s)
 	return s, err
 }
 
-type ScionLabVM struct {
+type SCIONLabVM struct {
 	Id           uint64 `orm:"column(id);auto;pk"`
 	UserEmail    string `orm:"unique"`        // Email address of the Owning user
-	IP           string `orm:"unique"`        // IP address of the ScionLab VM
+	IP           string `orm:"unique"`        // IP address of the SCIONLab VM
 	IA           *As    `orm:"rel(fk);index"` // The AS belonging to the VM
 	RemoteIA     string // the SCIONLab AS it connects to
 	RemoteIAPort int    // port number of the remote SCIONLab AS being connected to
 	Activated    bool
 }
 
-func FindScionLabVMByUserEmail(email string) (*ScionLabVM, error) {
-	v := new(ScionLabVM)
+func FindSCIONLabVMByUserEmail(email string) (*SCIONLabVM, error) {
+	v := new(SCIONLabVM)
 	err := o.QueryTable(v).Filter("UserEmail", email).RelatedSel().One(v)
 	return v, err
 }
 
-func FindScionLabVMByIPAndIA(ip, ia string) (*ScionLabVM, error) {
-	v := new(ScionLabVM)
+func FindSCIONLabVMByIPAndIA(ip, ia string) (*SCIONLabVM, error) {
+	v := new(SCIONLabVM)
 	err := o.QueryTable(v).Filter("IP", ip).Filter("RemoteIA", ia).RelatedSel().One(v)
 	return v, err
 }
 
-func FindScionLabVMsByRemoteIA(remoteIA string) ([]ScionLabVM, error) {
-	var v []ScionLabVM
-	_, err := o.QueryTable("scion_lab_v_m").Filter("RemoteIA", remoteIA).Filter("Activated", false).RelatedSel().All(&v)
+func FindSCIONLabVMsByRemoteIA(remoteIA string) ([]SCIONLabVM, error) {
+	var v []SCIONLabVM
+	// TODO (ercanucan): Find a better way to refer to the database table without absolute name
+	_, err := o.QueryTable("s_c_i_o_n_lab_v_m").Filter("RemoteIA", remoteIA).Filter("Activated", false).RelatedSel().All(&v)
 	return v, err
 }
 
-func (svm *ScionLabVM) Insert() error {
+func (svm *SCIONLabVM) Insert() error {
 	_, err := o.Insert(svm)
 	return err
 }
 
-func (svm *ScionLabVM) Update() error {
+func (svm *SCIONLabVM) Update() error {
 	_, err := o.Update(svm)
 	return err
 }
