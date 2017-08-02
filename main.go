@@ -81,10 +81,10 @@ func main() {
 	// TODO(ercanucan): fix the authentication
 	router.Handle("/api/as/generateVM", apiChain.ThenFunc(scionLabVMController.GenerateSCIONLabVM))
 	router.Handle("/api/as/downloads", apiChain.ThenFunc(scionLabVMController.ReturnTarball))
-	router.Handle("/api/as/getNewScionLabVMASes/{account_id}/{secret}",
-		apiChain.ThenFunc(scionLabVMController.GetNewScionLabVMASes))
-	router.Handle("/api/as/confirmActivatedScionLabVMASes/{account_id}/{secret}",
-		apiChain.ThenFunc(scionLabVMController.ConfirmActivatedScionLabVMASes))
+	router.Handle("/api/as/getNewSCIONLabVMASes/{account_id}/{secret}",
+		apiChain.ThenFunc(scionLabVMController.GetNewSCIONLabVMASes))
+	router.Handle("/api/as/confirmActivatedSCIONLabVMASes/{account_id}/{secret}",
+		apiChain.ThenFunc(scionLabVMController.ConfirmActivatedSCIONLabVMASes))
 
 	// ==========================================================
 	// API
