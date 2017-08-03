@@ -40,12 +40,13 @@ var (
 	scion_coord_path = filepath.Dir(filepath.Dir(current_path))
 	local_gen_path   = filepath.Join(scion_coord_path, "python/local_gen.py")
 	// TODO (jonghoonkwon): may be better to create this topo file in a temp folder
-	topo_path    = filepath.Join(scion_coord_path, "templates/simple_config_topo.json")
-	scion_path   = filepath.Join(filepath.Dir(scion_coord_path), "scion")
-	python_path  = filepath.Join(scion_path, "python")
-	vagrant_path = filepath.Join(scion_coord_path, "vagrant")
-	user_path    = filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(scion_coord_path)))))
-	package_path = filepath.Join(user_path, "scionLabConfigs")
+	topo_path      = filepath.Join(scion_coord_path, "templates/simple_config_topo.json")
+	scion_path     = filepath.Join(filepath.Dir(scion_coord_path), "scion")
+	scion_web_path = filepath.Join(scion_path, "sub", "web")
+	python_path    = filepath.Join(scion_path, "python")
+	vagrant_path   = filepath.Join(scion_coord_path, "vagrant")
+	user_path      = filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(scion_coord_path)))))
+	package_path   = filepath.Join(user_path, "scionLabConfigs")
 )
 
 type SCIONLabVMController struct {
@@ -280,7 +281,7 @@ func (s *SCIONLabVMController) generateLocalGen(svmInfo *SCIONLabVMInfo) error {
 	cmd := exec.Command("python3", local_gen_path, "--topo_file="+topo_path, "--user_id="+userEmail,
 		"--joining_ia="+isdID+"-"+asID)
 	env := os.Environ()
-	env = append(env, "PYTHONPATH="+python_path+":"+scion_path)
+	env = append(env, "PYTHONPATH="+python_path+":"+scion_path+":"+scion_web_path)
 	cmd.Env = env
 	cmdOut, _ := cmd.StdoutPipe()
 	cmdErr, _ := cmd.StderrPipe()
@@ -301,11 +302,11 @@ func (s *SCIONLabVMController) generateLocalGen(svmInfo *SCIONLabVMInfo) error {
 func (s *SCIONLabVMController) packageSCIONLabVM(userEmail string) (string, error) {
 	log.Printf("Packaging SCIONLab VM")
 	user_package_path := filepath.Join(user_path, "scionLabConfigs", userEmail)
-	directory, err := os.Open(vagrant_path)
+	vagrant_dir, err := os.Open(vagrant_path)
 	if err != nil {
 		return "", fmt.Errorf("Failed to open directory. Path: %v, %v", vagrant_path, err)
 	}
-	objects, err := directory.Readdir(-1)
+	objects, err := vagrant_dir.Readdir(-1)
 	if err != nil {
 		return "", fmt.Errorf("Failed to read directory contents. Path: %v, %v", vagrant_path, err)
 	}
