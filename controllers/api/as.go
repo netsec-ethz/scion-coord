@@ -651,3 +651,55 @@ func (c *ASController) ListASes(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Fprintln(w, string(b))
 }
+
+type ConnectionWithCredits struct {
+	ISD int
+	AS int
+	CreditBalance uint64
+	Bandwidth uint64
+	IsOutgoing bool
+
+}
+
+func (c *ASController) ListAsesConnectionsWithCredits(w http.ResponseWriter, r *http.Request) {
+	var response struct {
+		ISD         int
+		AS          int
+		Credits     uint64
+		Connections []ConnectionWithCredits
+	}
+
+	vars := mux.Vars(r)
+	isdas := vars["isdas"]
+
+	if isdas == "" {
+		c.BadRequest(errors.New("missing isdas parameter"), w, r)
+		return
+	}
+
+	requestingAS, err := models.FindAsByIsdAs(isdas)
+	if err != nil {
+		c.NotFound(errors.New(isdas+" not found"), w, r)
+		return
+	}
+	response.ISD = requestingAS.Isd
+	response.AS = requestingAS.As
+	response.Credits = requestingAS.Credits
+
+	connections, err := requestingAS.ListConnections()
+	if err != nil {
+		log.Printf("Error while retrieving list of ASes. ISD-AS: %v", requestingAS)
+		c.BadRequest(err, w, r)
+		return
+	}
+	response.Connections = connections
+
+	b, err := json.Marshal(response)
+	if err != nil {
+		log.Printf("Error during JSON Marshaling. ISD-AS: %v, %v", requestingAS, err)
+		c.Error500(err, w, r)
+		return
+	}
+	fmt.Fprintln(w, string(b))
+
+}

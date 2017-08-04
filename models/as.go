@@ -20,6 +20,7 @@ import (
 	"github.com/netsec-ethz/scion/go/lib/addr"
 	"log"
 	"time"
+	"github.com/netsec-ethz/scion-coord/controllers/api"
 )
 
 type As struct {
@@ -52,6 +53,47 @@ func FindAsByIsdAs(isdas string) (*As, error) {
 	as := new(As)
 	err = o.QueryTable(as).Filter("Isd", ia.I).Filter("As", ia.A).RelatedSel().One(as)
 	return as, err
+}
+
+func (as *As) ListConnections() ([]api.ConnectionWithCredits, error) {
+	var connections []api.ConnectionWithCredits
+	var isdas = fmt.Sprint("%v-%v", as.Isd, as.As)
+
+	// Outgoing ones (this AS paid for)
+	var outGoings []api.ConnRequest
+	_, err := o.QueryTable("conn_request").Filter("status", APPROVED).Filter("request_i_a", isdas).All(&outGoings)
+	if err != nil {
+		return connections, err
+	}
+	for _, v := range outGoings {
+		var tmp,_ = addr.IAFromString(v.RespondIA)
+		connections = append(connections, api.ConnectionWithCredits{
+			ISD: tmp.I,
+			AS: tmp.A,
+			Bandwidth: v.Bandwidth,
+			CreditBalance: BandwidthToCredits(v.Bandwidth),
+			IsOutgoing: true,
+		})
+	}
+
+	// Ingoing ones (this AS get Credits for)
+	var inGoings []api.ConnRequest
+	_, err = o.QueryTable("conn_request").Filter("status", APPROVED).Filter("respond_i_a", isdas).All(&inGoings)
+	if err != nil {
+		return connections, err
+	}
+	for _, v := range inGoings {
+		var tmp,_ = addr.IAFromString(v.RespondIA)
+		connections = append(connections, api.ConnectionWithCredits{
+			ISD: tmp.I,
+			AS: tmp.A,
+			Bandwidth: v.Bandwidth,
+			CreditBalance: BandwidthToCredits(v.Bandwidth),
+			IsOutgoing: false,
+		})
+	}
+
+	return connections, err
 }
 
 func (as *As) deleteAs() error {

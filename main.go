@@ -92,6 +92,7 @@ func main() {
 
 	// Virtual currency API
 	// ==========================================================
+	router.Handle("/api/listASConnections/{account_id}/{secret}/{isdas}", apiChain.ThenFunc(asController.ListAsesConnectionsWithCredits))
 
 	// serve static files
 	static := http.StripPrefix("/public/", http.FileServer(http.Dir("public")))
