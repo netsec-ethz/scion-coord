@@ -333,6 +333,29 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 		// findAndValidateAccount logs the error and writes back the response
 		return
 	}
+
+	as, err := models.FindAsByIsdAs(cr.RequestIA)
+	if err != nil {
+		log.Printf("Error: Unkown AS: %v, %v", r.Body, err)
+		c.BadRequest(err, w, r)
+		return
+	}
+
+	var creditsNeeded = models.BandwidthToCredits(cr.Bandwidth)
+	if (as.Credits - creditsNeeded) <= 0 {
+		err = errors.New(fmt.Sprintf("Error: Not enough credits to create a connection request! You need %v, but have only %v", creditsNeeded, as.Credits))
+		log.Printf("Info: Not enough credits! AS: %v, Request: %v, Error: %v", as, r.Body, err)
+		c.BadRequest(err, w, r)
+		return
+	}
+
+	// Subtract credits from AS
+	if err:= as.UpdateCurrency(-1* creditsNeeded); err != nil {
+		log.Printf("Error: Substracting credits! AS: %v, Request: %v, Error: %v", as, r.Body, err)
+		c.Error500(err, w, r)
+		return
+	}
+
 	connRequest := models.ConnRequest{
 		RequestId:            cr.RequestId,
 		AccountId:            account,
@@ -354,6 +377,11 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 		log.Printf("Error inserting Connection Request. Account %v AS %v: %v", account,
 			cr.RequestIA, err)
 		c.Error500(err, w, r)
+
+		// Roll back UpdateCurrency changes
+		if err:= as.UpdateCurrency(creditsNeeded); err != nil {
+			log.Printf("Critical error: Can't roll back UpdateCurrency changes! Credits: %v, AS: %v, Request: %v, Error: %v", creditsNeeded, as, r.Body, err)
+		}
 		return
 	}
 	log.Printf("Connection Request Successfully Received: %v Request ID: %v",
@@ -411,12 +439,29 @@ func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 		c.Error500(err, w, r)
 		return
 	}
-	// Seconds per day / 16 => with this credit system the AS can reserve the complete day 10 mbits each possible slot
-	err = as.UpdateCurrency(5400); // 
-	if err != nil {
-		log.Printf("Error updating the credits. AS: %v, %v",	as, err)
-		c.Error500(err, w, r)
-		return
+
+	var credits = models.BandwidthToCredits(cr.Bandwidth)
+	// If the connection is approved, add credits to the responding AS
+	if cr.Status == models.APPROVED {
+		otherAs, err := models.FindAsByIsdAs(cr.RespondIA)
+		if err != nil {
+			log.Printf("Error finding the RespondIA. Request ID: %v RequestIA: %v, RespondIA: %v, %v",
+				reply.RequestId, reply.RequestIA, reply.RespondIA, err)
+			c.Error500(err, w, r)
+			return
+		}
+		if err := otherAs.UpdateCurrency(credits); err != nil {
+			log.Printf("Error: Adding credits! AS: %v, Request: %v, Error: %v", otherAs, r.Body, err)
+			c.Error500(err, w, r)
+			return
+		}
+		// If the connection request is denied, release the reserved credits for the connection
+	} else if cr.Status != models.PENDING {
+		if err := as.UpdateCurrency(credits); err != nil {
+			log.Printf("Error: Adding credits! AS: %v, Request: %v, Error: %v", as, r.Body, err)
+			c.Error500(err, w, r)
+			return
+		}
 	}
 
 	log.Printf("Connection Reply Successfully Received. Account: %v Request ID: %v "+

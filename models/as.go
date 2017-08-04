@@ -62,7 +62,7 @@ func (as *As) deleteAs() error {
 func (as *As) Insert() error {
 	// First check whether this AS already exists, duplicates are not allowed.
 	existing_as := new(As)
-	// should always return with orm.ErrNoRows
+		// should always return with orm.ErrNoRows
 	err := o.QueryTable(as).Filter("Isd", as.Isd).Filter("As", as.As).RelatedSel().One(existing_as)
 	if err == nil {
 		log.Printf("ISD-AS (%v-%v) already exists, will not be re-inserted", as.Isd, as.As)
@@ -70,6 +70,7 @@ func (as *As) Insert() error {
 	} else if err != orm.ErrNoRows { // some other error occurred during lookup
 		return err
 	}
+	as.Credits = StartCredits()
 	_, err = o.Insert(as)
 	return err
 }
