@@ -651,22 +651,12 @@ func (c *ASController) ListASes(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Fprintln(w, string(b))
 }
-
-type ConnectionWithCredits struct {
-	ISD int
-	AS int
-	CreditBalance uint64
-	Bandwidth uint64
-	IsOutgoing bool
-
-}
-
 func (c *ASController) ListAsesConnectionsWithCredits(w http.ResponseWriter, r *http.Request) {
 	var response struct {
 		ISD         int
 		AS          int
-		Credits     uint64
-		Connections []ConnectionWithCredits
+		Credits     int64
+		Connections []models.ConnectionWithCredits
 	}
 
 	vars := mux.Vars(r)

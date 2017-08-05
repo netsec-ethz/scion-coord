@@ -20,7 +20,6 @@ import (
 	"github.com/netsec-ethz/scion/go/lib/addr"
 	"log"
 	"time"
-	"github.com/netsec-ethz/scion-coord/controllers/api"
 )
 
 type As struct {
@@ -29,7 +28,7 @@ type As struct {
 	As      int      `orm:"index"`
 	Core    bool     `orm:"default(false)"`
 	Account *Account `orm:"rel(fk);index"`
-	Credits uint64
+	Credits int64
 	Created time.Time
 }
 
@@ -55,19 +54,29 @@ func FindAsByIsdAs(isdas string) (*As, error) {
 	return as, err
 }
 
-func (as *As) ListConnections() ([]api.ConnectionWithCredits, error) {
-	var connections []api.ConnectionWithCredits
+type ConnectionWithCredits struct {
+	ISD int
+	AS int
+	CreditBalance int64
+	Bandwidth uint64
+	IsOutgoing bool
+
+}
+
+
+func (as *As) ListConnections() ([]ConnectionWithCredits, error) {
+	var connections []ConnectionWithCredits
 	var isdas = fmt.Sprint("%v-%v", as.Isd, as.As)
 
 	// Outgoing ones (this AS paid for)
-	var outGoings []api.ConnRequest
+	var outGoings []ConnRequest
 	_, err := o.QueryTable("conn_request").Filter("status", APPROVED).Filter("request_i_a", isdas).All(&outGoings)
 	if err != nil {
 		return connections, err
 	}
 	for _, v := range outGoings {
 		var tmp,_ = addr.IAFromString(v.RespondIA)
-		connections = append(connections, api.ConnectionWithCredits{
+		connections = append(connections, ConnectionWithCredits{
 			ISD: tmp.I,
 			AS: tmp.A,
 			Bandwidth: v.Bandwidth,
@@ -77,14 +86,14 @@ func (as *As) ListConnections() ([]api.ConnectionWithCredits, error) {
 	}
 
 	// Ingoing ones (this AS get Credits for)
-	var inGoings []api.ConnRequest
+	var inGoings []ConnRequest
 	_, err = o.QueryTable("conn_request").Filter("status", APPROVED).Filter("respond_i_a", isdas).All(&inGoings)
 	if err != nil {
 		return connections, err
 	}
 	for _, v := range inGoings {
 		var tmp,_ = addr.IAFromString(v.RespondIA)
-		connections = append(connections, api.ConnectionWithCredits{
+		connections = append(connections, ConnectionWithCredits{
 			ISD: tmp.I,
 			AS: tmp.A,
 			Bandwidth: v.Bandwidth,
@@ -117,7 +126,7 @@ func (as *As) Insert() error {
 	return err
 }
 
-func (as *As) UpdateCurrency(Credits uint64) error {
+func (as *As) UpdateCurrency(Credits int64) error {
 	as.Credits += Credits
 	_, err := o.Update(as, "Credits")
 	return err
