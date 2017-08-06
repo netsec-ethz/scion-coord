@@ -6,9 +6,9 @@ func StartCredits() (int64){
 	return 100
 }
 
-func BandwidthToCredits(bandwidthInMegabits uint64) (int64){
-	return int64(bandwidthInMegabits) / 10
+func BandwidthToCredits(bandwidthInKilobits uint64) (int64){
+	return int64(bandwidthInKilobits) / 1000 / 10
 }
-func CreditsToBandwidthInMegabits(credits uint64)(int64){
-	return int64(credits) * 10
+func CreditsToBandwidthInBandwidthInKilobits(credits uint64)(int64){
+	return int64(credits) * 1000 * 10
 }
