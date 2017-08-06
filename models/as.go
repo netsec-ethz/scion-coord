@@ -60,6 +60,7 @@ type ConnectionWithCredits struct {
 	CreditBalance int64
 	Bandwidth uint64
 	IsOutgoing bool
+	Timestamp string
 
 }
 
@@ -82,6 +83,7 @@ func (as *As) ListConnections() ([]ConnectionWithCredits, error) {
 			Bandwidth: v.Bandwidth,
 			CreditBalance: BandwidthToCredits(v.Bandwidth),
 			IsOutgoing: true,
+			Timestamp: v.Timestamp,
 		})
 	}
 
@@ -99,6 +101,7 @@ func (as *As) ListConnections() ([]ConnectionWithCredits, error) {
 			Bandwidth: v.Bandwidth,
 			CreditBalance: BandwidthToCredits(v.Bandwidth),
 			IsOutgoing: false,
+			Timestamp: v.Timestamp,
 		})
 	}
 
