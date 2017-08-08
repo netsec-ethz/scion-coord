@@ -1,0 +1,23 @@
+--- 
+jobs: 
+  build: 
+    docker: 
+      - 
+        image: "circleci/golang:1.8"
+      - 
+        environment: 
+          - MYSQL_ROOT_PASSWORD: development_pass
+          - MYSQL_DATABASE: scion_coord_test
+
+        image: "circleci/mysql:latest"
+    steps: 
+      - checkout
+      - run:
+         name: Wait for db
+         command: dockerize -wait tcp://localhost:3306 -timeout 1m
+      - 
+        run: "go get -v -t -d ./..."
+      - 
+        run: "go test -v ./..."
+    working_directory: "/go/src/github.com/netsec-ethz/scion-coord"
+version: 2
