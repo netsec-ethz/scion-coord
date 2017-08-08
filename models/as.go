@@ -16,10 +16,11 @@ package models
 
 import (
 	"fmt"
-	"github.com/astaxie/beego/orm"
-	"github.com/netsec-ethz/scion/go/lib/addr"
 	"log"
 	"time"
+
+	"github.com/astaxie/beego/orm"
+	"github.com/netsec-ethz/scion/go/lib/addr"
 )
 
 type As struct {
@@ -50,8 +51,8 @@ func FindAsByIsdAs(isdas string) (*As, error) {
 		return nil, err
 	}
 	as := new(As)
-	err = o.QueryTable(as).Filter("Isd", ia.I).Filter("As", ia.A).RelatedSel().One(as)
-	return as, err
+	dbErr := o.QueryTable(as).Filter("Isd", ia.I).Filter("As", ia.A).RelatedSel().One(as)
+	return as, dbErr
 }
 
 func FindAllASes() ([]As, error) {
