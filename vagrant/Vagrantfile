@@ -1,0 +1,27 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+Vagrant.require_version ">= 1.9.7"
+
+Vagrant.configure(2) do |config|
+  $setup_scion = <<-SCRIPT
+  echo 'export GOPATH="$HOME/go"' >> ~/.profile
+    echo 'export PATH="$HOME/.local/bin:$GOPATH/bin:/usr/local/go/bin:$PATH"' >> ~/.profile
+    source ~/.profile
+    mkdir -p "$GOPATH"
+    mkdir -p "$GOPATH/src/github.com/netsec-ethz"
+    cd "$GOPATH/src/github.com/netsec-ethz"
+    git config --global url.https://github.com/.insteadOf git@github.com:
+    git clone --recursive -b scionlab git@github.com:ercanucan/scion
+    cd scion
+    bash -c 'yes | GO_INSTALL=true ./env/deps'
+  SCRIPT
+  config.vm.box = "ubuntu/xenial64"
+  config.vm.network "forwarded_port", guest: 50000, host: 50000, protocol: "udp"
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = "2048"
+    vb.name = "SCIONLabVM"
+  end
+  config.vm.provision "shell", privileged: false, inline: $setup_scion
+  config.vm.provision "file", source: "gen", destination: "go/src/github.com/netsec-ethz/scion"
+end
+
