@@ -257,12 +257,10 @@ func sendMail(userID uint64) error {
 	mail := new(email.Email)
 	mail.From = config.EMAIL_FROM
 	mail.To = []string{user.Email}
-	mail.Subject = "Verify your email address for SCIONLab Coordination Service"
+	mail.Subject = "[SCIONLab] Verify your email address for SCIONLab Coordination Service"
 	mail.Body = body
 
-	server := &email.SMTPServer{Host: config.EMAIL_HOST, Port: config.EMAIL_PORT}
-
-	if err := email.Send(mail, server); err != nil {
+	if err := email.Send(mail); err != nil {
 		return err
 	}
 

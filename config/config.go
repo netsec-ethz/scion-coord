@@ -23,8 +23,8 @@ var (
 	HTTP_BIND_ADDRESS        = goconf.AppConf.String("http.bind_address") // address the service listens on
 	HTTP_BIND_PORT, _        = goconf.AppConf.Int("http.bind_port")       // port the service listens on
 	HTTP_HOST_ADDRESS        = goconf.AppConf.String("http.host_address") // address from which the service is reachable from outside
-	EMAIL_HOST               = goconf.AppConf.String("email.host")
-	EMAIL_PORT, _            = goconf.AppConf.Int("email.port")
+	EMAIL_PM_SERVER_TOKEN    = goconf.AppConf.String("email.pm_server_token")
+	EMAIL_PM_ACCOUNT_TOKEN   = goconf.AppConf.String("email.pm_account_token")
 	EMAIL_FROM               = goconf.AppConf.String("email.from")
 	SESSION_PATH             = goconf.AppConf.String("session.path")
 	SESSION_ENCRYPTION_KEY   = goconf.AppConf.String("session.encryption_key")
