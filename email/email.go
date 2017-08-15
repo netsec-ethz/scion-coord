@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package email provides functionality for constructing and sending emails using a local SMTP server
+// Package email provides functionality for constructing and sending emails via PostMark
 package email
 
 import (
-	"errors"
-	"fmt"
+	"github.com/keighl/postmark"
+	"github.com/netsec-ethz/scion-coord/config"
 	"log"
-	"net/smtp"
 	"strings"
-	"time"
 )
 
 type Email struct {
@@ -31,90 +29,27 @@ type Email struct {
 	Body    string
 }
 
-type SMTPServer struct {
-	Host     string
-	Port     int
-	User     string
-	Password string
-}
+// Send connects to the PostMark email API and sends the email
+func Send(mail *Email) error {
 
-var timeNow = time.Now
+	client := postmark.NewClient(config.EMAIL_PM_SERVER_TOKEN, config.EMAIL_PM_ACCOUNT_TOKEN)
 
-// Concatenates the hostname and port to get the servername as needed in the Send function
-func (s *SMTPServer) serverName() string {
-	return fmt.Sprintf("%s:%d", s.Host, s.Port)
-}
-
-// Composes the message to be sent using the fields specified in Email
-func (mail *Email) buildMessage() (string, error) {
-	if len(mail.To) == 0 {
-		return "", errors.New("No recipients specified")
+	email := postmark.Email{
+		From:       mail.From,
+		To:         strings.Join(mail.To, ","),
+		Subject:    mail.Subject,
+		TextBody:   mail.Body,
+		Tag:        "email-verification",
+		TrackOpens: true,
 	}
-	message := fmt.Sprintf("From: %s\r\n", mail.From)
-	message += fmt.Sprintf("To: %s\r\n", strings.Join(mail.To, ","))
-	message += fmt.Sprintf("Subject: %s\r\n", mail.Subject)
-	message += "Content-Type: text/plain; charset=utf-8\r\n"
-	message += "Date :" + fmt.Sprintf(timeNow().Format("02 Jan 2006 15:04:05 -0700")) + "\r\n"
-	message += "\r\n" + mail.Body
 
-	return message, nil
-}
+	_, err := client.SendEmail(email)
 
-// Send connects to the specified server and sends the email
-func Send(mail *Email, server *SMTPServer) (err error) {
-
-	// Connect to SMTP server
-	c, err := smtp.Dial(server.serverName())
 	if err != nil {
-		log.Printf("Error connecting to SMTP server: %v", err)
-		return
+		log.Printf("Error sending email via PostMark to: %v, %v", email.To, err)
+		return err
 	}
 
-	// Set the sender and recipients
-	if err = c.Mail(mail.From); err != nil {
-		log.Printf("Error setting sender: %v", err)
-		return
-	}
-
-	for _, t := range mail.To {
-		if err = c.Rcpt(t); err != nil {
-			log.Printf("Error setting recipients: %v", err)
-			return
-		}
-	}
-
-	// Send the email body.
-	wc, err := c.Data()
-	if err != nil {
-		log.Printf("Error sending the DATA command: %v", err)
-		return
-	}
-
-	// build the message
-	message, err := mail.buildMessage()
-	if err != nil {
-		log.Printf("Error building message: %v", err)
-		return
-	}
-
-	// write the message
-	if _, err = wc.Write([]byte(message)); err != nil {
-		log.Printf("Error writing email body: %v", err)
-		return
-	}
-
-	// close the writer
-	if err = wc.Close(); err != nil {
-		log.Printf("Error closing WriteCloser: %v", err)
-		return
-	}
-
-	// quit connection with server
-	if err = c.Quit(); err != nil {
-		log.Printf("Error closing connection with SMTP server: %v", err)
-		return
-	}
-
-	return
+	return nil
 
 }

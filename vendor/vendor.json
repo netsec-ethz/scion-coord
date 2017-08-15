@@ -75,6 +75,12 @@
 			"revisionTime": "2017-02-06T21:37:01Z"
 		},
 		{
+			"checksumSHA1": "x8EMONM0Wq3tTZMaW9RjBI50CLg=",
+			"path": "github.com/keighl/postmark",
+			"revision": "f7544123de4af45ccbb4e1a0f286cb45adb11bb7",
+			"revisionTime": "2017-06-05T11:53:17Z"
+		},
+		{
 			"checksumSHA1": "eiKZJz+wsoOmDZQ7xdpX+sqQte4=",
 			"path": "github.com/kormat/fmt15",
 			"revision": "aeb535ae78961b7591ea7f7740b74fc6560c88a8",
