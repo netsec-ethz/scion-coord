@@ -1,7 +1,7 @@
 'use strict';
 
 angular.module('scionApp', [
-  'ngRoute'
+  'ngRoute', 'vcRecaptcha'
 
 ]).config(function ($routeProvider, $locationProvider, $httpProvider) {
     $routeProvider
