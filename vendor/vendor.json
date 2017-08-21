@@ -63,6 +63,12 @@
 			"revisionTime": "2017-08-02T14:17:18Z"
 		},
 		{
+			"checksumSHA1": "gSSTik330tiAQw2CFOpNKAsRCRU=",
+			"path": "github.com/haisum/recaptcha",
+			"revision": "7d3b8053900e7a0f549a11e800649a5fa950700f",
+			"revisionTime": "2017-03-27T14:22:40Z"
+		},
+		{
 			"checksumSHA1": "mrmfY0cVu7jvgoIuTRaR8yVVh/M=",
 			"path": "github.com/inconshreveable/log15",
 			"revision": "74a0988b5f804e8ce9ff74fca4f16980776dff29",

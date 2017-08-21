@@ -22,8 +22,10 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/haisum/recaptcha"
 	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
@@ -43,6 +45,7 @@ type registrationRequest struct {
 	First                string `json:"first"`
 	Last                 string `json:"last"`
 	Account              string `json:"account"`
+	Captcha              string `json:"captcha"`
 }
 
 // TODO: cache the templates
@@ -65,6 +68,13 @@ func (c *RegistrationController) RegisterPage(w http.ResponseWriter, r *http.Req
 
 // Method used to validate the registration request
 func (r *registrationRequest) isValid() (bool, error) {
+
+	//check recaptcha
+	rc := recaptcha.R{Secret: config.CAPTCHA_SECRET_KEY}
+	if !rc.VerifyResponse(r.Captcha) {
+		return false, fmt.Errorf("ReCaptcha error: %s", strings.Join(rc.LastError()[1:], ", "))
+	}
+
 	// check if any of this is empty
 	if r.Email == "" || r.Organisation == "" || r.Password == "" || r.PasswordConfirmation == "" ||
 		r.First == "" || r.Last == "" || r.Account == "" {
