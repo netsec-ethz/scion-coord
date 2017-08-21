@@ -352,8 +352,9 @@ func CopyFile(source string, dest string) (err error) {
 
 type SCIONLabVMResp struct {
 	ASID         string // ISD-AS of the VM
-	VMIP         string // IP address of the SCIONLab VM
 	RemoteIAPort int    // port number of the remote SCIONLab AS being connected to
+	UserEmail    string // The email address of the user owning this SCIONLab VM AS
+	VMIP         string // IP address of the SCIONLab VM
 }
 
 // API end-point to serve the list of newly created but not yet activated SCIONLab VMs.
@@ -377,6 +378,7 @@ func (s *SCIONLabVMController) GetNewSCIONLabVMASes(w http.ResponseWriter, r *ht
 			ASID:         strconv.Itoa(v.IA.Isd) + "-" + strconv.Itoa(v.IA.As),
 			VMIP:         v.IP,
 			RemoteIAPort: v.RemoteIAPort,
+			UserEmail:    v.UserEmail,
 		}
 		vms_resp = append(vms_resp, vm_resp)
 	}
