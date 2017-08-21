@@ -1,7 +1,7 @@
 angular.module('scionApp')
     .factory('adminService', ["$http", "$q", function($http, $q) {
     var adminService = {
-        // Get supervisor state
+        // Load the user's data
         me: function() {
             // $http returns a promise, which has a then function, which also returns a promise
             return $http.get('/api/me').then(function (response) {
