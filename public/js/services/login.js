@@ -1,7 +1,7 @@
 angular.module('scionApp')
     .factory('loginService', ["$http", "$q", function($http, $q) {
     var loginService = {
-        // Get supervisor state
+        // Log the user in
         login: function(user) {
             // $http returns a promise, which has a then function, which also returns a promise
             return $http.post('/api/login', user).then(function (response) {
