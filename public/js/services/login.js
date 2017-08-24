@@ -1,5 +1,5 @@
 angular.module('scionApp')
-    .factory('loginService', ["$http", "$q", function($http, $q) {
+    .factory('loginService', ["$http", "$q",'$httpParamSerializer', function($http, $q, $httpParamSerializer) {
     var loginService = {
         // Log the user in
         login: function(user) {
@@ -18,6 +18,14 @@ angular.module('scionApp')
                 console.log(response);
                 // The return value gets picked up by the then in the controller.
                 return response.data;
+            });
+        },
+        resendEmail: function(email){
+           return $http({
+                method: 'POST',
+                url: '/api/resendLink',
+                data: $httpParamSerializer({ 'email': email }),
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }
             });
         }
     };
