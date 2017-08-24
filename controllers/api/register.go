@@ -240,6 +240,10 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 
 }
 
+func (c *RegistrationController) LoadCaptchaSiteKey(w http.ResponseWriter, r *http.Request) {
+	c.Plain(config.CAPTCHA_SITE_KEY, w, r)
+}
+
 // Helper function which creates the email and server objects used to send emails to users
 func sendMail(userID uint64) error {
 

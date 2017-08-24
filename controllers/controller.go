@@ -24,6 +24,8 @@ import (
 type output interface {
 	// returns JSON data
 	JSON(data interface{}, w http.ResponseWriter, r *http.Request)
+	// returns plain text data
+	Plain(data string, w http.ResponseWriter, r *http.Request)
 	// Response with a 500 and an error
 	Error500(err error, w http.ResponseWriter, r *http.Request)
 
@@ -65,6 +67,16 @@ func (c HTTPController) JSON(data interface{}, w http.ResponseWriter, r *http.Re
 		c.Error500(err, w, r)
 	}
 
+}
+
+func (c HTTPController) Plain(data string, w http.ResponseWriter, r *http.Request) {
+
+	// Set plain text header
+	w.Header().Set("Content-Type", "test/plain; charset=utf-8")
+	// write the content to socket
+	if _, err := w.Write([]byte(data)); err != nil {
+		c.Error500(err, w, r)
+	}
 }
 
 func (c HTTPController) Error500(err error, w http.ResponseWriter, r *http.Request) {

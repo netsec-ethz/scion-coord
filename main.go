@@ -66,6 +66,7 @@ func main() {
 
 	// registration
 	router.Handle("/api/register", loggingChain.ThenFunc(registrationController.Register))
+	router.Handle("/api/captchaSiteKey", loggingChain.ThenFunc(registrationController.LoadCaptchaSiteKey))
 	// login
 	router.Handle("/api/login", loggingChain.ThenFunc(loginController.Login))
 	// Logout
