@@ -2,10 +2,13 @@ angular.module('scionApp')
     .controller('registerCtrl', ['$scope', 'registerService', '$interval', '$location', 'vcRecaptchaService',
         function($scope, registerService, $interval, $location, vcRecaptchaService) {
 
-            $scope.error = "";
-            $scope.message = "";
             $scope.user = {};
-            $scope.pubkey = "----Public-Site-Key-Here----";
+
+           registerService.getSiteKey().then(
+                function (response) {
+                    $scope.pubkey = response.data;
+                }
+            );
 
             $scope.register = function(user) {
 

@@ -27,6 +27,7 @@ var (
 	EMAIL_PM_ACCOUNT_TOKEN   = goconf.AppConf.String("email.pm_account_token")
 	EMAIL_FROM               = goconf.AppConf.String("email.from")
 	CAPTCHA_SECRET_KEY       = goconf.AppConf.String("captcha.secret_key")
+	CAPTCHA_SITE_KEY         = goconf.AppConf.String("captcha.site_key")
 	SESSION_PATH             = goconf.AppConf.String("session.path")
 	SESSION_ENCRYPTION_KEY   = goconf.AppConf.String("session.encryption_key")
 	SESSION_VERIFICATION_KEY = goconf.AppConf.String("session.verification_key")
