@@ -18,7 +18,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
 	"log"
 	"net/http"
 
@@ -45,16 +44,6 @@ type user struct {
 	Organisation string
 	AccountId    string
 	Secret       string
-}
-
-// TODO: cache the templates
-func (c *LoginController) LoginPage(w http.ResponseWriter, r *http.Request) {
-	t, err := template.ParseFiles("templates/layout.html", "templates/login.html")
-	if err != nil {
-		c.Error500(err, w, r)
-		return
-	}
-	c.Render(t, nil, w, r)
 }
 
 func (c *LoginController) Me(w http.ResponseWriter, r *http.Request) {
