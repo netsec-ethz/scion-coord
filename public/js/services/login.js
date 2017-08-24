@@ -19,6 +19,14 @@ scionApp
                 // The return value gets picked up by the then in the controller.
                 return response.data;
             });
+        },
+        resendEmail: function(email){
+           return $http({
+                method: 'POST',
+                url: '/api/resendLink',
+                data: $httpParamSerializer({ 'email': email }),
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }
+            });
         }
     };
 }]);
