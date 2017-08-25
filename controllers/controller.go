@@ -18,6 +18,7 @@ package controllers
 import (
 	"encoding/json"
 	"html/template"
+	"log"
 	"net/http"
 )
 
@@ -64,6 +65,7 @@ func (c HTTPController) JSON(data interface{}, w http.ResponseWriter, r *http.Re
 
 	// write the content to socket
 	if _, err := w.Write(content); err != nil {
+		log.Printf("Error writing data to socket: %v", err)
 		c.Error500(err, w, r)
 	}
 
@@ -75,6 +77,7 @@ func (c HTTPController) Plain(data string, w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "test/plain; charset=utf-8")
 	// write the content to socket
 	if _, err := w.Write([]byte(data)); err != nil {
+		log.Printf("Error writing data to socket: %v", err)
 		c.Error500(err, w, r)
 	}
 }

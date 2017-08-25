@@ -4,7 +4,7 @@ angular.module('scionApp')
 
             $scope.user = {};
 
-           registerService.getSiteKey().then(
+            registerService.getSiteKey().then(
                 function (response) {
                     $scope.pubkey = response.data;
                 }
