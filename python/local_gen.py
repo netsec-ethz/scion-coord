@@ -60,11 +60,12 @@ from ad_manager.util.local_config_util import (
 
 
 # TODO (ercanucan): Ensure that this folder exists!
-GEN_ROOT = os.path.expanduser("~/scionLabConfigs")
-SCION_COORD_PATH = os.path.expanduser("~/go/src/github.com/netsec-ethz/scion-coord")
-DEFAULT_CORE_CERT_FILE = os.path.join(SCION_COORD_PATH, "python", "ISD1-AS1-V0.crt")
-DEFAULT_CORE_SIG_KEY = os.path.join(SCION_COORD_PATH, "python", "as-sig.key")
-DEFAULT_TRC_FILE = os.path.join(SCION_COORD_PATH, "python", "ISD1-V0.trc")
+FILE_PATH = os.path.dirname(os.path.realpath(__file__))
+SCION_COORD_PATH = os.path.dirname(FILE_PATH)
+GEN_ROOT = os.path.join(SCION_COORD_PATH, "temp")
+DEFAULT_CORE_CERT_FILE = os.path.join(SCION_COORD_PATH, "credentials", "ISD1-AS1-V0.crt")
+DEFAULT_CORE_SIG_KEY = os.path.join(SCION_COORD_PATH, "credentials", "as-sig.key")
+DEFAULT_TRC_FILE = os.path.join(SCION_COORD_PATH, "credentials", "ISD1-V0.trc")
 
 
 def create_scionlab_vm_local_gen(args, tp):
