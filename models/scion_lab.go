@@ -44,7 +44,8 @@ type SCIONLabVM struct {
 	IA           *As    `orm:"rel(fk);index"` // The AS belonging to the VM
 	RemoteIA     string // the SCIONLab AS it connects to
 	RemoteIAPort int    // port number of the remote SCIONLab AS being connected to
-	Activated    bool
+	RemoteBR     string // the name of the remote border router for this AS
+	Status       string // Action to be taken for this VM (i.e Active, Create, Update, Remove)
 }
 
 func FindSCIONLabVMByUserEmail(email string) (*SCIONLabVM, error) {
@@ -53,7 +54,7 @@ func FindSCIONLabVMByUserEmail(email string) (*SCIONLabVM, error) {
 	return v, err
 }
 
-func FindSCIONLabVMByIPAndIA(ip, ia string) (*SCIONLabVM, error) {
+func FindSCIONLabVMByIPAndRemoteIA(ip, ia string) (*SCIONLabVM, error) {
 	v := new(SCIONLabVM)
 	err := o.QueryTable(v).Filter("IP", ip).Filter("RemoteIA", ia).RelatedSel().One(v)
 	return v, err
@@ -62,7 +63,7 @@ func FindSCIONLabVMByIPAndIA(ip, ia string) (*SCIONLabVM, error) {
 func FindSCIONLabVMsByRemoteIA(remoteIA string) ([]SCIONLabVM, error) {
 	var v []SCIONLabVM
 	// TODO (ercanucan): Find a better way to refer to the database table without absolute name
-	_, err := o.QueryTable("s_c_i_o_n_lab_v_m").Filter("RemoteIA", remoteIA).Filter("Activated", false).RelatedSel().All(&v)
+	_, err := o.QueryTable("s_c_i_o_n_lab_v_m").Filter("RemoteIA", remoteIA).RelatedSel().All(&v)
 	return v, err
 }
 

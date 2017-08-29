@@ -71,11 +71,12 @@ func main() {
 	// generates a SCIONLab VM
 	// TODO(ercanucan): fix the authentication
 	router.Handle("/api/as/generateVM", apiChain.ThenFunc(scionLabVMController.GenerateSCIONLabVM))
+	router.Handle("/api/as/removeVM", apiChain.ThenFunc(scionLabVMController.RemoveSCIONLabVM))
 	router.Handle("/api/as/downloads", apiChain.ThenFunc(scionLabVMController.ReturnTarball))
-	router.Handle("/api/as/getNewSCIONLabVMASes/{account_id}/{secret}",
-		apiChain.ThenFunc(scionLabVMController.GetNewSCIONLabVMASes))
-	router.Handle("/api/as/confirmActivatedSCIONLabVMASes/{account_id}/{secret}",
-		apiChain.ThenFunc(scionLabVMController.ConfirmActivatedSCIONLabVMASes))
+	router.Handle("/api/as/getSCIONLabVMASes/{account_id}/{secret}",
+		apiChain.ThenFunc(scionLabVMController.GetSCIONLabVMASes))
+	router.Handle("/api/as/confirmSCIONLabVMASes/{account_id}/{secret}",
+		apiChain.ThenFunc(scionLabVMController.ConfirmSCIONLabVMASes))
 
 	// ==========================================================
 	// SCION Web API
