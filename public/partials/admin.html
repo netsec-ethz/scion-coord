@@ -22,12 +22,20 @@
     </div>
     <div class="row">
       <div class="col-xs-12">
-        <button ng-click="scionLabVM(user)" type="button" class="btn btn-primary btn-block btn-flat">Create and Download SCIONLab VM Configuration</button>
+        <button ng-click="generateSCIONLabVM(user)" type="button" class="btn btn-primary btn-block btn-flat">Create/Update and Download SCIONLab VM Configuration</button>
       </div>
-      <!-- /.col -->
+    </div>
+    <br/>
+    <div class="row">
+      <div class="col-xs-12">
+        <button ng-click="removeSCIONLabVM(user)" type="button" class="btn btn-primary btn-block btn-flat">Remove my SCIONLab VM</button>
+      </div>
     </div>
     <div ng-show="error" ng-model="error" class="alert alert-danger alert-dismissible">
       {{error}}
+    </div>
+    <div ng-if="message" class="alert alert-success alert-dismissible">
+      {{message}}
     </div>
   </form>
 

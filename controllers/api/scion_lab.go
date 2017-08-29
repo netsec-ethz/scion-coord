@@ -49,6 +49,17 @@ var (
 	package_path   = filepath.Join(user_path, "scionLabConfigs")
 )
 
+// The states in which a user's SCIONLab VM can be in.
+const (
+	ACTIVE  = "Active"
+	CREATE  = "Create"
+	UPDATE  = "Update"
+	REMOVE  = "Remove"
+	CREATED = "Created"
+	UPDATED = "Updated"
+	REMOVED = "Removed"
+)
+
 type SCIONLabVMController struct {
 	controllers.HTTPController
 }
@@ -104,7 +115,7 @@ func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http
 		s.Error500(err, w, r)
 		return
 	}
-	// Persist the relevant data in the DB
+	// Persist the relevant data into the DB
 	if err = s.updateDB(svmInfo); err != nil {
 		log.Printf("Error updating DB tables: %v", err)
 		s.Error500(err, w, r)
@@ -202,7 +213,7 @@ func (s *SCIONLabVMController) updateDB(svmInfo *SCIONLabVMInfo) error {
 			IP:           svmInfo.IP,
 			IA:           new_as,
 			RemoteIAPort: svmInfo.RemotePort,
-			Activated:    false,
+			Status:       CREATE,
 			RemoteIA:     svmInfo.RemoteIA,
 		}
 		if err = new_svm.Insert(); err != nil {
@@ -211,6 +222,11 @@ func (s *SCIONLabVMController) updateDB(svmInfo *SCIONLabVMInfo) error {
 	} else {
 		// Update the SCIONLabVM Table
 		svmInfo.SVM.IP = svmInfo.IP
+		if svmInfo.SVM.Status == REMOVED {
+			svmInfo.SVM.Status = CREATE
+		} else {
+			svmInfo.SVM.Status = UPDATE
+		}
 		if err := svmInfo.SVM.Update(); err != nil {
 			return fmt.Errorf("Error updating SCIONLabVM Table. User: %v, %v", svmInfo.UserEmail,
 				err)
@@ -350,17 +366,30 @@ func CopyFile(source string, dest string) (err error) {
 	return
 }
 
-type SCIONLabVMResp struct {
+// The struct used for API calls between scion-coord and SCIONLab ASes
+type SCIONLabVM struct {
 	ASID         string // ISD-AS of the VM
 	RemoteIAPort int    // port number of the remote SCIONLab AS being connected to
 	UserEmail    string // The email address of the user owning this SCIONLab VM AS
 	VMIP         string // IP address of the SCIONLab VM
+	RemoteBR     string // The name of the remote border router
 }
 
-// API end-point to serve the list of newly created but not yet activated SCIONLab VMs.
-// If successful, it returns an array of SCIONLabVMResp structs.
-func (s *SCIONLabVMController) GetNewSCIONLabVMASes(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Inside GetNewSCIONLabVMASes = %v", r.URL.Query())
+// API end-point for the designated SCIONLab ASes to query actions to be done for users'
+// SCIONLab VM ASes.
+// An example response to this API may look like the following:
+// {"1-7":
+//        {"Create":[],
+//         "Remove":[],
+//         "Update":[{"ASID":"1-1020",
+//                    "RemoteIAPort":50053,
+//                    "UserEmail":"user@example.com",
+//                    "VMIP":"203.0.113.0",
+//                    "RemoteBR":"br1-5-5"}]
+//        }
+// }
+func (s *SCIONLabVMController) GetSCIONLabVMASes(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Inside GetSCIONLabVMASes = %v", r.URL.Query())
 	scionLabAS := r.URL.Query().Get("scionLabAS")
 	if len(scionLabAS) == 0 {
 		s.BadRequest(fmt.Errorf("scionLabAS parameter missing."), w, r)
@@ -372,18 +401,33 @@ func (s *SCIONLabVMController) GetNewSCIONLabVMASes(w http.ResponseWriter, r *ht
 		s.Error500(err, w, r)
 		return
 	}
-	vms_resp := []SCIONLabVMResp{}
+	vms_create_resp := []SCIONLabVM{}
+	vms_update_resp := []SCIONLabVM{}
+	vms_remove_resp := []SCIONLabVM{}
 	for _, v := range vms {
-		vm_resp := SCIONLabVMResp{
+		vm_resp := SCIONLabVM{
 			ASID:         strconv.Itoa(v.IA.Isd) + "-" + strconv.Itoa(v.IA.As),
 			VMIP:         v.IP,
 			RemoteIAPort: v.RemoteIAPort,
 			UserEmail:    v.UserEmail,
+			RemoteBR:     v.RemoteBR,
 		}
-		vms_resp = append(vms_resp, vm_resp)
+		if v.Status == CREATE {
+			vms_create_resp = append(vms_create_resp, vm_resp)
+		} else if v.Status == UPDATE {
+			vms_update_resp = append(vms_update_resp, vm_resp)
+		} else if v.Status == REMOVE {
+			vms_remove_resp = append(vms_remove_resp, vm_resp)
+		} else {
+			// do nothing for the Active or Removed VMs
+		}
 	}
-	resp := map[string][]SCIONLabVMResp{
-		scionLabAS: vms_resp,
+	resp := map[string]map[string][]SCIONLabVM{
+		scionLabAS: {
+			"Create": vms_create_resp,
+			"Update": vms_update_resp,
+			"Remove": vms_remove_resp,
+		},
 	}
 	b, err := json.Marshal(resp)
 	if err != nil {
@@ -394,31 +438,54 @@ func (s *SCIONLabVMController) GetNewSCIONLabVMASes(w http.ResponseWriter, r *ht
 	fmt.Fprintln(w, string(b))
 }
 
-// API end-point to mark the provided SCIONLabVMs as ACTIVE
-// If sucessful it returns and empty JSON response with HTTP code 200.
-func (s *SCIONLabVMController) ConfirmActivatedSCIONLabVMASes(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Inside ConfirmActivatedSCIONLabVMASes..")
-	var ASIDs2VMIPs map[string][]string
+// API end-point to mark the provided SCIONLabVMs as Created, Updated or Removed
+// An example request to this API may look like the following:
+// {"1-7":
+//        {"Created":[],
+//         "Removed":[],
+//         "Updated":[{"ASID":"1-1020",
+//                     "RemoteIAPort":50053,
+//                     "VMIP":"203.0.113.0",
+//                     "RemoteBR":"br1-5-5"}]
+//        }
+// }
+// If sucessful, the API will return an empty JSON response with HTTP code 200.
+func (s *SCIONLabVMController) ConfirmSCIONLabVMASes(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Inside ConfirmSCIONLabVMASes..")
+	var ASIDs2VMs map[string]map[string][]SCIONLabVM
 	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&ASIDs2VMIPs); err != nil {
+	if err := decoder.Decode(&ASIDs2VMs); err != nil {
 		log.Printf("Error decoding JSON: %v, %v", r.Body, err)
 		s.BadRequest(err, w, r)
 		return
 	}
-	for ia, vmIPs := range ASIDs2VMIPs {
-		for _, ip := range vmIPs {
-			// find the relevant SCIONLabVM and mark it as active.
-			vm, err := models.FindSCIONLabVMByIPAndIA(ip, ia)
-			if err != nil {
-				log.Printf("Error finding the SCIONLabVM with IP %v: %v", ip, err)
-				s.Error500(fmt.Errorf("Error finding the SCIONLabVM with IP %v: %v", ip, err), w, r)
-				return
-			}
-			vm.Activated = true
-			if err = vm.Update(); err != nil {
-				log.Printf("Error updating SCIONLabVM Table. VM IP: %v, %v", ip, err)
-				s.Error500(fmt.Errorf("Error updating SCIONLabVM Table. VM IP: %v, %v", ip, err),
-					w, r)
+	for ia, event := range ASIDs2VMs {
+		for status, vms := range event {
+			log.Printf("status = %v, vms = %v", status, vms)
+			for _, vm := range vms {
+				// find the SCIONLabVM
+				vm_db, err := models.FindSCIONLabVMByIPAndRemoteIA(vm.VMIP, ia)
+				if err != nil {
+					log.Printf("Error finding the SCIONLabVM with IP %v: %v",
+						vm.VMIP, err)
+					s.Error500(fmt.Errorf("Error finding the SCIONLabVM with IP %v: %v",
+						vm.VMIP, err), w, r)
+					return
+				}
+				if (status == CREATED) || (status == UPDATED) || (status == REMOVED) {
+					vm_db.Status = status
+					vm_db.RemoteBR = vm.RemoteBR
+					if err = vm_db.Update(); err != nil {
+						log.Printf("Error updating SCIONLabVM Table. VM IP: %v, %v", vm.VMIP, err)
+						s.Error500(fmt.Errorf("Error updating SCIONLabVM Table. VM IP: %v, %v",
+							vm.VMIP, err), w, r)
+						return
+					}
+				} else {
+					log.Printf("Unsupported VM action for: %v, %v", vm.VMIP, err)
+					s.Error500(fmt.Errorf("Unsupported VM action for: %v, %v", vm.VMIP, err), w, r)
+					return
+				}
 			}
 		}
 	}
@@ -443,4 +510,36 @@ func (s *SCIONLabVMController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+file_name)
 	w.Header().Set("Content-Transfer-Encoding", "binary")
 	http.ServeContent(w, r, "/api/as/downloads/"+file_name, time.Now(), bytes.NewReader(data))
+}
+
+// The handler function to remove a SCIONLab VM for the given user.
+// If successful, it will return a 200 status with an empty response.
+func (s *SCIONLabVMController) RemoveSCIONLabVM(w http.ResponseWriter, r *http.Request) {
+	// Parse the argument
+	if err := r.ParseForm(); err != nil {
+		log.Printf("Error parsing the form in RemoveSCIONLabVM: %v", err)
+		s.BadRequest(err, w, r)
+		return
+	}
+	userEmail := r.Form["userEmail"][0]
+	// Find this user's VM
+	svm, err := models.FindSCIONLabVMByUserEmail(userEmail)
+	if err != nil {
+		if err == orm.ErrNoRows {
+			s.BadRequest(fmt.Errorf("You currently do not have an active SCIONLab VM."), w, r)
+			return
+		} else {
+			s.Error500(fmt.Errorf("Error looking up SCIONLab VM from DB %v: %v", userEmail, err),
+				w, r)
+			return
+		}
+	}
+	svm.Status = REMOVE
+	if err := svm.Update(); err != nil {
+		s.Error500(fmt.Errorf("Error removing entry from SCIONLabVM Table. User: %v, %v",
+			userEmail, err), w, r)
+		return
+	}
+	log.Printf("Marked removal of SCIONLabVM of user %v.", userEmail)
+	fmt.Fprintln(w, "Your VM will be removed within the next 5 minutes.")
 }
