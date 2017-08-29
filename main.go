@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -28,6 +29,20 @@ import (
 )
 
 func main() {
+	// check if credential files exist and create necessary directories
+	for _, f := range []string{api.TrcFile, api.CoreCertFile, api.CoreSigKey} {
+		if _, err := os.Stat(f); err != nil {
+			if os.IsNotExist(err) {
+				fmt.Println("ERROR: Please make sure that the necessary credential files exist.")
+				fmt.Println("Consult the README.md for further details.")
+			} else {
+				fmt.Println("An error occurred when accessing " + f + ".")
+			}
+			return
+		}
+	}
+	os.MkdirAll(api.TempPath, os.ModePerm)
+	os.MkdirAll(api.PackagePath, os.ModePerm)
 
 	// controllers
 	registrationController := api.RegistrationController{}
