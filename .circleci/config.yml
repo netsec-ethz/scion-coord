@@ -12,6 +12,7 @@ jobs:
         image: "circleci/mysql:latest"
     steps: 
       - checkout
+      - run: "cp conf/development.conf.default conf/development.conf"
       - run:
          name: Wait for db
          command: dockerize -wait tcp://localhost:3306 -timeout 1m
