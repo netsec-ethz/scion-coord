@@ -15,14 +15,14 @@
 
   <p><font color="red"><b>Please note:</b> SCIONLab currently requires that your machine has a public IP address and can receive UDP traffic at port 50000.</font></p>
 
-  <ng-form name="scionLabVMForm" ng-submit="submit()">
+  <form name="scionLabVMForm" ng-submit="scionLabVM(user)">
     <div class="form-group has-feedback">
       <input type="text" class="form-control" ng-model="user.scionLabVMIP" name="scionLabVMIP" placeholder="My host's public IP address" ng-required="true">
       <span class="form-control-feedback"></span>
     </div>
     <div class="row">
       <div class="col-xs-12">
-        <button ng-click="scionLabVM(user)" type="button" class="btn btn-primary btn-block btn-flat">Create and Download SCIONLab VM Configuration</button>
+        <button type="submit" class="btn btn-primary btn-block btn-flat">Create and Download SCIONLab VM Configuration</button>
       </div>
       <!-- /.col -->
     </div>
