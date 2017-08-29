@@ -38,15 +38,13 @@ var (
 	_, b, _, _       = runtime.Caller(0)
 	current_path     = filepath.Dir(b)
 	scion_coord_path = filepath.Dir(filepath.Dir(current_path))
-	local_gen_path   = filepath.Join(scion_coord_path, "python/local_gen.py")
-	// TODO (jonghoonkwon): may be better to create this topo file in a temp folder
-	topo_path      = filepath.Join(scion_coord_path, "templates/simple_config_topo.json")
+	local_gen_path   = filepath.Join(scion_coord_path, "python", "local_gen.py")
+	topo_path      = filepath.Join(scion_coord_path, "temp", "simple_config_topo.json")
 	scion_path     = filepath.Join(filepath.Dir(scion_coord_path), "scion")
 	scion_web_path = filepath.Join(scion_path, "sub", "web")
 	python_path    = filepath.Join(scion_path, "python")
 	vagrant_path   = filepath.Join(scion_coord_path, "vagrant")
-	user_path      = filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(scion_coord_path)))))
-	package_path   = filepath.Join(user_path, "scionLabConfigs")
+	package_path   = filepath.Join(scion_coord_path, "temp")
 )
 
 type SCIONLabVMController struct {
@@ -245,9 +243,7 @@ func (s *SCIONLabVMController) generateTopologyFile(svmInfo *SCIONLabVMInfo) err
 		return fmt.Errorf("Error parsing topology template config. User: %v, %v", svmInfo.UserEmail,
 			err)
 	}
-	// TODO (ercanucan): create this file in a user specific directory in order to
-	// prevent race conditions.
-	f, err := os.Create("templates/simple_config_topo.json")
+	f, err := os.Create(topo_path)
 	if err != nil {
 		return fmt.Errorf("Error creating topology file config. User: %v, %v", svmInfo.UserEmail,
 			err)
@@ -301,7 +297,7 @@ func (s *SCIONLabVMController) generateLocalGen(svmInfo *SCIONLabVMInfo) error {
 // generated file.
 func (s *SCIONLabVMController) packageSCIONLabVM(userEmail string) (string, error) {
 	log.Printf("Packaging SCIONLab VM")
-	user_package_path := filepath.Join(user_path, "scionLabConfigs", userEmail)
+	user_package_path := filepath.Join(package_path, userEmail)
 	vagrant_dir, err := os.Open(vagrant_path)
 	if err != nil {
 		return "", fmt.Errorf("Failed to open directory. Path: %v, %v", vagrant_path, err)
