@@ -14,7 +14,7 @@
       </div>
 
 
-    <ng-form name="registration" ng-submit="submit()">
+    <form name="registration" ng-submit="register(user)">
       <div class="form-group has-feedback">
         <input type="text" class="form-control" ng-model="user.first" name="first" placeholder="First name" ng-required="true">
         <span class="glyphicon glyphicon-user form-control-feedback"></span>
@@ -47,7 +47,7 @@
         <!-- /.col -->
         <div class="col-xs-12">
           <!-- <button ng-click="register(user)" ng-disabled="registration.$invalid" type="button" class="btn btn-primary btn-block btn-flat">Register</button> -->
-          <button ng-click="register(user)" type="button" class="btn btn-primary btn-block btn-flat">Register</button>
+          <button type="submit" class="btn btn-primary btn-block btn-flat">Register</button>
         </div>
         <!-- /.col -->
       </div>

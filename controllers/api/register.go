@@ -68,17 +68,17 @@ func (r *registrationRequest) isValid() (bool, error) {
 	// check if any of this is empty
 	if r.Email == "" || r.Organisation == "" || r.Password == "" || r.PasswordConfirmation == "" ||
 		r.First == "" || r.Last == "" || r.Account == "" {
-		return false, fmt.Errorf("%s\n", "Email, Organisation, Password, Password confirmation, First and Last name and Account are all mandatory fields")
+		return false, fmt.Errorf("%s\n", "You entered incomplete data. All form fields are mandatory.")
 	}
 
 	// check if the password match and that the length is at least 8 chars
 	if len(r.Password) < 8 {
 
-		return false, fmt.Errorf("%s\n", "Password length invalid. Use at leats 8 chars")
+		return false, fmt.Errorf("%s\n", "Please use at least 8 characters for your password.")
 	}
 
 	if r.Password != r.PasswordConfirmation {
-		return false, fmt.Errorf("%s\n", "Password mismatch")
+		return false, fmt.Errorf("%s\n", "Please enter matching passwords.")
 	}
 
 	return true, nil
@@ -94,22 +94,22 @@ func (c *RegistrationController) VerifyEmail(w http.ResponseWriter, r *http.Requ
 	u, err := models.FindUserByVerificationUUID(uuid)
 
 	if err != nil {
-		log.Printf("Error verifying email address. %v is not a valid UUID", uuid)
-		c.BadRequest(fmt.Errorf("%v is not a valid identifier", uuid), w, r)
+		log.Printf("Error verifying email address. %v is not a valid UUID.", uuid)
+		c.BadRequest(fmt.Errorf("Error verifying email address. %v is not a valid user identifier.", uuid), w, r)
 		return
 	}
 
 	if u.Verified {
-		log.Printf("Error verifying email address. User %v is already verified", u.Email)
-		c.BadRequest(fmt.Errorf("user %v is already verified", u.Email), w, r)
+		log.Printf("Error verifying email address. User %v is already verified.", u.Email)
+		c.BadRequest(fmt.Errorf("The email %v is already verified. Please continue to the login page.", u.Email), w, r)
 		return
 	}
 
 	// update user
 	if err := u.UpdateVerified(true); err != nil {
-		log.Printf("Error verifying email address for user %v: %v", u.Email, err)
+		log.Printf("Error verifying email address for user %v: %v.", u.Email, err)
 		// TODO: Pass the user a unique error ID which links to the specific error and allows for debugging
-		c.Error500(fmt.Errorf("Error verifying email address for user %v", u.Email), w, r)
+		c.Error500(fmt.Errorf("Error verifying email address for user %v.", u.Email), w, r)
 		return
 	}
 
