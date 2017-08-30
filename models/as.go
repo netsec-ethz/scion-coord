@@ -67,7 +67,7 @@ type ConnectionWithCredits struct {
 
 func (as *As) ListConnections() ([]ConnectionWithCredits, error) {
 	var connections []ConnectionWithCredits
-	var isdas = fmt.Sprint("%v-%v", as.Isd, as.As)
+	var isdas = fmt.Sprintf("%v-%v", as.Isd, as.As)
 
 	// Outgoing ones (this AS paid for)
 	var outGoings []ConnRequest
