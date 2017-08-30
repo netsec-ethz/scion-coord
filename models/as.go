@@ -131,7 +131,11 @@ func (as *As) Insert() error {
 
 func (as *As) UpdateCurrency(Credits int64) error {
 	as.Credits += Credits
-	_, err := o.Update(as, "Credits")
+	// Can't use update because of missing pk error (but pk is set, beego have some serious problems)
+	_, err := o.QueryTable(as).Filter("Isd", as.Isd).Filter("As", as.As).Update(orm.Params{
+		"credits" : as.Credits,
+		})
+
 	return err
 }
 

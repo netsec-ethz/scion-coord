@@ -439,7 +439,6 @@ func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 		c.Error500(err, w, r)
 		return
 	}
-
 	var credits = models.BandwidthToCredits(cr.Bandwidth)
 	// If the connection is approved, add credits to the responding AS
 	if cr.Status == models.APPROVED {
@@ -451,14 +450,14 @@ func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := otherAs.UpdateCurrency(credits); err != nil {
-			log.Printf("Error: Adding credits! AS: %v, Request: %v, Error: %v", otherAs, r.Body, err)
+			log.Printf("Error: Adding credits! OtherAS: %v, Request: %v, Error: %v", otherAs, r.Body, err)
 			c.Error500(err, w, r)
 			return
 		}
 		// If the connection request is denied, release the reserved credits for the connection
 	} else if cr.Status != models.PENDING {
 		if err := as.UpdateCurrency(credits); err != nil {
-			log.Printf("Error: Adding credits! AS: %v, Request: %v, Error: %v", as, r.Body, err)
+			log.Printf("Error: Readding credits! ThisAS: %v, Request: %v, Error: %v", as, r.Body, err)
 			c.Error500(err, w, r)
 			return
 		}
