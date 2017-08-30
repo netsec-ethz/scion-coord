@@ -46,9 +46,9 @@ type registrationRequest struct {
 // Method used to validate the registration request
 func (r *registrationRequest) isValid() (bool, error) {
 	// check if any of this is empty
-	if r.Email == "" || r.Organisation == "" || r.Password == "" || r.PasswordConfirmation == "" ||
-		r.First == "" || r.Last == "" || r.Account == "" {
-		return false, fmt.Errorf("%s\n", "You entered incomplete data. All form fields are mandatory.")
+	if r.Email == "" || r.Password == "" || r.PasswordConfirmation == "" ||
+		r.First == "" || r.Last == "" {
+		return false, fmt.Errorf("%s\n", "You entered incomplete data. First and last name, email and password are mandatory fields.")
 	}
 
 	// check if the password match and that the length is at least 8 chars
@@ -133,7 +133,8 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 	}
 
 	// register the user
-	user, err := models.RegisterUser(regRequest.Account, regRequest.Organisation,
+	account := regRequest.Email // use the user's email as a unique account
+	user, err := models.RegisterUser(account, regRequest.Organisation,
 		regRequest.Email, regRequest.Password, regRequest.First, regRequest.Last)
 
 	if err != nil {
