@@ -94,7 +94,7 @@ func (as *As) ListConnections() ([]ConnectionWithCredits, error) {
 		return connections, err
 	}
 	for _, v := range inGoings {
-		var tmp,_ = addr.IAFromString(v.RespondIA)
+		var tmp,_ = addr.IAFromString(v.RequestIA)
 		connections = append(connections, ConnectionWithCredits{
 			ISD: tmp.I,
 			AS: tmp.A,
