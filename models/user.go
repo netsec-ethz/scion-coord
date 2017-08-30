@@ -41,13 +41,13 @@ type Account struct {
 	Organisation string
 	AccountId    string
 	Secret       string
-	Users        []*user `orm:"reverse(many);index"`
+	Users        []*User `orm:"reverse(many);index"`
 	ASes         []*As   `orm:"reverse(many);index"`
 	Created      time.Time
 	Updated      time.Time
 }
 
-type user struct {
+type User struct {
 	Id               uint64
 	Email            string `orm:"index"`
 	Password         string
@@ -82,7 +82,7 @@ func derivePassword(password string, salt []byte) ([]byte, error) {
 }
 
 // This function creates both a new user and a new account and associate them
-func RegisterUser(accountName, organisation, email, password, first, last string) (*user, error) {
+func RegisterUser(accountName, organisation, email, password, first, last string) (*User, error) {
 
 	// find whether the user email is already taken
 	storedUser, err := FindUserByEmail(email)
@@ -139,7 +139,7 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 		}
 
 		// create user
-		u := new(user)
+		u := new(User)
 		u.Email = email
 		u.FirstName = first
 		u.LastName = last
@@ -181,32 +181,32 @@ func FindAccount(name string) (*Account, error) {
 	return a, err
 }
 
-func FindUserByEmail(email string) (*user, error) {
-	u := new(user)
+func FindUserByEmail(email string) (*User, error) {
+	u := new(User)
 	err := o.QueryTable(u).Filter("Email", email).RelatedSel().One(u)
 	return u, err
 }
 
-func FindUserByVerificationUUID(link string) (*user, error) {
-	u := new(user)
+func FindUserByVerificationUUID(link string) (*User, error) {
+	u := new(User)
 	err := o.QueryTable(u).Filter("VerificationUUID", link).RelatedSel().One(u)
 	return u, err
 }
 
-func FindUserByRecoveryToken(token string) (*user, error) {
-	u := new(user)
+func FindUserByRecoveryToken(token string) (*User, error) {
+	u := new(User)
 	err := o.QueryTable(u).Filter("RecoveryToken", token).RelatedSel().One(u)
 	return u, err
 }
 
-func FindUserEmailToken(token string) (*user, error) {
-	u := new(user)
+func FindUserEmailToken(token string) (*User, error) {
+	u := new(User)
 	err := o.QueryTable(u).Filter("EmailToken", token).RelatedSel().One(u)
 	return u, err
 }
 
-func FindUserById(id string) (*user, error) {
-	u := new(user)
+func FindUserById(id string) (*User, error) {
+	u := new(User)
 	err := o.QueryTable(u).Filter("Id", id).RelatedSel().One(u)
 	return u, err
 }
@@ -223,7 +223,7 @@ func FindAccountByAccountId(acc_id string) (*Account, error) {
 	return u, err
 }
 
-func (u *user) Delete() error {
+func (u *User) Delete() error {
 	_, err := o.Delete(u)
 	return err
 }
@@ -233,7 +233,7 @@ func (a *Account) Delete() error {
 	return err
 }
 
-func (u *user) Authenticate(password string) error {
+func (u *User) Authenticate(password string) error {
 
 	// if u.Locked {
 	// 	return errors.New("User locked.")
@@ -260,7 +260,7 @@ func (u *user) Authenticate(password string) error {
 	// return errors.New("Too many login attempts. Account locked.")
 }
 
-func (u *user) checkPassword(password string) error {
+func (u *User) checkPassword(password string) error {
 	// update time of attempts
 	// if err := u.UpdateLastLoginAttempt(); err != nil {
 	// 	return err
@@ -282,7 +282,7 @@ func (u *user) checkPassword(password string) error {
 	return errors.New("Password invalid")
 }
 
-func (u *user) CheckVerified() error {
+func (u *User) CheckVerified() error {
 	if !u.Verified {
 		return errors.New("Email is not verified")
 	}
@@ -314,7 +314,7 @@ func validUserPassword(storedPassHex, storedSaltHex, password string) bool {
 	return bytes.Equal(derivedPass, storedPass)
 }
 
-func (u *user) UpdateVerified(value bool) error {
+func (u *User) UpdateVerified(value bool) error {
 	u.Verified = value
 	u.Updated = time.Now().UTC()
 	_, err := o.Update(u, "Verified")

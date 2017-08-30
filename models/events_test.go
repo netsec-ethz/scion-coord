@@ -19,7 +19,7 @@ import (
 	"testing"
 )
 
-func createTestUser(t *testing.T) *user {
+func createTestUser(t *testing.T) *User {
 	email := "testemail@scion.com"
 	password := "pass"
 	u, err := RegisterUser("scion-test-db", "Scion Test DB", email, password, "John", "Doe")
