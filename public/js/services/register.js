@@ -1,6 +1,11 @@
 angular.module('scionApp')
     .factory('registerService', ["$http", "$q", function($http, $q) {
     var registerService = {
+
+        // Get ReCaptcha site key
+        getSiteKey: function(){
+           return $http.get('/api/captchaSiteKey');
+        },
         // Register a user
         register: function(registration) {
             // $http returns a promise, which has a then function, which also returns a promise
