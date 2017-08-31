@@ -18,21 +18,12 @@
 
 """
 
-# Append SCION directories to PYTHONPATH
-import os
-FILE_PATH = os.path.dirname(os.path.realpath(__file__))
-SCION_PATH = os.path.join(os.path.dirname(os.path.dirname(FILE_PATH)), "scion")
-
-import sys
-sys.path.append(os.path.join(SCION_PATH, "python"))
-sys.path.append(SCION_PATH)
-sys.path.append(os.path.join(SCION_PATH, "sub", "web"))
-
 # Standard library
 import argparse
 import base64
 import configparser
 import json
+import os
 from shutil import rmtree
 
 # External packages
@@ -67,14 +58,6 @@ from ad_manager.util.local_config_util import (
     TYPES_TO_KEYS,
 )
 
-# Directory structure and credential files
-SCION_COORD_PATH = os.path.dirname(FILE_PATH)
-GEN_ROOT = os.path.join(SCION_COORD_PATH, "temp")
-DEFAULT_CORE_CERT_FILE = os.path.join(SCION_COORD_PATH, "credentials", "ISD1-AS1-V0.crt")
-DEFAULT_CORE_SIG_KEY = os.path.join(SCION_COORD_PATH, "credentials", "as-sig.key")
-DEFAULT_TRC_FILE = os.path.join(SCION_COORD_PATH, "credentials", "ISD1-V0.trc")
-
-
 def create_scionlab_vm_local_gen(args, tp):
     """
     Creates the usual gen folder structure for an ISD/AS under web_scion/gen,
@@ -84,11 +67,11 @@ def create_scionlab_vm_local_gen(args, tp):
     """
     new_ia = ISD_AS(args.joining_ia)
     core_ia = ISD_AS(args.core_ia)
-    local_gen_path = os.path.join(GEN_ROOT, args.user_id, 'gen')
+    local_gen_path = os.path.join(args.package_path, args.user_id, 'gen')
     # XXX (ercanucan): we remove user's past configs when he re-requests!
     rmtree(local_gen_path, ignore_errors=True)
     as_obj = generate_certificate(
-        new_ia, core_ia, args.core_sign_priv_key_file, args.core_cert_file)
+        new_ia, core_ia, args.core_sign_priv_key_file, args.core_cert_file, args.trc_file)
     write_dispatcher_config(local_gen_path)
     for service_type, type_key in TYPES_TO_KEYS.items():
         executable_name = TYPES_TO_EXECUTABLES[service_type]
@@ -106,7 +89,7 @@ def create_scionlab_vm_local_gen(args, tp):
     generate_zk_config(tp, new_ia, local_gen_path, simple_conf_mode=True)
 
 
-def generate_certificate(joining_ia, core_ia, core_sign_priv_key_file, core_cert_file):
+def generate_certificate(joining_ia, core_ia, core_sign_priv_key_file, core_cert_file, trc_file):
     """
     """
     validity = Certificate.AS_VALIDITY_PERIOD
@@ -122,7 +105,7 @@ def generate_certificate(joining_ia, core_ia, core_sign_priv_key_file, core_cert
     sig_priv_key = base64.b64encode(private_key_sign).decode()
     enc_priv_key = base64.b64encode(private_key_encr).decode()
     joining_ia_chain = CertificateChain([cert, core_ia_chain.core_as_cert]).to_json()
-    trc = open(DEFAULT_TRC_FILE).read()
+    trc = open(trc_file).read()
     master_as_key = base64.b64encode(Random.new().read(16)).decode('utf-8')
     as_obj = ASCredential(sig_priv_key, enc_priv_key, joining_ia_chain, trc, master_as_key)
     return as_obj
@@ -177,16 +160,19 @@ def main():
                         help='Signing Core ISD-AS',
                         default='1-1')
     parser.add_argument("--core_sign_priv_key_file",
-                        help='Signing private key of the core AS',
-                        default=DEFAULT_CORE_SIG_KEY)
+                        help='Signing private key of the core AS')
     parser.add_argument("--core_cert_file",
-                        help='Certificate file of the signing core AS',
-                        default=DEFAULT_CORE_CERT_FILE)
+                        help='Certificate file of the signing core AS')
+    parser.add_argument("--trc_file",
+                        help='Trusted Root Configuration file')
     parser.add_argument("--topo_file",
                         help='Topology file to be used for config generation.')
+    parser.add_argument("--package_path",
+                        help='Path to generate and store VM configurations.')
     parser.add_argument("--user_id",
                         help='User Identifier (email)')
     args = parser.parse_args()
+
     with open(args.topo_file) as json_data:
         topo_dict = json.load(json_data)
     create_scionlab_vm_local_gen(args, topo_dict)

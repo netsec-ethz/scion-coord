@@ -35,16 +35,21 @@ import (
 )
 
 var (
-	_, b, _, _       = runtime.Caller(0)
-	current_path     = filepath.Dir(b)
-	scion_coord_path = filepath.Dir(filepath.Dir(current_path))
-	local_gen_path   = filepath.Join(scion_coord_path, "python", "local_gen.py")
-	topo_path      = filepath.Join(scion_coord_path, "temp", "simple_config_topo.json")
-	scion_path     = filepath.Join(filepath.Dir(scion_coord_path), "scion")
-	scion_web_path = filepath.Join(scion_path, "sub", "web")
-	python_path    = filepath.Join(scion_path, "python")
-	vagrant_path   = filepath.Join(scion_coord_path, "vagrant")
-	package_path   = filepath.Join(scion_coord_path, "temp")
+	_, b, _, _      = runtime.Caller(0)
+	currentPath     = filepath.Dir(b)
+	scionCoordPath  = filepath.Dir(filepath.Dir(currentPath))
+	localGenPath    = filepath.Join(scionCoordPath, "python", "local_gen.py")
+	TempPath        = filepath.Join(scionCoordPath, "temp")
+	scionPath       = filepath.Join(filepath.Dir(scionCoordPath), "scion")
+	scionWebPath    = filepath.Join(scionPath, "sub", "web")
+	pythonPath      = filepath.Join(scionPath, "python")
+	vagrantPath     = filepath.Join(scionCoordPath, "vagrant")
+	homePath        = os.Getenv("HOME")
+	PackagePath     = filepath.Join(homePath, "scionLabConfigs")
+	credentialsPath = filepath.Join(scionCoordPath, "credentials")
+	CoreCertFile    = filepath.Join(credentialsPath, "ISD1-AS1-V0.crt")
+	CoreSigKey      = filepath.Join(credentialsPath, "as-sig.key")
+	TrcFile         = filepath.Join(credentialsPath, "ISD1-V0.trc")
 )
 
 type SCIONLabVMController struct {
@@ -183,27 +188,27 @@ func (s *SCIONLabVMController) updateDB(svmInfo *SCIONLabVMInfo) error {
 		if err != nil {
 			return fmt.Errorf("Error finding the user by email %v: %v", svmInfo.UserEmail, err)
 		}
-		new_as := &models.As{
+		newAs := &models.As{
 			Isd:     svmInfo.ISD_ID,
 			As:      svmInfo.AS_ID,
 			Core:    false,
 			Account: user.Account,
 			Created: time.Now().UTC(),
 		}
-		if err = new_as.Insert(); err != nil {
-			return fmt.Errorf("Error inserting new AS: %v User: %v, %v", new_as.String(), user,
+		if err = newAs.Insert(); err != nil {
+			return fmt.Errorf("Error inserting new AS: %v User: %v, %v", newAs.String(), user,
 				err)
 		}
-		log.Printf("New SCIONLab VM AS successfully created. User: %v new AS: %v", user, new_as.String())
-		new_svm := models.SCIONLabVM{
+		log.Printf("New SCIONLab VM AS successfully created. User: %v new AS: %v", user, newAs.String())
+		newSvm := models.SCIONLabVM{
 			UserEmail:    svmInfo.UserEmail,
 			IP:           svmInfo.IP,
-			IA:           new_as,
+			IA:           newAs,
 			RemoteIAPort: svmInfo.RemotePort,
 			Activated:    false,
 			RemoteIA:     svmInfo.RemoteIA,
 		}
-		if err = new_svm.Insert(); err != nil {
+		if err = newSvm.Insert(); err != nil {
 			return fmt.Errorf("Error inserting new SCIONLabVM. User: %v, %v", user, err)
 		}
 	} else {
@@ -233,6 +238,11 @@ func (s *SCIONLabVMController) getNewSCIONLabVMASID() (int, error) {
 	return asID + 1, nil
 }
 
+// Generates the path to the temporary topology file
+func (svmInfo *SCIONLabVMInfo) topologyFile() string {
+	return filepath.Join(TempPath, svmInfo.UserEmail+"_topology.json")
+}
+
 // Generates the topology file for the SCIONLab VM AS. It uses the template file
 // simple_config_topo.tmpl under templates folder in order to populate and generate the
 // JSON file.
@@ -243,7 +253,7 @@ func (s *SCIONLabVMController) generateTopologyFile(svmInfo *SCIONLabVMInfo) err
 		return fmt.Errorf("Error parsing topology template config. User: %v, %v", svmInfo.UserEmail,
 			err)
 	}
-	f, err := os.Create(topo_path)
+	f, err := os.Create(svmInfo.topologyFile())
 	if err != nil {
 		return fmt.Errorf("Error creating topology file config. User: %v, %v", svmInfo.UserEmail,
 			err)
@@ -274,10 +284,15 @@ func (s *SCIONLabVMController) generateLocalGen(svmInfo *SCIONLabVMInfo) error {
 	isdID := strconv.Itoa(svmInfo.ISD_ID)
 	userEmail := svmInfo.UserEmail
 	log.Printf("Calling create local gen. ISD-ID: %v, AS-ID: %v, UserEmail: %v", isdID, asID, userEmail)
-	cmd := exec.Command("python3", local_gen_path, "--topo_file="+topo_path, "--user_id="+userEmail,
-		"--joining_ia="+isdID+"-"+asID)
-	env := os.Environ()
-	cmd.Env = env
+	cmd := exec.Command("python3", localGenPath,
+		"--topo_file="+svmInfo.topologyFile(), "--user_id="+userEmail,
+		"--joining_ia="+isdID+"-"+asID,
+		"--core_sign_priv_key_file="+CoreSigKey,
+		"--core_cert_file="+CoreCertFile,
+		"--trc_file="+TrcFile,
+		"--package_path="+PackagePath)
+	os.Setenv("PYTHONPATH", pythonPath+":"+scionPath+":"+scionWebPath)
+	cmd.Env = os.Environ()
 	cmdOut, _ := cmd.StdoutPipe()
 	cmdErr, _ := cmd.StderrPipe()
 	if err := cmd.Start(); err != nil {
@@ -296,18 +311,18 @@ func (s *SCIONLabVMController) generateLocalGen(svmInfo *SCIONLabVMInfo) error {
 // generated file.
 func (s *SCIONLabVMController) packageSCIONLabVM(userEmail string) (string, error) {
 	log.Printf("Packaging SCIONLab VM")
-	user_package_path := filepath.Join(package_path, userEmail)
-	vagrant_dir, err := os.Open(vagrant_path)
+	userPackagePath := filepath.Join(PackagePath, userEmail)
+	vagrantDir, err := os.Open(vagrantPath)
 	if err != nil {
-		return "", fmt.Errorf("Failed to open directory. Path: %v, %v", vagrant_path, err)
+		return "", fmt.Errorf("Failed to open directory. Path: %v, %v", vagrantPath, err)
 	}
-	objects, err := vagrant_dir.Readdir(-1)
+	objects, err := vagrantDir.Readdir(-1)
 	if err != nil {
-		return "", fmt.Errorf("Failed to read directory contents. Path: %v, %v", vagrant_path, err)
+		return "", fmt.Errorf("Failed to read directory contents. Path: %v, %v", vagrantPath, err)
 	}
 	for _, obj := range objects {
-		src := filepath.Join(vagrant_path, obj.Name())
-		dst := filepath.Join(user_package_path, obj.Name())
+		src := filepath.Join(vagrantPath, obj.Name())
+		dst := filepath.Join(userPackagePath, obj.Name())
 		if !obj.IsDir() {
 			if err = CopyFile(src, dst); err != nil {
 				return "", fmt.Errorf("Failed to copy files. User: %v, src: %v, dst: %v, %v",
@@ -316,7 +331,7 @@ func (s *SCIONLabVMController) packageSCIONLabVM(userEmail string) (string, erro
 		}
 	}
 	cmd := exec.Command("tar", "zcvf", userEmail+".tar.gz", userEmail)
-	cmd.Dir = package_path
+	cmd.Dir = PackagePath
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("Failed to create SCIONLabVM tarball. User: %v, %v", userEmail, err)
 	}
@@ -367,18 +382,18 @@ func (s *SCIONLabVMController) GetNewSCIONLabVMASes(w http.ResponseWriter, r *ht
 		s.Error500(err, w, r)
 		return
 	}
-	vms_resp := []SCIONLabVMResp{}
+	vmsResp := []SCIONLabVMResp{}
 	for _, v := range vms {
-		vm_resp := SCIONLabVMResp{
+		vmResp := SCIONLabVMResp{
 			ASID:         strconv.Itoa(v.IA.Isd) + "-" + strconv.Itoa(v.IA.As),
 			VMIP:         v.IP,
 			RemoteIAPort: v.RemoteIAPort,
 			UserEmail:    v.UserEmail,
 		}
-		vms_resp = append(vms_resp, vm_resp)
+		vmsResp = append(vmsResp, vmResp)
 	}
 	resp := map[string][]SCIONLabVMResp{
-		scionLabAS: vms_resp,
+		scionLabAS: vmsResp,
 	}
 	b, err := json.Marshal(resp)
 	if err != nil {
@@ -423,19 +438,19 @@ func (s *SCIONLabVMController) ConfirmActivatedSCIONLabVMASes(w http.ResponseWri
 // API end-point to serve the generated SCIONLab VM configuration tarball.
 func (s *SCIONLabVMController) ReturnTarball(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Inside ReturnTarball = %v", r.URL.Query())
-	file_name := r.URL.Query().Get("filename")
-	if len(file_name) == 0 {
-		s.BadRequest(fmt.Errorf("file_name parameter missing."), w, r)
+	fileName := r.URL.Query().Get("filename")
+	if len(fileName) == 0 {
+		s.BadRequest(fmt.Errorf("fileName parameter missing."), w, r)
 		return
 	}
-	file_path := filepath.Join(package_path, file_name)
-	data, err := ioutil.ReadFile(file_path)
+	filePath := filepath.Join(PackagePath, fileName)
+	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		log.Printf("Error reading the tarball. FileName: %v, %v", file_name, err)
+		log.Printf("Error reading the tarball. FileName: %v, %v", fileName, err)
 		s.Error500(err, w, r)
 	}
 	w.Header().Set("Content-Type", "application/gzip")
-	w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+file_name)
+	w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
 	w.Header().Set("Content-Transfer-Encoding", "binary")
-	http.ServeContent(w, r, "/api/as/downloads/"+file_name, time.Now(), bytes.NewReader(data))
+	http.ServeContent(w, r, "/api/as/downloads/"+fileName, time.Now(), bytes.NewReader(data))
 }
