@@ -5,9 +5,10 @@
   <br/>
   <p>Welcome to SCIONLab! Your account credentials are the following:</p>
 
-  <p><b>AccountId:</b> {{user.AccountID}}</p>
-  <p><b>Secret:</b> {{user.Secret}}</p>
-  <div class="alert alert-info"><p>{{vmInfo.VMText}} <span ng-if="vmInfo.ShowIP">Your registered IP address is <b>{{vmInfo.VMIP}}</b>.</span></p></div>
+  <p><strong>AccountId:</strong> {{user.AccountID}}</p>
+  <p><strong>Secret:</strong> {{user.Secret}}</p>
+  <div class="alert alert-info"><p>{{vmInfo.VMText}} <span ng-if="vmInfo.ShowIP">Your registered IP address is <strong>{{vmInfo.VMIP}}</strong>.</span>
+  </p></div>
 
   <div style="color:red">
     <p>When you fill out and submit the form below, your SCIONLab VM configuration for connecting to SCIONLab AS 1-7 will be packaged
@@ -17,26 +18,37 @@
 
   <form name="scionLabVMForm" ng-submit="generateSCIONLabVM(user)">
     <div class="form-group has-feedback">
-      <input type="text" class="form-control" ng-model="user.scionLabVMIP" name="scionLabVMIP" placeholder="My host's public IP address" ng-required="true">
+      <input type="text" class="form-control" ng-model="user.scionLabVMIP" name="scionLabVMIP"
+             placeholder="My host's public IP address" ng-required="true">
       <span class="form-control-feedback"></span>
     </div>
     <div class="row">
       <div class="col-xs-12">
-        <button type="submit" class="btn btn-primary btn-block btn-flat">Create/Update and Download SCIONLab VM Configuration</button>
-      </div>
-    </div>
-    <br/>
-    <div class="row">
-      <div class="col-xs-12">
-        <button ng-click="removeSCIONLabVM(user)" type="button" class="btn btn-primary btn-block btn-flat btn-danger">Remove my SCIONLab VM</button>
+        <div id="buttongroup" ng-class="{true:'btn-group-vertical btn-block', false:'btn-group btn-group-justified'}[isSmall]">
+          <div class="btn-group" role="group">
+            <button type="submit" ng-disabled="buttonConfig.UpdateDisable" class="btn btn-primary"
+                    data-toggle="tooltip" title="{{buttonConfig.UpdateTooltip}}">{{buttonConfig.UpdateText}}</button>
+          </div>
+          <div class="btn-group" role="group" ng-if="buttonConfig.IsInactive == false">
+            <button ng-click="downloadSCIONLabVM(user)" ng-disabled="buttonConfig.DownloadDisable"
+                    class="btn btn-primary" data-toggle="tooltip" title="{{buttonConfig.DownloadTooltip}}">Re-download my SCIONLab VM Configuration</button>
+          </div>
+          <div class="btn-group" role="group" ng-if="buttonConfig.IsInactive == false">
+            <button ng-click="removeSCIONLabVM(user)" ng-disabled="buttonConfig.RemoveDisable" type="button"
+                    class="btn btn-danger" data-toggle="tooltip"
+                    title="{{buttonConfig.RemoveTooltip}}">Remove my SCIONLab VM Configuration</button>
+          </div>
+        </div>
       </div>
     </div>
   </form>
   <br/>
-  <div ng-show="error" ng-model="error" class="alert alert-danger alert-dismissible">
+  <div ng-show="error" class="alert alert-danger alert-dismissible fade in">
+    <button type="button" class="close" aria-label="Close" ng-click="dismissError()">&times;</button>
     {{error}}
   </div>
-  <div ng-if="message" class="alert alert-success alert-dismissible">
+  <div ng-show="message" class="alert alert-success alert-dismissible fade in">
+    <button type="button" class="close" aria-label="Close" ng-click="dismissSuccess()">&times;</button>
     {{message}}
   </div>
 

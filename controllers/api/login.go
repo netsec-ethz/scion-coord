@@ -54,43 +54,76 @@ type vmInfo struct {
 	ShowIP   bool
 }
 
-type meData struct {
-	User   user
-	VMInfo vmInfo
+type buttonConfiguration struct {
+	IsInactive      bool
+	UpdateDisable   bool
+	RemoveDisable   bool
+	DownloadDisable bool
+	UpdateTooltip   string
+	UpdateText      string
+	RemoveTooltip   string
+	DownloadTooltip string
 }
 
-func populateVMStatus(userEmail string) (vmInfo, error) {
+type meData struct {
+	User         user
+	VMInfo       vmInfo
+	ButtonConfig buttonConfiguration
+}
+
+func populateVMStatusButtons(userEmail string) (vmInfo, buttonConfiguration, error) {
 
 	vmInfo := vmInfo{}
-
+	buttonConfig := buttonConfiguration{
+		UpdateDisable: true,
+		RemoveDisable: true,
+		UpdateText:    "Update and Download SCIONLab VM Configuration",
+	}
 	vm, err := models.FindSCIONLabVMByUserEmail(userEmail)
 	if err != nil {
-		if err == orm.ErrNoRows {
-			vmInfo.VMText = "You currently do not have an active SCIONLab VM."
-		} else {
-			return vmInfo, err
+		if err != orm.ErrNoRows {
+			return vmInfo, buttonConfig, err
 		}
 	} else {
 		vmInfo.VMIP = vm.IP
 		vmInfo.VMStatus = vm.Status
-		switch vm.Status {
-		case INACTIVE:
-			vmInfo.VMText = "You currently do not have an active SCIONLab VM."
-		case ACTIVE:
-			vmInfo.VMText = "You currently have an active SCIONLab VM."
-			vmInfo.ShowIP = true
-		case CREATE:
-			vmInfo.VMText = "You have a pending creation request for your SCIONLab VM."
-			vmInfo.ShowIP = true
-		case UPDATE:
-			vmInfo.VMText = "You have a pending update request for your SCIONLab VM."
-			vmInfo.ShowIP = true
-		case REMOVE:
-			vmInfo.VMText = "Your SCIONLab VM configuration is currently scheduled for removal."
-		}
+	}
+	switch vmInfo.VMStatus {
+	case INACTIVE:
+		vmInfo.VMText = "You currently do not have an active SCIONLab VM."
+		buttonConfig.UpdateText = "Create and Download SCIONLab VM Configuration"
+		buttonConfig.UpdateDisable = false
+		buttonConfig.DownloadDisable = true
+		buttonConfig.IsInactive = true
+	case ACTIVE:
+		vmInfo.VMText = "You currently have an active SCIONLab VM."
+		vmInfo.ShowIP = true
+		buttonConfig.UpdateDisable = false
+		buttonConfig.RemoveDisable = false
+	case CREATE:
+		vmInfo.VMText = "You have a pending creation request for your SCIONLab VM."
+		vmInfo.ShowIP = true
+	case UPDATE:
+		vmInfo.VMText = "You have a pending update request for your SCIONLab VM."
+		vmInfo.ShowIP = true
+	case REMOVE:
+		vmInfo.VMText = "Your SCIONLab VM configuration is currently scheduled for removal."
+		buttonConfig.DownloadDisable = true
 	}
 
-	return vmInfo, nil
+	if buttonConfig.UpdateDisable {
+		buttonConfig.UpdateTooltip = "Updates are disabled as you have a pending request."
+	}
+
+	if buttonConfig.RemoveDisable {
+		buttonConfig.RemoveTooltip = "You currently do not have an active VM configuration."
+	}
+
+	if buttonConfig.DownloadDisable {
+		buttonConfig.DownloadTooltip = "You currently do not have an active VM configuration."
+	}
+
+	return vmInfo, buttonConfig, nil
 }
 
 func (c *LoginController) Me(w http.ResponseWriter, r *http.Request) {
@@ -120,16 +153,16 @@ func (c *LoginController) Me(w http.ResponseWriter, r *http.Request) {
 		AccountID:    storedUser.Account.AccountId,
 		Secret:       storedUser.Account.Secret,
 	}
-
-	vmInfo, err := populateVMStatus(userSession.Email)
+	vmInfo, buttonConfig, err := populateVMStatusButtons(userSession.Email)
 	if err != nil {
 		c.Forbidden(err, w, r)
 		return
 	}
 
 	me := meData{
-		User:   user,
-		VMInfo: vmInfo,
+		User:         user,
+		VMInfo:       vmInfo,
+		ButtonConfig: buttonConfig,
 	}
 
 	c.JSON(&me, w, r)
