@@ -155,7 +155,6 @@ func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http
 		s.Error500(err, w, r)
 		return
 	}
-	log.Printf(string(b))
 	fmt.Fprintln(w, string(b))
 }
 

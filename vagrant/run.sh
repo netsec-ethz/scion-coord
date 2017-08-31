@@ -33,33 +33,38 @@ run_osx() {
 }
 
 run_linux() {
-    echo "[SCIONLabVM] Given system: LINUX"
-    sudo bash -c 'echo deb http://vagrant-deb.linestarve.com/ any main > /etc/apt/sources.list.d/wolfgang42-vagrant.list'
-    sudo apt-key adv --keyserver pgp.mit.edu --recv-key AD319E0F7CFFA38B4D9F6E55CE3F3DE92099F7A4
-    sudo apt-get update
-    if dpkg --get-selections | grep -q "^$VB[[:space:]]*install$" >/dev/null; then
-        echo "[SCIONLabVM] $VB is already installed"
+    if [[ -f "/usr/bin/apt-get" && -f "/usr/bin/dpkg" ]]
+    then
+        echo "[SCIONLabVM] Given system: LINUX"
+        sudo bash -c 'echo deb http://vagrant-deb.linestarve.com/ any main > /etc/apt/sources.list.d/wolfgang42-vagrant.list'
+        sudo apt-key adv --keyserver pgp.mit.edu --recv-key AD319E0F7CFFA38B4D9F6E55CE3F3DE92099F7A4
+        sudo apt-get update
+        if dpkg --get-selections | grep -q "^$VB[[:space:]]*install$" >/dev/null; then
+            echo "[SCIONLabVM] $VB is already installed"
+        else
+            echo "[SCIONLabVM] Installing $VB"
+            sudo apt-get --yes install $VB
+        fi
+        if vagrant version | grep "Installed Version: 1.9" >/dev/null; then
+            echo "[SCIONLabVM] $VG is already installed"
+        elif dpkg --get-selections | grep -q "^$VG[[:space:]]*install$" >/dev/null; then
+            echo "[SCIONLabVM] ${RED}Warning!${NC} Current version of $VG in your system is out of date."
+            while true; do
+                read -p "[SCIONLabVM] Do you want upgrade $VG now? If no, it will terminate SCIONLabVM immediately. [y/n]" yesno
+                case $yesno in
+                    [Yy]*) sudo apt-get install --only-upgrade $VG; break;;
+                    [Nn]*) echo "[SCIONLabVM] Closing SCIONLabVM installation."; exit 1;;
+                    *) ;;
+                esac
+            done
+        else
+            echo "[SCIONLabVM] Installing $VG"
+            sudo apt-get --yes install $VG
+        fi
+        run_vagrant
     else
-        echo "[SCIONLabVM] Installing $VB"
-        sudo apt-get --yes install $VB
+    	echo "Currently, SCIONLabVM does not support your linux distribution."
     fi
-    if vagrant version | grep "Installed Version: 1.9" >/dev/null; then
-        echo "[SCIONLabVM] $VG is already installed"
-    elif dpkg --get-selections | grep -q "^$VG[[:space:]]*install$" >/dev/null; then
-        echo "[SCIONLabVM] ${RED}Warning!${NC} Current version of $VG in your system is out of date."
-        while true; do
-            read -p "[SCIONLabVM] Do you want upgrade $VG now? If no, it will terminate SCIONLabVM immediately. [y/n]" yesno
-            case $yesno in
-                [Yy]*) sudo apt-get install --only-upgrade $VG; break;;
-                [Nn]*) echo "[SCIONLabVM] Closing SCIONLabVM installation."; exit 1;;
-                *) ;;
-            esac
-        done
-    else
-        echo "[SCIONLabVM] Installing $VG"
-        sudo apt-get --yes install $VG
-    fi
-    run_vagrant
 }
 
 
@@ -69,5 +74,5 @@ case "$OSTYPE" in
   linux*)
         "run_linux" ;;
   solaris*|bsd*|msys|*) 
-    echo "Currently, SCIONLabVM does not support $OSTYPE system" ;;
+    echo "Currently, SCIONLabVM does not support $OSTYPE system." ;;
 esac
