@@ -277,7 +277,6 @@ func (s *SCIONLabVMController) generateLocalGen(svmInfo *SCIONLabVMInfo) error {
 	cmd := exec.Command("python3", local_gen_path, "--topo_file="+topo_path, "--user_id="+userEmail,
 		"--joining_ia="+isdID+"-"+asID)
 	env := os.Environ()
-	env = append(env, "PYTHONPATH="+python_path+":"+scion_path+":"+scion_web_path)
 	cmd.Env = env
 	cmdOut, _ := cmd.StdoutPipe()
 	cmdErr, _ := cmd.StderrPipe()
