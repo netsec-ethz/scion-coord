@@ -1,8 +1,8 @@
-angular.module('scionApp')
-    .factory('userService', ["$http", "$q", function($http, $q) {
-    var userService = {
+scionApp
+    .factory('userService', ["$http", "$q", function ($http, $q) {
+    return {
         // Load the user's data
-        me: function() {
+        me: function () {
             // $http returns a promise, which has a then function, which also returns a promise
             return $http.get('/api/me').then(function (response) {
                 // The then function here is an opportunity to modify the response
@@ -12,7 +12,7 @@ angular.module('scionApp')
             });
         },
         // Create SCIONLab VM
-        generateSCIONLabVM: function(user) {
+        generateSCIONLabVM: function (user) {
             // $http returns a promise, which has a then function, which also returns a promise
             // TODO(ercanucan): compose the URL in a cleaner fashion
             var url = '/api/as/generateVM?scionLabVMIP=' + user.scionLabVMIP + "&userEmail=" + user.Email;
@@ -24,7 +24,7 @@ angular.module('scionApp')
             });
         },
         // Remove SCIONLab VM
-        removeSCIONLabVM: function(user) {
+        removeSCIONLabVM: function (user) {
             // $http returns a promise, which has a then function, which also returns a promise
             console.log("Inside remove VM");
             var url = '/api/as/removeVM?userEmail=' + user.Email;
@@ -36,5 +36,4 @@ angular.module('scionApp')
             });
         }
     };
-    return userService;
 }]);

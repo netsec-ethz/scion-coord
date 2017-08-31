@@ -1,8 +1,8 @@
-angular.module('scionApp')
-    .factory('loginService', ["$http", "$q", function($http, $q) {
-    var loginService = {
+scionApp
+    .factory('loginService', ["$http", "$q", function ($http, $q) {
+    return {
         // Log the user in
-        login: function(user) {
+        login: function (user) {
             // $http returns a promise, which has a then function, which also returns a promise
             return $http.post('/api/login', user).then(function (response) {
                 // The then function here is an opportunity to modify the response
@@ -11,7 +11,7 @@ angular.module('scionApp')
                 return response.data;
             });
         },
-        logout: function() {
+        logout: function () {
             // $http returns a promise, which has a then function, which also returns a promise
             return $http.post('/api/logout').then(function (response) {
                 // The then function here is an opportunity to modify the response
@@ -21,5 +21,4 @@ angular.module('scionApp')
             });
         }
     };
-    return loginService;
 }]);

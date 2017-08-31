@@ -21,7 +21,6 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/astaxie/beego/orm"
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/models"
@@ -45,94 +44,6 @@ type user struct {
 	Organisation string
 	AccountID    string
 	Secret       string
-}
-
-type vmInfo struct {
-	VMStatus uint8
-	VMText   string
-	VMIP     string
-	ShowIP   bool
-}
-
-type meData struct {
-	User   user
-	VMInfo vmInfo
-}
-
-func populateVMStatus(userEmail string) (vmInfo, error) {
-
-	vmInfo := vmInfo{}
-
-	vm, err := models.FindSCIONLabVMByUserEmail(userEmail)
-	if err != nil {
-		if err == orm.ErrNoRows {
-			vmInfo.VMText = "You currently do not have an active SCIONLab VM."
-		} else {
-			return vmInfo, err
-		}
-	} else {
-		vmInfo.VMIP = vm.IP
-		vmInfo.VMStatus = vm.Status
-		switch vm.Status {
-		case INACTIVE:
-			vmInfo.VMText = "You currently do not have an active SCIONLab VM."
-		case ACTIVE:
-			vmInfo.VMText = "You currently have an active SCIONLab VM."
-			vmInfo.ShowIP = true
-		case CREATE:
-			vmInfo.VMText = "You have a pending creation request for your SCIONLab VM."
-			vmInfo.ShowIP = true
-		case UPDATE:
-			vmInfo.VMText = "You have a pending update request for your SCIONLab VM."
-			vmInfo.ShowIP = true
-		case REMOVE:
-			vmInfo.VMText = "Your SCIONLab VM configuration is currently scheduled for removal."
-		}
-	}
-
-	return vmInfo, nil
-}
-
-func (c *LoginController) Me(w http.ResponseWriter, r *http.Request) {
-	// get the current user session if present.
-	// if not then, abort
-	_, userSession, err := middleware.GetUserSession(r)
-
-	if err != nil || userSession == nil {
-		log.Println(err)
-		http.Error(w, err.Error(), http.StatusForbidden)
-		return
-	}
-
-	// retrieve the user via the email
-	storedUser, err := models.FindUserByEmail(userSession.Email)
-	if err != nil {
-		c.Forbidden(err, w, r)
-		return
-	}
-
-	user := user{
-		Email:        storedUser.Email,
-		FirstName:    storedUser.FirstName,
-		LastName:     storedUser.LastName,
-		Account:      storedUser.Account.Name,
-		Organisation: storedUser.Account.Organisation,
-		AccountID:    storedUser.Account.AccountId,
-		Secret:       storedUser.Account.Secret,
-	}
-
-	vmInfo, err := populateVMStatus(userSession.Email)
-	if err != nil {
-		c.Forbidden(err, w, r)
-		return
-	}
-
-	me := meData{
-		User:   user,
-		VMInfo: vmInfo,
-	}
-
-	c.JSON(&me, w, r)
 }
 
 func (c *LoginController) Logout(w http.ResponseWriter, r *http.Request) {
@@ -248,7 +159,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 		c.JSON(&user, w, r)
 
 	} else {
-		log.Println("AUth error")
+		log.Println("Auth error")
 		c.Forbidden(err, w, r)
 		return
 	}
