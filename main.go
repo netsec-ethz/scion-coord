@@ -34,7 +34,6 @@ func main() {
 	loginController := api.LoginController{}
 	asController := api.ASController{}
 	scionLabVMController := api.SCIONLabVMController{}
-	adminController := api.AdminController{}
 
 	// router
 	router := mux.NewRouter()
@@ -51,27 +50,19 @@ func main() {
 	// 404 on favicon requests
 	router.Handle("/favicon.ico", http.HandlerFunc(http.NotFound))
 
-	// index page for registration and login
+	// index page
 	router.Handle("/", xsrfChain.ThenFunc(controllers.Index))
 
-	// login page
-	router.Handle("/login", xsrfChain.ThenFunc(loginController.LoginPage))
+	// ==========================================================
+	// SCION Coord API
 
-	// register page
-	router.Handle("/register", xsrfChain.ThenFunc(registrationController.RegisterPage))
-	router.Handle("/register", xsrfChain.ThenFunc(registrationController.RegisterPost)).Methods("POST")
-
-	// admin page
-	router.Handle("/admin", loggingChain.ThenFunc(adminController.Index))
-
-	// registration
-	router.Handle("/api/register", loggingChain.ThenFunc(registrationController.Register))
-	// login
+	// user registration
+	router.Handle("/api/register", loggingChain.ThenFunc(registrationController.Register)).Methods("POST")
+	// user login
 	router.Handle("/api/login", loggingChain.ThenFunc(loginController.Login))
-	// Logout
+	// user Logout
 	router.Handle("/api/logout", loggingChain.ThenFunc(loginController.Logout))
-
-	// Me
+	// user information
 	router.Handle("/api/me", loggingChain.ThenFunc(loginController.Me))
 
 	//email validation
@@ -87,7 +78,8 @@ func main() {
 		apiChain.ThenFunc(scionLabVMController.ConfirmActivatedSCIONLabVMASes))
 
 	// ==========================================================
-	// API
+	// SCION Web API
+
 	router.Handle("/api/as/exists/{as_id}/{account_id}/{secret}", apiChain.ThenFunc(asController.Exists))
 
 	// ISD join request

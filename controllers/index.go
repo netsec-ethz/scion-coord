@@ -19,7 +19,8 @@ import (
 	"net/http"
 )
 
+// Index is the starting point of the webserver, the index page contains references to all the resources needed
 func Index(w http.ResponseWriter, r *http.Request) {
-	t, _ := template.ParseFiles("templates/index.html")
+	t, _ := template.ParseFiles("public/index.html")
 	t.Execute(w, nil)
 }
