@@ -18,12 +18,21 @@
 
 """
 
+# Append SCION directories to PYTHONPATH
+import os
+FILE_PATH = os.path.dirname(os.path.realpath(__file__))
+SCION_PATH = os.path.join(os.path.dirname(os.path.dirname(FILE_PATH)), "scion")
+
+import sys
+sys.path.append(os.path.join(SCION_PATH, "python"))
+sys.path.append(SCION_PATH)
+sys.path.append(os.path.join(SCION_PATH, "sub", "web"))
+
 # Standard library
 import argparse
 import base64
 import configparser
 import json
-import os
 from shutil import rmtree
 
 # External packages
@@ -58,9 +67,7 @@ from ad_manager.util.local_config_util import (
     TYPES_TO_KEYS,
 )
 
-
-# TODO (ercanucan): Ensure that this folder exists!
-FILE_PATH = os.path.dirname(os.path.realpath(__file__))
+# Directory structure and credential files
 SCION_COORD_PATH = os.path.dirname(FILE_PATH)
 GEN_ROOT = os.path.join(SCION_COORD_PATH, "temp")
 DEFAULT_CORE_CERT_FILE = os.path.join(SCION_COORD_PATH, "credentials", "ISD1-AS1-V0.crt")
