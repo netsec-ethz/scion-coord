@@ -25,8 +25,8 @@ angular.module('scionApp')
                 adminService.generateSCIONLabVM(user).then(
                     function(data) {
                         console.log(data);
-                        window.location.assign('/api/as/downloads?filename=' + data);
-                        $scope.message = "Your VM will be activated within a few minutes.";
+                        window.location.assign('/api/as/downloads?filename=' + data["filename"]);
+                        $scope.message = data["message"];
                     },
                     function(response) {
                         console.log(response);
