@@ -1,2 +1,4 @@
 scion-coord
 vendor/*/
+temp/
+credentials/

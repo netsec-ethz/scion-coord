@@ -3,6 +3,8 @@ SCION Coordination service
 
 ### How to run it
 
+#### Dependencies
+
 The application uses govendor. You need to install govendor via:
 `go get github.com/kardianos/govendor`
 
@@ -22,13 +24,7 @@ Secret key: 6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe
 Warning: Use above keys only for testing purposes as they circumvent the captcha.
 
 
-Afterwards, you can run `go run main.go` from the root folder.
-Otherwise you can also run the application via:
-
-```
-go build
-./scion-coord
-```
+#### MySQL database
 
 Important:
 The project needs a working MySQL server instance running locally. You can
@@ -47,7 +43,32 @@ and then executing the following command:
 
 `CREATE DATABASE scion_coord_test;`
 
+
+#### Custom settings
+
 You can change the settings in the config file located at: `conf/development.conf`
+
+
+#### Credentials
+
+In order for the configurations to be generated, the following files must exist:
+```
+credentials/ISD1-AS1-V0.crt
+credentials/as-sig.key
+credentials/ISD1-V0.trc
+```
+
+
+#### Run scion-coord
+
+
+Afterwards, you can run `go run main.go` from the root folder.
+Otherwise you can also run the application via:
+
+```
+go build
+./scion-coord
+```
 
 
 ### Current APIs
