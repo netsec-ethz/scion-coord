@@ -42,7 +42,8 @@
       <div class="row">
         <!-- /.col -->
         <div class="col-xs-12">
-          <!-- <button ng-click="register(user)" ng-disabled="registration.$invalid" type="button" class="btn btn-primary btn-block btn-flat">Register</button> -->
+          <div vc-recaptcha ng-model="user.captcha" key="siteKey"></div>
+          <br>
           <button type="submit" class="btn btn-primary btn-block btn-flat">Register</button>
         </div>
         <!-- /.col -->
@@ -57,7 +58,7 @@
         Google+</a>
     </div>
     -->
-    <br/>
+    <br>
     <a href="#/login" class="text-center">I am already registered.</a>
   </div>
 </div>
