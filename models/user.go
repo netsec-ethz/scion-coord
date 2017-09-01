@@ -108,7 +108,7 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 	// 3 - link user to account
 	if err == orm.ErrNoRows {
 		// 1 check if an account already exists
-		a, err := FindAccount(accountName)
+		a, err := FindAccountByName(accountName)
 
 		// if there is no account with the name then create it
 		if err == orm.ErrNoRows {
@@ -163,7 +163,7 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 }
 
 func (a *Account) Upsert() error {
-	storedAccount, err := FindAccount(a.Name)
+	storedAccount, err := FindAccountByName(a.Name)
 	if err == nil && storedAccount != nil && storedAccount.Id > 0 {
 		a.Id = storedAccount.Id
 		a.Updated = time.Now().UTC()
@@ -175,7 +175,7 @@ func (a *Account) Upsert() error {
 	return err
 }
 
-func FindAccount(name string) (*Account, error) {
+func FindAccountByName(name string) (*Account, error) {
 	a := new(Account)
 	err := o.QueryTable(a).Filter("Name", name).RelatedSel().One(a)
 	return a, err
@@ -190,18 +190,6 @@ func FindUserByEmail(email string) (*user, error) {
 func FindUserByVerificationUUID(link string) (*user, error) {
 	u := new(user)
 	err := o.QueryTable(u).Filter("VerificationUUID", link).RelatedSel().One(u)
-	return u, err
-}
-
-func FindUserByRecoveryToken(token string) (*user, error) {
-	u := new(user)
-	err := o.QueryTable(u).Filter("RecoveryToken", token).RelatedSel().One(u)
-	return u, err
-}
-
-func FindUserEmailToken(token string) (*user, error) {
-	u := new(user)
-	err := o.QueryTable(u).Filter("EmailToken", token).RelatedSel().One(u)
 	return u, err
 }
 
@@ -317,6 +305,6 @@ func validUserPassword(storedPassHex, storedSaltHex, password string) bool {
 func (u *user) UpdateVerified(value bool) error {
 	u.Verified = value
 	u.Updated = time.Now().UTC()
-	_, err := o.Update(u, "Verified")
+	_, err := o.Update(u, "Verified", "Updated")
 	return err
 }
