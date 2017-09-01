@@ -21,8 +21,10 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/haisum/recaptcha"
 	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/email"
@@ -41,10 +43,18 @@ type registrationRequest struct {
 	First                string `json:"first"`
 	Last                 string `json:"last"`
 	Account              string `json:"account"`
+	Captcha              string `json:"captcha"`
 }
 
 // Method used to validate the registration request
 func (r *registrationRequest) isValid() (bool, error) {
+
+	//check recaptcha
+	rc := recaptcha.R{Secret: config.CAPTCHA_SECRET_KEY}
+	if !rc.VerifyResponse(r.Captcha) {
+		return false, fmt.Errorf("ReCaptcha error: %s", strings.Join(rc.LastError()[1:], ", "))
+	}
+
 	// check if any of this is empty
 	if r.Email == "" || r.Password == "" || r.PasswordConfirmation == "" ||
 		r.First == "" || r.Last == "" {
@@ -151,6 +161,10 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 		c.Error500(err, w, r)
 	}
 
+}
+
+func (c *RegistrationController) LoadCaptchaSiteKey(w http.ResponseWriter, r *http.Request) {
+	c.Plain(config.CAPTCHA_SITE_KEY, w, r)
 }
 
 // Helper function which creates the email and server objects used to send emails to users
