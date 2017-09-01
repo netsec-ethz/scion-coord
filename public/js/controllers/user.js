@@ -10,7 +10,8 @@ angular.module('scionApp')
                 userService.me().then(
                     function(data) {
                         console.log(data);
-                        $scope.user = data;
+                        $scope.user = data["User"];
+                        $scope.vmInfo = data["VMInfo"]
                     },
                     function(response) {
                         console.log(response);
@@ -25,8 +26,8 @@ angular.module('scionApp')
                 userService.generateSCIONLabVM(user).then(
                     function(data) {
                         console.log(data);
-                        window.location.assign('/api/as/downloads?filename=' + data);
-                        $scope.message = "Your VM will be activated within a few minutes.";
+                        window.location.assign('/api/as/downloads?filename=' + data["filename"]);
+                        $scope.message = data["message"];
                     },
                     function(response) {
                         console.log(response);

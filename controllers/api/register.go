@@ -15,7 +15,6 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -154,7 +153,7 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 	}
 
 	// Send email address confirmation link
-	if err := sendMail(user.Id); err != nil {
+	if err := sendVerificationEmail(user.Id); err != nil {
 		log.Printf("Error sending verification email: %v", err)
 		c.Error500(err, w, r)
 	}
@@ -165,15 +164,10 @@ func (c *RegistrationController) LoadCaptchaSiteKey(w http.ResponseWriter, r *ht
 	c.Plain(config.CAPTCHA_SITE_KEY, w, r)
 }
 
-// Helper function which creates the email and server objects used to send emails to users
-func sendMail(userID uint64) error {
+// Function which sends verification emails to newly registered users
+func sendVerificationEmail(userID uint64) error {
 
 	user, err := models.FindUserById(fmt.Sprintf("%v", userID))
-	if err != nil {
-		return err
-	}
-
-	tmpl, err := template.ParseFiles("email/templates/verification.html")
 	if err != nil {
 		return err
 	}
@@ -185,17 +179,12 @@ func sendMail(userID uint64) error {
 		VerificationUUID string
 	}{user.FirstName, user.LastName, config.HTTP_HOST_ADDRESS, user.VerificationUUID}
 
-	buf := new(bytes.Buffer)
-	tmpl.Execute(buf, data)
-	body := buf.String()
-
-	mail := new(email.Email)
-	mail.From = config.EMAIL_FROM
-	mail.To = []string{user.Email}
-	mail.Subject = "[SCIONLab] Verify your email address for SCIONLab Coordination Service"
-	mail.Body = body
-
-	if err := email.Send(mail); err != nil {
+	if err := email.ConstructAndSend(
+		"verification.html",
+		"[SCIONLab] Verify your email address for SCIONLab Coordination Service",
+		data,
+		"email-verification",
+		user.Email); err != nil {
 		return err
 	}
 

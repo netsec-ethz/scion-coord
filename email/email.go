@@ -16,8 +16,10 @@
 package email
 
 import (
+	"bytes"
 	"github.com/keighl/postmark"
 	"github.com/netsec-ethz/scion-coord/config"
+	"html/template"
 	"log"
 	"strings"
 )
@@ -27,6 +29,7 @@ type Email struct {
 	To      []string
 	Subject string
 	Body    string
+	Tag     string
 }
 
 // Send connects to the PostMark email API and sends the email
@@ -39,7 +42,7 @@ func Send(mail *Email) error {
 		To:         strings.Join(mail.To, ","),
 		Subject:    mail.Subject,
 		TextBody:   mail.Body,
-		Tag:        "email-verification",
+		Tag:        mail.Tag,
 		TrackOpens: true,
 	}
 
@@ -52,4 +55,35 @@ func Send(mail *Email) error {
 
 	return nil
 
+}
+
+// ConstructAndSend builds and then sends an email to the user specified by
+// their userEmail by filling in the specified template with the given subject
+// and information in the data object
+func ConstructAndSend(emailTemplate string, subject string, data interface{},
+	tag string, userEmail string) (err error) {
+
+	tmpl, err := template.ParseFiles("email/templates/" + emailTemplate)
+	if err != nil {
+		log.Printf("Parsing template %v failed: %v", emailTemplate, err)
+		return err
+	}
+
+	buf := new(bytes.Buffer)
+	tmpl.Execute(buf, data)
+	body := buf.String()
+
+	mail := new(Email)
+	mail.From = config.EMAIL_FROM
+	mail.To = []string{userEmail}
+	mail.Subject = subject
+	mail.Body = body
+	mail.Tag = tag
+
+	if err = Send(mail); err != nil {
+		log.Printf("Sending email to %v failed: %v", userEmail, err)
+		return err
+	}
+
+	return nil
 }
