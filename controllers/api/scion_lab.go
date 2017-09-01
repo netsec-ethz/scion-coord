@@ -51,11 +51,11 @@ var (
 
 // The states in which a user's SCIONLab VM can be in.
 const (
-	ACTIVE   = "Active"
-	INACTIVE = "Inactive"
-	CREATE   = "Create"
-	UPDATE   = "Update"
-	REMOVE   = "Remove"
+	INACTIVE = iota // 0
+	ACTIVE
+	CREATE
+	UPDATE
+	REMOVE
 )
 
 // Acknowledgments for the performed operations by a SCIONLab AS.

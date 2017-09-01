@@ -45,7 +45,7 @@ type SCIONLabVM struct {
 	RemoteIA     string // the SCIONLab AS it connects to
 	RemoteIAPort int    // port number of the remote SCIONLab AS being connected to
 	RemoteBR     string // the name of the remote border router for this AS
-	Status       string // Action to be taken for this VM (i.e Active, Create, Update, Remove)
+	Status       uint8  `orm:"default(0)"` // Status of the VM (i.e Active, Create, Update, Remove)
 }
 
 func FindSCIONLabVMByUserEmail(email string) (*SCIONLabVM, error) {
