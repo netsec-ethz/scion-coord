@@ -7,13 +7,14 @@
 
   <p><b>AccountId:</b> {{user.AccountId}}</p>
   <p><b>Secret:</b> {{user.Secret}}</p>
+  <p></p>
+  <p>{{user.VMStatus}} <span ng-if="user.ShowIp">Your registered IP address is <b>{{user.VMIp}}</b>.</span></p>
   <div ng-show="error" ng-model="error" class="alert alert-danger alert-dismissible">
     {{error}}
   </div>
   <div ng-if="message" class="alert alert-success alert-dismissible">
     {{message}}
   </div>
-  <br/>
   <br/>
   <p><font color="red">When you fill out and submit the form below, your SCIONLab VM configuration for connecting to SCIONLab AS 1-7 will be packaged
   and downloaded. Please extract the downloaded tarball in a desired location and refer to the README file inside for instructions.</font></p>

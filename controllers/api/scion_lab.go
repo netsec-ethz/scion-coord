@@ -19,7 +19,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/astaxie/beego/orm"
+	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/controllers"
+	"github.com/netsec-ethz/scion-coord/email"
 	"github.com/netsec-ethz/scion-coord/models"
 	"io"
 	"io/ioutil"
@@ -85,7 +87,8 @@ type SCIONLabVMInfo struct {
 }
 
 // The main handler function to generates a SCIONLab VM for the given user.
-// If successful, it will return the filename of the tarball to download.
+// If successful, it will return the filename of the tarball to download
+// as well as a message to be printed.
 // The front-end will then initiate the downloading of the tarball.
 func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http.Request) {
 	// Parse the arguments
@@ -139,7 +142,21 @@ func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http
 		s.Error500(err, w, r)
 		return
 	}
-	fmt.Fprintln(w, fileName)
+
+	jsonResponse := map[string]string{
+		"filename": fileName,
+		"message": "Your VM will be activated within a few minutes. " +
+			"You will receive an email confirmation as soon as the process is complete.",
+	}
+
+	b, err := json.Marshal(jsonResponse)
+	if err != nil {
+		log.Printf("Error during JSON Marshaling: %v", err)
+		s.Error500(err, w, r)
+		return
+	}
+	log.Printf(string(b))
+	fmt.Fprintln(w, string(b))
 }
 
 // Parses the necessary parameters from the URL: the user's email address and the public
@@ -515,7 +532,7 @@ func (s *SCIONLabVMController) ConfirmSCIONLabVMASes(w http.ResponseWriter, r *h
 }
 
 // Updates the relevant DB tables based on the received confirmations from
-// SCIONLab AS.
+// SCIONLab AS and send out confirmation emails.
 func (s *SCIONLabVMController) processConfirmedSCIONLabVMASes(ia, action string,
 	vms []SCIONLabVM) []string {
 	log.Printf("action = %v, vms = %v", action, vms)
@@ -527,6 +544,7 @@ func (s *SCIONLabVMController) processConfirmedSCIONLabVMASes(ia, action string,
 			log.Printf("Error finding the SCIONLabVM with IP %v: %v",
 				vm.VMIP, err)
 			failedConfirmations = append(failedConfirmations, vm.VMIP)
+			continue
 		}
 		switch action {
 		case CREATED, UPDATED:
@@ -538,13 +556,67 @@ func (s *SCIONLabVMController) processConfirmedSCIONLabVMASes(ia, action string,
 		default:
 			log.Printf("Unsupported VM action for: %v. User %v", vm.VMIP, vm_db.UserEmail)
 			failedConfirmations = append(failedConfirmations, vm.VMIP)
+			continue
 		}
 		if err = vm_db.Update(); err != nil {
 			log.Printf("Error updating SCIONLabVM Table. VM IP: %v, %v", vm.VMIP, err)
 			failedConfirmations = append(failedConfirmations, vm.VMIP)
+		} else {
+			if err := sendConfirmationEmail(vm_db.UserEmail, action); err != nil {
+				log.Printf("Error sending email confirmation to user %v: %v", vm_db.UserEmail, err)
+			}
 		}
 	}
 	return failedConfirmations
+}
+
+// Helper function which creates the email and server objects used to send
+// confirmation emails to users
+func sendConfirmationEmail(userEmail, action string) error {
+	user, err := models.FindUserByEmail(userEmail)
+	if err != nil {
+		return err
+	}
+
+	tmpl, err := template.ParseFiles("email/templates/status.html")
+	if err != nil {
+		return err
+	}
+
+	var message string
+	switch action {
+	case CREATED:
+		message = "The infrastructure for your SCIONLab VM has been created. " +
+			"You are now able to use the SCION network through your VM."
+	case UPDATED:
+		message = "The settings for your SCIONLab VM have been updated."
+	case REMOVED:
+		message = "Your removal request has been processed. " +
+			"All infrastructure for your SCIONLab VM has been removed."
+	}
+
+	data := struct {
+		FirstName   string
+		LastName    string
+		HostAddress string
+		Message     string
+	}{user.FirstName, user.LastName, config.HTTP_HOST_ADDRESS, message}
+
+	buf := new(bytes.Buffer)
+	tmpl.Execute(buf, data)
+	body := buf.String()
+
+	mail := new(email.Email)
+	mail.From = config.EMAIL_FROM
+	mail.To = []string{userEmail}
+	mail.Subject = "[SCIONLab] Status update"
+	mail.Body = body
+
+	if err := email.Send(mail); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // API end-point to serve the generated SCIONLab VM configuration tarball.
@@ -595,7 +667,8 @@ func (s *SCIONLabVMController) RemoveSCIONLabVM(w http.ResponseWriter, r *http.R
 		return
 	}
 	log.Printf("Marked removal of SCIONLabVM of user %v.", userEmail)
-	fmt.Fprintln(w, "Your VM will be removed within the next 5 minutes.")
+	fmt.Fprintln(w, "Your VM will be removed within the next few minutes. "+
+		"You will receive a confirmation email as soon as the removal is complete.")
 }
 
 // Check if the user's VM is already removed or in the process of being removed.

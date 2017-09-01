@@ -21,6 +21,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/astaxie/beego/orm"
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/models"
@@ -44,6 +45,9 @@ type user struct {
 	Organisation string
 	AccountId    string
 	Secret       string
+	VMStatus     string
+	VMIp         string
+	ShowIp       bool
 }
 
 func (c *LoginController) Me(w http.ResponseWriter, r *http.Request) {
@@ -64,6 +68,37 @@ func (c *LoginController) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	vm, err := models.FindSCIONLabVMByUserEmail(userSession.Email)
+
+	var vmStatus string
+	vmIp := ""
+	showIp := false
+	if err != nil {
+		if err == orm.ErrNoRows {
+			vmStatus = "You currently do not have an active SCIONLab VM."
+		} else {
+			c.Forbidden(err, w, r)
+			return
+		}
+	} else {
+		vmIp = vm.IP
+		if vm.Status > 0 && vm.Status < 4 {
+			showIp = true
+		}
+		switch vm.Status {
+		case 0:
+			vmStatus = "You currently do not have an active SCIONLab VM."
+		case 1:
+			vmStatus = "You currently have an active SCIONLab VM."
+		case 2:
+			vmStatus = "You have a pending creation request for your SCIONLab VM."
+		case 3:
+			vmStatus = "You have a pending update request for your SCIONLab VM."
+		case 4:
+			vmStatus = "Your SCIONLab VM configuration is currently scheduled for removal."
+		}
+	}
+
 	user := user{
 		Email:        storedUser.Email,
 		FirstName:    storedUser.FirstName,
@@ -72,6 +107,9 @@ func (c *LoginController) Me(w http.ResponseWriter, r *http.Request) {
 		Organisation: storedUser.Account.Organisation,
 		AccountId:    storedUser.Account.AccountId,
 		Secret:       storedUser.Account.Secret,
+		VMStatus:     vmStatus,
+		VMIp:         vmIp,
+		ShowIp:       showIp,
 	}
 
 	c.JSON(&user, w, r)
