@@ -16,15 +16,17 @@ package models
 
 import (
 	"fmt"
-	"github.com/astaxie/beego/orm"
-	"github.com/netsec-ethz/scion/go/lib/addr"
 	"log"
 	"time"
+
+	"github.com/astaxie/beego/orm"
+	"github.com/netsec-ethz/scion/go/lib/addr"
 )
 
 type As struct {
-	Id      uint64   `orm:"column(id);auto;pk"`
-	Isd     int      `orm:"index"`
+	Id  uint64 `orm:"column(id);auto;pk"`
+	Isd int    `orm:"index"`
+	// TODO (ercanucan): This field should be renamed to AS ID!
 	As      int      `orm:"index"`
 	Core    bool     `orm:"default(false)"`
 	Account *Account `orm:"rel(fk);index"`
@@ -50,8 +52,14 @@ func FindAsByIsdAs(isdas string) (*As, error) {
 		return nil, err
 	}
 	as := new(As)
-	err = o.QueryTable(as).Filter("Isd", ia.I).Filter("As", ia.A).RelatedSel().One(as)
-	return as, err
+	dbErr := o.QueryTable(as).Filter("Isd", ia.I).Filter("As", ia.A).RelatedSel().One(as)
+	return as, dbErr
+}
+
+func FindAllASes() ([]As, error) {
+	var ases []As
+	_, err := o.QueryTable("as").All(&ases)
+	return ases, err
 }
 
 type ConnectionWithCredits struct {

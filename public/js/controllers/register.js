@@ -1,26 +1,32 @@
 angular.module('scionApp')
-    .controller('registerCtrl', ['$scope', 'registerService', '$interval', '$location',
-        function($scope, registerService, $interval, $location) {            
+    .controller('registerCtrl', ['$scope', 'registerService', 'ResolveSiteKey', '$interval', '$location', 'vcRecaptchaService',
+        function($scope, registerService, ResolveSiteKey, $interval, $location, vcRecaptchaService) {
 
-            $scope.error = "";
-            $scope.message = "";
             $scope.user = {};
+            $scope.siteKey = ResolveSiteKey.data;
 
-            // refresh the list of processes
-            $scope.register = function (user) {
-                
+            $scope.register = function(user) {
+
+                if (!$scope.user.captcha){
+                    $scope.error = "Please resolve the captcha before submitting."
+                    $scope.message = "";
+                } else {
+
                 registerService.register(user).then(
-                    function(data) {                    
-                        //$scope.message = "Registration completed successfully.\nYou will be soon redirected to the home page.";
-                        $scope.user = data;
-                        $location.path('/login');
-                        
+                    function(data) {
+                        $scope.message = "Registration completed successfully. We sent you an email to your inbox with a link to verify your account.";
+                        $scope.error = ""
+                        $scope.user = {};
+                        vcRecaptchaService.reload();
                     },
                     function(response) {
                         $scope.error = response.data;
+                        $scope.message = ""
+                        vcRecaptchaService.reload();
                         console.log(response);
-                    });  
+                    });
+                }
             };
 
- }]);
-
+        }
+    ]);

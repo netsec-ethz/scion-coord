@@ -6,11 +6,11 @@
   <div class="login-box-body">
     <p class="login-box-msg">Sign in to start your session</p>
 
-    <div ng-show="error" ng-model="error" class="alert alert-danger alert-dismissible">                
-        {{error}}        
+    <div ng-show="error" ng-model="error" class="alert alert-danger alert-dismissible">
+        {{error}}
       </div>
 
-    <ng-form name="loginForm" ng-submit="submit()">
+    <form name="loginForm" ng-submit="login(user)">
       <div class="form-group has-feedback">
         <input type="email" class="form-control" ng-model="user.email" name="email" placeholder="Email" ng-required="true">
         <span class="glyphicon glyphicon-envelope form-control-feedback"></span>
@@ -21,7 +21,7 @@
       </div>
       <div class="row">
         <div class="col-xs-12">
-          <button ng-click="login(user)" type="button" class="btn btn-primary btn-block btn-flat">Login</button>
+          <button type="submit" class="btn btn-primary btn-block btn-flat">Login</button>
         </div>
         <!-- /.col -->
       </div>

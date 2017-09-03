@@ -18,14 +18,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"net/http"
+	"time"
+
 	"github.com/astaxie/beego/orm"
 	"github.com/gorilla/mux"
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/models"
 	"github.com/netsec-ethz/scion/go/lib/addr"
-	"log"
-	"net/http"
-	"time"
 )
 
 type JoinRequest struct {
@@ -261,10 +262,10 @@ func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 			Account: account,
 			Created: time.Now().UTC(),
 		}
-		if err = new_as.Insert(); err != nil {
+		if dbErr := new_as.Insert(); dbErr != nil {
 			log.Printf("Error inserting new AS: %v Account: %v Request ID: %v, %v",
 				new_as.String(), account, reply.RequestId, err)
-			c.Error500(err, w, r)
+			c.Error500(dbErr, w, r)
 			return
 		}
 		log.Printf("New AS successfully created. Account: %v Request ID: %v new AS: %v",

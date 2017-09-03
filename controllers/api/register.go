@@ -15,15 +15,20 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"github.com/netsec-ethz/scion-coord/controllers"
-	"github.com/netsec-ethz/scion-coord/controllers/middleware"
-	"github.com/netsec-ethz/scion-coord/models"
 	"html/template"
 	"log"
 	"net/http"
+	"strings"
+
+	"github.com/gorilla/mux"
+	"github.com/haisum/recaptcha"
+	"github.com/netsec-ethz/scion-coord/config"
+	"github.com/netsec-ethz/scion-coord/controllers"
+	"github.com/netsec-ethz/scion-coord/email"
+	"github.com/netsec-ethz/scion-coord/models"
 )
 
 type RegistrationController struct {
@@ -38,93 +43,75 @@ type registrationRequest struct {
 	First                string `json:"first"`
 	Last                 string `json:"last"`
 	Account              string `json:"account"`
-}
-
-// TODO: cache the templates
-func (c *RegistrationController) RegisterPage(w http.ResponseWriter, r *http.Request) {
-	t, err := template.ParseFiles("templates/layout.html", "templates/register.html")
-	if err != nil {
-		c.Error500(err, w, r)
-		return
-	}
-
-	_, userSession, err := middleware.GetUserSession(r)
-	if err != nil || userSession == nil {
-		c.Error500(err, w, r)
-		return
-	}
-
-	c.Render(t, userSession, w, r)
+	Captcha              string `json:"captcha"`
 }
 
 // Method used to validate the registration request
 func (r *registrationRequest) isValid() (bool, error) {
+
+	//check recaptcha
+	rc := recaptcha.R{Secret: config.CAPTCHA_SECRET_KEY}
+	if !rc.VerifyResponse(r.Captcha) {
+		return false, fmt.Errorf("ReCaptcha error: %s", strings.Join(rc.LastError()[1:], ", "))
+	}
+
 	// check if any of this is empty
-	if r.Email == "" || r.Organisation == "" || r.Password == "" || r.PasswordConfirmation == "" ||
-		r.First == "" || r.Last == "" || r.Account == "" {
-		return false, fmt.Errorf("%s\n", "Email, Organisation, Password, Password confirmation, Firts and Last name and Account are all mandatory fields")
+	if r.Email == "" || r.Password == "" || r.PasswordConfirmation == "" ||
+		r.First == "" || r.Last == "" {
+		return false, fmt.Errorf("%s\n", "You entered incomplete data. First and last name, email and password are mandatory fields.")
 	}
 
 	// check if the password match and that the length is at least 8 chars
 	if len(r.Password) < 8 {
 
-		return false, fmt.Errorf("%s\n", "Password length invalid. Use at leats 8 chars")
+		return false, fmt.Errorf("%s\n", "Please use at least 8 characters for your password.")
 	}
 
 	if r.Password != r.PasswordConfirmation {
-		return false, fmt.Errorf("%s\n", "Password mismatch")
+		return false, fmt.Errorf("%s\n", "Please enter matching passwords.")
 	}
 
 	return true, nil
 }
 
-// This method is used to register a new account via the standard form
-func (c *RegistrationController) RegisterPost(w http.ResponseWriter, r *http.Request) {
+// Method used to validate email address
+func (c *RegistrationController) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 
-	session, userSession, err := middleware.GetUserSession(r)
+	//retrieve submitted uuid
+	uuid := mux.Vars(r)["uuid"]
 
-	if err != nil || userSession == nil {
+	//validate link
+	u, err := models.FindUserByVerificationUUID(uuid)
+
+	if err != nil {
+		log.Printf("Error verifying email address. %v is not a valid UUID.", uuid)
+		c.BadRequest(fmt.Errorf("Error verifying email address. %v is not a valid user identifier.", uuid), w, r)
+		return
+	}
+
+	if u.Verified {
+		log.Printf("Error verifying email address. User %v is already verified.", u.Email)
+		c.BadRequest(fmt.Errorf("The email %v is already verified. Please continue to the login page.", u.Email), w, r)
+		return
+	}
+
+	// update user
+	if err := u.UpdateVerified(true); err != nil {
+		log.Printf("Error verifying email address for user %v: %v.", u.Email, err)
+		// TODO: Pass the user a unique error ID which links to the specific error and allows for debugging
+		c.Error500(fmt.Errorf("Error verifying email address for user %v.", u.Email), w, r)
+		return
+	}
+
+	// load validation page
+	t, err := template.ParseFiles("templates/layout.html", "templates/verified.html")
+	if err != nil {
+		log.Printf("Error parsing HTML files: %v", err)
 		c.Error500(err, w, r)
 		return
 	}
+	c.Render(t, u, w, r)
 
-	// parse the form value
-	if err := r.ParseForm(); err != nil {
-		log.Println(err)
-		userSession.Error = "Could not parse the input data. Try again."
-		session.Save(r, w)
-		c.Redirect(302, "/register", w, r)
-		return
-	}
-
-	// parse the JSON coming from the client
-	var regRequest registrationRequest
-	decoder := json.NewDecoder(r.Body)
-
-	// check if the parsing succeeded
-	if err := decoder.Decode(&regRequest); err != nil {
-		userSession.Error = "Could not parse the input data. Try again."
-		session.Save(r, w)
-		c.Redirect(302, "/register", w, r)
-		return
-	}
-
-	// validate the data
-	if valid, err := regRequest.isValid(); !valid {
-		userSession.Error = err.Error()
-		session.Save(r, w)
-		c.Redirect(302, "/register", w, r)
-		return
-	}
-
-	// register the user
-	if user, err := models.RegisterUser(regRequest.Account, regRequest.Organisation,
-		regRequest.Email, regRequest.Password, regRequest.First, regRequest.Last); err != nil {
-		c.Error500(errors.New("{}"), w, r)
-		return
-	} else {
-		c.JSON(&user, w, r)
-	}
 }
 
 // This method is used to register a new account via the standard form
@@ -156,12 +143,63 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 	}
 
 	// register the user
-	if user, err := models.RegisterUser(regRequest.Account, regRequest.Organisation,
-		regRequest.Email, regRequest.Password, regRequest.First, regRequest.Last); err != nil {
-		log.Println(err)
+	account := regRequest.Email // use the user's email as a unique account
+	user, err := models.RegisterUser(account, regRequest.Organisation,
+		regRequest.Email, regRequest.Password, regRequest.First, regRequest.Last)
+
+	if err != nil {
+		log.Printf("Error registering the user: %v", err)
 		c.Error500(err, w, r)
 		return
 	} else {
 		c.JSON(&user, w, r)
 	}
+
+	// Send email address confirmation link
+	if err := sendMail(user.Id); err != nil {
+		log.Printf("Error sending verification email: %v", err)
+		c.Error500(err, w, r)
+	}
+
+}
+
+func (c *RegistrationController) LoadCaptchaSiteKey(w http.ResponseWriter, r *http.Request) {
+	c.Plain(config.CAPTCHA_SITE_KEY, w, r)
+}
+
+// Helper function which creates the email and server objects used to send emails to users
+func sendMail(userID uint64) error {
+
+	user, err := models.FindUserById(fmt.Sprintf("%v", userID))
+	if err != nil {
+		return err
+	}
+
+	tmpl, err := template.ParseFiles("email/templates/verification.html")
+	if err != nil {
+		return err
+	}
+
+	data := struct {
+		FirstName        string
+		LastName         string
+		HostAddress      string
+		VerificationUUID string
+	}{user.FirstName, user.LastName, config.HTTP_HOST_ADDRESS, user.VerificationUUID}
+
+	buf := new(bytes.Buffer)
+	tmpl.Execute(buf, data)
+	body := buf.String()
+
+	mail := new(email.Email)
+	mail.From = config.EMAIL_FROM
+	mail.To = []string{user.Email}
+	mail.Subject = "[SCIONLab] Verify your email address for SCIONLab Coordination Service"
+	mail.Body = body
+
+	if err := email.Send(mail); err != nil {
+		return err
+	}
+
+	return nil
 }

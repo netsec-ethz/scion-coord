@@ -1,13 +1,18 @@
 'use strict';
- 
+
 angular.module('scionApp', [
-  'ngRoute'
+  'ngRoute', 'vcRecaptcha'
 
 ]).config(function ($routeProvider, $locationProvider, $httpProvider) {
-    $routeProvider      
+    $routeProvider
       .when('/register', {
         templateUrl: '/public/partials/register.html',
-        controller: 'registerCtrl'
+        controller: 'registerCtrl',
+        resolve: {
+            ResolveSiteKey: ['registerService', function(registerService){
+            return registerService.getSiteKey()
+          }]
+        }
       })
       .when('/login', {
         templateUrl: '/public/partials/login.html',
@@ -25,12 +30,12 @@ angular.module('scionApp', [
 
           $httpProvider.interceptors.push(function() {
               return {
-                  response: function(response) {                    
+                  response: function(response) {
                     console.log(response.headers('X-Xsrf-Token'));
                       $httpProvider.defaults.headers.common['X-Xsrf-Token'] = response.headers('X-Xsrf-Token');
                       return response;
                   }
-              }    
+              }
           });
 
 

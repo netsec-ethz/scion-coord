@@ -15,23 +15,40 @@
 package main
 
 import (
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/controllers/api"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
-	"log"
-	"net/http"
 )
 
 func main() {
+	// check if credential files exist and create necessary directories
+	for _, f := range []string{api.TrcFile, api.CoreCertFile, api.CoreSigKey} {
+		if _, err := os.Stat(f); err != nil {
+			if os.IsNotExist(err) {
+				fmt.Println("ERROR: Please make sure that the necessary credential files exist.")
+				fmt.Println("Consult the README.md for further details.")
+			} else {
+				fmt.Println("An error occurred when accessing " + f + ".")
+			}
+			return
+		}
+	}
+	os.MkdirAll(api.TempPath, os.ModePerm)
+	os.MkdirAll(api.PackagePath, os.ModePerm)
 
 	// controllers
 	registrationController := api.RegistrationController{}
 	loginController := api.LoginController{}
 	asController := api.ASController{}
-	adminController := api.AdminController{}
+	scionLabVMController := api.SCIONLabVMController{}
 
 	// router
 	router := mux.NewRouter()
@@ -48,31 +65,38 @@ func main() {
 	// 404 on favicon requests
 	router.Handle("/favicon.ico", http.HandlerFunc(http.NotFound))
 
-	// index page for registration and login
+	// index page
 	router.Handle("/", xsrfChain.ThenFunc(controllers.Index))
 
-	// login page
-	router.Handle("/login", xsrfChain.ThenFunc(loginController.LoginPage))
+	// ==========================================================
+	// SCION Coord API
 
-	// register page
-	router.Handle("/register", xsrfChain.ThenFunc(registrationController.RegisterPage))
-	router.Handle("/register", xsrfChain.ThenFunc(registrationController.RegisterPost)).Methods("POST")
-
-	// admin page
-	router.Handle("/admin", loggingChain.ThenFunc(adminController.Index))
-
-	// registration
-	router.Handle("/api/register", loggingChain.ThenFunc(registrationController.Register))
-	// login
+	// user registration
+	router.Handle("/api/register", loggingChain.ThenFunc(registrationController.Register)).Methods("POST")
+	router.Handle("/api/captchaSiteKey", loggingChain.ThenFunc(registrationController.LoadCaptchaSiteKey))
+	// user login
 	router.Handle("/api/login", loggingChain.ThenFunc(loginController.Login))
-	// Logout
+	// user Logout
 	router.Handle("/api/logout", loggingChain.ThenFunc(loginController.Logout))
-	// Me
-
+	// user information
 	router.Handle("/api/me", loggingChain.ThenFunc(loginController.Me))
 
+	//email validation
+	router.Handle("/api/verifyEmail/{uuid}", loggingChain.ThenFunc(registrationController.VerifyEmail))
+
+	// generates a SCIONLab VM
+	// TODO(ercanucan): fix the authentication
+	router.Handle("/api/as/generateVM", apiChain.ThenFunc(scionLabVMController.GenerateSCIONLabVM))
+	router.Handle("/api/as/removeVM", apiChain.ThenFunc(scionLabVMController.RemoveSCIONLabVM))
+	router.Handle("/api/as/downloads", apiChain.ThenFunc(scionLabVMController.ReturnTarball))
+	router.Handle("/api/as/getSCIONLabVMASes/{account_id}/{secret}",
+		apiChain.ThenFunc(scionLabVMController.GetSCIONLabVMASes))
+	router.Handle("/api/as/confirmSCIONLabVMASes/{account_id}/{secret}",
+		apiChain.ThenFunc(scionLabVMController.ConfirmSCIONLabVMASes))
+
 	// ==========================================================
-	// API
+	// SCION Web API
+
 	router.Handle("/api/as/exists/{as_id}/{account_id}/{secret}", apiChain.ThenFunc(asController.Exists))
 
 	// ISD join request
@@ -99,5 +123,5 @@ func main() {
 	router.PathPrefix("/public/").Handler(xsrfChain.Then(static))
 
 	// listen to HTTP requests
-	log.Fatal(http.ListenAndServe(config.HTTP_HOST+":"+config.HTTP_PORT, handlers.CompressHandler(router)))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", config.HTTP_BIND_ADDRESS, config.HTTP_BIND_PORT), handlers.CompressHandler(router)))
 }

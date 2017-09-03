@@ -16,6 +16,7 @@ package models
 
 import (
 	"fmt"
+
 	"github.com/astaxie/beego/orm"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/netsec-ethz/scion-coord/config"
@@ -28,7 +29,7 @@ var (
 func init() {
 	orm.RegisterDriver("mysql", orm.DRMySQL)
 	orm.RegisterDataBase("default", "mysql",
-		fmt.Sprintf("%s:%s@(%s:%s)/%s?charset=utf8&parseTime=true",
+		fmt.Sprintf("%s:%s@(%s:%d)/%s?charset=utf8&parseTime=true",
 			config.DB_USER, config.DB_PASS, config.DB_HOST, config.DB_PORT, config.DB_NAME), config.DB_MAX_CONNECTIONS, config.DB_MAX_IDLE)
 
 	// prints the queries
@@ -36,7 +37,7 @@ func init() {
 
 	// register the models
 	orm.RegisterModel(new(user), new(Account), new(As), new(JoinRequest), new(ConnRequest),
-		new(JoinReply), new(ConnReply))
+		new(JoinReply), new(ConnReply), new(SCIONLabServer), new(SCIONLabVM))
 
 	// print verbose logs when generating the tables
 	verbose := true
