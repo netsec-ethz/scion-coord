@@ -82,19 +82,19 @@ func (c *LoginController) Me(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		vmIp = vm.IP
-		if vm.Status > 0 && vm.Status < 4 {
-			showIp = true
-		}
 		switch vm.Status {
-		case 0:
+		case INACTIVE:
 			vmStatus = "You currently do not have an active SCIONLab VM."
-		case 1:
+		case ACTIVE:
 			vmStatus = "You currently have an active SCIONLab VM."
-		case 2:
+			showIp = true
+		case CREATE:
 			vmStatus = "You have a pending creation request for your SCIONLab VM."
-		case 3:
+			showIp = true
+		case UPDATE:
 			vmStatus = "You have a pending update request for your SCIONLab VM."
-		case 4:
+			showIp = true
+		case REMOVE:
 			vmStatus = "Your SCIONLab VM configuration is currently scheduled for removal."
 		}
 	}
