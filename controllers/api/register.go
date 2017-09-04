@@ -90,17 +90,15 @@ func (c *RegistrationController) VerifyEmail(w http.ResponseWriter, r *http.Requ
 	}
 
 	if u.Verified {
-		log.Printf("Error verifying email address. User %v is already verified.", u.Email)
-		c.BadRequest(fmt.Errorf("The email %v is already verified. Please continue to the login page.", u.Email), w, r)
-		return
-	}
-
-	// update user
-	if err := u.UpdateVerified(true); err != nil {
-		log.Printf("Error verifying email address for user %v: %v.", u.Email, err)
-		// TODO: Pass the user a unique error ID which links to the specific error and allows for debugging
-		c.Error500(fmt.Errorf("Error verifying email address for user %v.", u.Email), w, r)
-		return
+		log.Printf("User %v is already verified.", u.Email)
+	} else {
+		// update user
+		if err := u.UpdateVerified(true); err != nil {
+			log.Printf("Error verifying email address for user %v: %v.", u.Email, err)
+			// TODO: Pass the user a unique error ID which links to the specific error and allows for debugging
+			c.Error500(fmt.Errorf("Error verifying email address for user %v.", u.Email), w, r)
+			return
+		}
 	}
 
 	// load validation page
