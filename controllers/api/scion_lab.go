@@ -570,29 +570,27 @@ func (s *SCIONLabVMController) processConfirmedSCIONLabVMASes(ia, action string,
 	return failedConfirmations
 }
 
-// Helper function which creates the email and server objects used to send
-// confirmation emails to users
+// Function which sends confirmation emails to users
 func sendConfirmationEmail(userEmail, action string) error {
 	user, err := models.FindUserByEmail(userEmail)
 	if err != nil {
 		return err
 	}
 
-	tmpl, err := template.ParseFiles("email/templates/status.html")
-	if err != nil {
-		return err
-	}
-
 	var message string
+	subject := "[SCIONLab] "
 	switch action {
 	case CREATED:
 		message = "The infrastructure for your SCIONLab VM has been created. " +
 			"You are now able to use the SCION network through your VM."
+		subject += "VM creation request completed"
 	case UPDATED:
 		message = "The settings for your SCIONLab VM have been updated."
+		subject += "VM update request completed"
 	case REMOVED:
 		message = "Your removal request has been processed. " +
 			"All infrastructure for your SCIONLab VM has been removed."
+		subject += "VM removal request completed"
 	}
 
 	data := struct {
@@ -602,17 +600,8 @@ func sendConfirmationEmail(userEmail, action string) error {
 		Message     string
 	}{user.FirstName, user.LastName, config.HTTP_HOST_ADDRESS, message}
 
-	buf := new(bytes.Buffer)
-	tmpl.Execute(buf, data)
-	body := buf.String()
-
-	mail := new(email.Email)
-	mail.From = config.EMAIL_FROM
-	mail.To = []string{userEmail}
-	mail.Subject = "[SCIONLab] Status update"
-	mail.Body = body
-
-	if err := email.Send(mail); err != nil {
+	log.Printf("Sending confirmation email to user %v.", userEmail)
+	if err := email.ConstructAndSend("vm_status.html", subject, data, "vm-update", userEmail); err != nil {
 		return err
 	}
 

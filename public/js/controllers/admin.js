@@ -10,7 +10,8 @@ angular.module('scionApp')
                 adminService.me().then(
                     function(data) {
                         console.log(data);
-                        $scope.user = data;
+                        $scope.user = data["User"];
+                        $scope.vmInfo = data["VMInfo"]
                     },
                     function(response) {
                         console.log(response);

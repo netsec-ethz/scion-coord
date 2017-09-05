@@ -130,7 +130,7 @@ func (c *ASController) findAndValidateAccount(w http.ResponseWriter, r *http.Req
 
 	account, err := FindAccountByRequest(r)
 	if err != nil {
-		log.Printf("Error finding account. AccountId: %v, Request: %v: %v", mux.Vars(r)["account_id"], r, err)
+		log.Printf("Error finding account. AccountID: %v, Request: %v: %v", mux.Vars(r)["account_id"], r, err)
 		c.BadRequest(err, w, r)
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func (c *ASController) UploadJoinReply(w http.ResponseWriter, r *http.Request) {
 	}
 	account, err := models.FindAccountByAccountId(reply.RequesterId)
 	if err != nil {
-		log.Printf("Error finding account by AccountId. AccountId: %v, Request ID: %v ISD-AS: %v, %v",
+		log.Printf("Error finding account by AccountID. AccountID: %v, Request ID: %v ISD-AS: %v, %v",
 			reply.RequesterId, reply.RequestId, reply.RespondIA, err)
 		return
 	}
