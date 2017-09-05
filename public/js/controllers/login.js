@@ -18,11 +18,11 @@ angular.module('scionApp')
 
             $scope.resendEmail = function(email){
                 if (!email){
-                    $scope.error = "Please fill out the email field."
+                    $scope.error = "Please fill out the email field"
                 } else {
 
                     loginService.resendEmail(email).then(function (response){
-                        $scope.message = "Verification email resent.";
+                        $scope.message = "Verification email resent";
                         $scope.error = "";
                     },
                     function(response){

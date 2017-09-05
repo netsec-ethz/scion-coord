@@ -19,7 +19,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
+	"github.com/didip/tollbooth"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/netsec-ethz/scion-coord/config"
@@ -28,7 +30,7 @@ import (
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 )
 
-func main() {
+func init() {
 	// check if credential files exist and create necessary directories
 	for _, f := range []string{api.TrcFile, api.CoreCertFile, api.CoreSigKey} {
 		if _, err := os.Stat(f); err != nil {
@@ -43,12 +45,19 @@ func main() {
 	}
 	os.MkdirAll(api.TempPath, os.ModePerm)
 	os.MkdirAll(api.PackagePath, os.ModePerm)
+}
 
+func main() {
 	// controllers
 	registrationController := api.RegistrationController{}
 	loginController := api.LoginController{}
 	asController := api.ASController{}
 	scionLabVMController := api.SCIONLabVMController{}
+
+	// rate limitation
+	resendLimit := tollbooth.NewLimiter(1, time.Minute*10)
+	resendLimit.RejectFunc = func() { log.Printf("A request to /api/resendLink was blocked due to rate limitation") }
+	resendLimit.Message = "You can request an email every 10 minutes"
 
 	// router
 	router := mux.NewRouter()
@@ -75,7 +84,7 @@ func main() {
 	router.Handle("/api/register", loggingChain.ThenFunc(registrationController.Register)).Methods("POST")
 	router.Handle("/api/captchaSiteKey", loggingChain.ThenFunc(registrationController.LoadCaptchaSiteKey))
 	// Resend verification email
-	router.Handle("/api/resendLink", loggingChain.ThenFunc(registrationController.ResendActivationLink))
+	router.Handle("/api/resendLink", tollbooth.LimitHandler(resendLimit, loggingChain.ThenFunc(registrationController.ResendActivationLink))).Methods("POST")
 	// user login
 	router.Handle("/api/login", loggingChain.ThenFunc(loginController.Login))
 	// user Logout

@@ -21,6 +21,12 @@
 			"revisionTime": "2017-07-11T18:34:51Z"
 		},
 		{
+			"checksumSHA1": "QlXKfAzQy+s0+dSHaSs/ASvu+Ik=",
+			"path": "github.com/didip/tollbooth/limiter",
+			"revision": "cb868bfc8e69f4181062140bd7716940fc369d08",
+			"revisionTime": "2017-09-05T00:45:17Z"
+		},
+		{
 			"checksumSHA1": "i3UtE7/Cn57eX1hO5Z0CqY/Eeb4=",
 			"path": "github.com/go-sql-driver/mysql",
 			"revision": "3955978caca48c1658a4bb7a9c6a0f084e326af3",
