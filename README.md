@@ -1,5 +1,5 @@
 # scion-coord
-SCION Coordination service
+SCIONLab Coordination service
 
 ### Setup and configuration
 
@@ -12,16 +12,16 @@ After this step, you can populate the dependencies in the `vendor` folder using:
 `govendor sync`
 
 
-#### Custon configuration
+#### Custom configuration
 
-Copy the default configuration file using 
-`cp conf/development.conf.default conf/development.conf` 
+Copy the default configuration file using
+`cp conf/development.conf.default conf/development.conf`
 and adjust the settings to fit your setup.
 Make sure that you set email.pm_server_token, email.pm_account_token, captcha.site_key, and captcha.secret_key as described below.
 
 ##### Postmark
 
-SCION Coordination service uses [Postmark](https://postmarkapp.com/ "Postmark") to send emails. You will need an account token and a server token which are obtained by signing up to their service.
+SCIONLab Coordination service uses [Postmark](https://postmarkapp.com/ "Postmark") to send emails. You will need an account token and a server token which are obtained by signing up to their service.
 Set the corresponding fields in the configuration file accordingly.
 
 ##### Captcha
