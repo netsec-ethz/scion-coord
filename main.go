@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/didip/tollbooth"
+	"github.com/didip/tollbooth/limiter"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/netsec-ethz/scion-coord/config"
@@ -30,7 +31,7 @@ import (
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 )
 
-func init() {
+func checkCredentials() bool {
 	// check if credential files exist and create necessary directories
 	for _, f := range []string{api.TrcFile, api.CoreCertFile, api.CoreSigKey} {
 		if _, err := os.Stat(f); err != nil {
@@ -40,14 +41,20 @@ func init() {
 			} else {
 				fmt.Println("An error occurred when accessing " + f + ".")
 			}
-			return
+			return false
 		}
 	}
 	os.MkdirAll(api.TempPath, os.ModePerm)
 	os.MkdirAll(api.PackagePath, os.ModePerm)
+	return true
 }
 
 func main() {
+
+	if !checkCredentials() {
+		return
+	}
+
 	// controllers
 	registrationController := api.RegistrationController{}
 	loginController := api.LoginController{}
@@ -55,9 +62,9 @@ func main() {
 	scionLabVMController := api.SCIONLabVMController{}
 
 	// rate limitation
-	resendLimit := tollbooth.NewLimiter(1, time.Minute*10)
-	resendLimit.RejectFunc = func() { log.Printf("A request to /api/resendLink was blocked due to rate limitation") }
-	resendLimit.Message = "You can request an email every 10 minutes"
+	resendLimit := tollbooth.NewLimiter(1, time.Minute*10, &limiter.ExpirableOptions{DefaultExpirationTTL: time.Hour})
+	resendLimit.SetRejectFunc(func() { log.Printf("A request to '/api/resendLink' was blocked due to rate limitation") })
+	resendLimit.SetMessage("You can request an email every 10 minutes")
 
 	// router
 	router := mux.NewRouter()
