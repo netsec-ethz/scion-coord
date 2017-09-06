@@ -66,8 +66,7 @@ func FindSCIONLabVMByIPAndRemoteIA(ip, ia string) (*SCIONLabVM, error) {
 
 func FindSCIONLabVMsByRemoteIA(remoteIA string) ([]SCIONLabVM, error) {
 	var v []SCIONLabVM
-	// TODO (ercanucan): Find a better way to refer to the database table without absolute name
-	_, err := o.QueryTable("s_c_i_o_n_lab_v_m").Filter("RemoteIA", remoteIA).RelatedSel().All(&v)
+	_, err := o.QueryTable(new(SCIONLabVM)).Filter("RemoteIA", remoteIA).RelatedSel().All(&v)
 	return v, err
 }
 

@@ -53,6 +53,9 @@ var (
 	CoreCertFile    = filepath.Join(credentialsPath, "ISD1-AS1-V0.crt")
 	CoreSigKey      = filepath.Join(credentialsPath, "as-sig.key")
 	TrcFile         = filepath.Join(credentialsPath, "ISD1-V0.trc")
+	EasyRSAPath     string
+	RSAKeyPath      string
+	CACertPath      string
 )
 
 // The states in which a user's SCIONLab VM can be in.
@@ -71,6 +74,15 @@ const (
 	REMOVED = "Removed"
 )
 
+func init() {
+	if config.PACKAGE_DIRECTORY != "" {
+		PackagePath = config.PACKAGE_DIRECTORY
+	}
+	EasyRSAPath = filepath.Join(PackagePath, "easy-rsa")
+	RSAKeyPath = filepath.Join(EasyRSAPath, "keys")
+	CACertPath = filepath.Join(RSAKeyPath, "ca.crt")
+}
+
 type SCIONLabVMController struct {
 	controllers.HTTPController
 }
@@ -78,12 +90,14 @@ type SCIONLabVMController struct {
 type SCIONLabVMInfo struct {
 	IsNewUser  bool               // denotes whether this is a new user.
 	UserEmail  string             // the email address of the user.
+	IsVPN      bool               // denotes whether this is a VPN setup
 	ISD_ID     int                // ISD
 	AS_ID      int                // asID of the SCIONLab VM
 	IP         string             // the public IP address of the SCIONLab VM
 	RemoteIA   string             // the SCIONLab AS the VM connects to
 	RemoteIP   string             // the IP address of the SCIONLab AS it connects to
 	RemotePort int                // port number of the remote SCIONLab AS being connected to
+	VPNIP      string             // IP of the VPN server
 	SVM        *models.SCIONLabVM // if exists, the DB object that belongs to this VM
 }
 
@@ -93,7 +107,7 @@ type SCIONLabVMInfo struct {
 // The front-end will then initiate the downloading of the tarball.
 func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http.Request) {
 	// Parse the arguments
-	scionLabVMIP, userEmail, err := s.parseURLParameters(r)
+	isVPN, scionLabVMIP, userEmail, err := s.parseURLParameters(r)
 	if err != nil {
 		log.Printf("Error parsing the parameters: %v", err)
 		s.BadRequest(err, w, r)
@@ -111,8 +125,8 @@ func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http
 			w, r)
 		return
 	}
-	// Target SCIONLab ISD and AS to connect to is fixed for now (1-7)
-	svmInfo, err := s.getSCIONLabVMInfo(scionLabVMIP, userEmail, config.SERVER_IA, 1)
+	// Target SCIONLab ISD and AS to connect to is determined by config file
+	svmInfo, err := s.getSCIONLabVMInfo(scionLabVMIP, userEmail, config.SERVER_IA, isVPN, 1)
 	if err != nil {
 		log.Printf("Error getting SCIONLabVMInfo: %v", err)
 		s.Error500(err, w, r)
@@ -129,6 +143,14 @@ func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http
 		log.Printf("Error generating local config: %v", err)
 		s.Error500(err, w, r)
 		return
+	}
+	// Generate VPN config if this is a VPN setup
+	if svmInfo.IsVPN {
+		if err = s.generateVPNConfig(svmInfo); err != nil {
+			log.Printf("Error generating VPN config: %v", err)
+			s.Error500(err, w, r)
+			return
+		}
 	}
 	// Package the VM
 	if err = s.packageSCIONLabVM(svmInfo.UserEmail); err != nil {
@@ -148,18 +170,20 @@ func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http
 	fmt.Fprintln(w, message)
 }
 
-// Parses the necessary parameters from the URL: the user's email address and the public
-// IP of the user's machine.
-func (s *SCIONLabVMController) parseURLParameters(r *http.Request) (string, string, error) {
+// Parses the necessary parameters from the URL: whether or not this is a VPN setup,
+// the user's email address, and the public IP of the user's machine.
+func (s *SCIONLabVMController) parseURLParameters(r *http.Request) (bool, string, string, error) {
 	if err := r.ParseForm(); err != nil {
-		return "", "", fmt.Errorf("Error parsing the form: %v", err)
+		return false, "", "", fmt.Errorf("Error parsing the form: %v", err)
 	}
 	userEmail := r.Form["userEmail"][0]
 	scionLabVMIP := r.Form["scionLabVMIP"][0]
-	if scionLabVMIP == "undefined" {
-		return "", "", fmt.Errorf("IP address cannot be empty. User: %v", userEmail)
+	isVPN, _ := strconv.ParseBool(r.Form["isVPN"][0])
+	if !isVPN && scionLabVMIP == "undefined" {
+		return false, "", "", fmt.Errorf(
+			"IP address cannot be empty for non-VPN setup. User: %v", userEmail)
 	}
-	return scionLabVMIP, userEmail, nil
+	return isVPN, scionLabVMIP, userEmail, nil
 }
 
 // Check if the user's VM is already in the process of being created or updated.
@@ -178,12 +202,18 @@ func (s *SCIONLabVMController) canCreateOrUpdate(userEmail string) (bool, error)
 	return false, nil
 }
 
+// Next unassigned VPN IP TODO (mlegner): Check if incrementing by 1 is enough
+func getNextVPNIP(lastAssignedIP string) string {
+	return utility.IPIncrement(lastAssignedIP, 1)
+}
+
 // Populates and returns a SCIONLabVMInfo struct, which contains the necessary information
 // to create the SCIONLab VM configuration.
 func (s *SCIONLabVMController) getSCIONLabVMInfo(scionLabVMIP, userEmail, targetIA string,
-	isdID int) (*SCIONLabVMInfo, error) {
+	isVPN bool, isdID int) (*SCIONLabVMInfo, error) {
 	var newUser bool
 	var asID int
+	var ip, remoteIP, vpnIP string
 	remotePort := -1
 	// See if this user already has a VM
 	svm, err := models.FindSCIONLabVMByUserEmail(userEmail)
@@ -204,26 +234,50 @@ func (s *SCIONLabVMController) getSCIONLabVMInfo(scionLabVMIP, userEmail, target
 	if err != nil {
 		return nil, fmt.Errorf("Error while retrieving scionLabServer for %v: %v", targetIA, err)
 	}
-	log.Printf("scionLabServerIP = %v", scionLabServer.IP)
-	remoteIP := scionLabServer.IP
-	if newUser {
-		remotePort = scionLabServer.LastAssignedPort + 1
-		log.Printf("newPort to be assigned = %v", remotePort)
-		scionLabServer.LastAssignedPort = remotePort
+
+	// Different settings depending on whether it is a VPN or standard setup
+	if isVPN {
+		ip = getNextVPNIP(scionLabServer.VPNLastAssignedIP)
+		scionLabServer.VPNLastAssignedIP = ip
+		remoteIP = scionLabServer.VPNIP
+		vpnIP = scionLabServer.IP
+
+		if newUser {
+			remotePort = scionLabServer.VPNLastAssignedPort + 1
+			log.Printf("newPort to be assigned = %v", remotePort)
+			scionLabServer.LastAssignedPort = remotePort
+		}
 		if err := scionLabServer.Update(); err != nil {
 			return nil, fmt.Errorf("Error Updating SCIONLabServerTable for SCIONLab AS: %v : %v",
 				targetIA, err)
 		}
+	} else {
+		ip = scionLabVMIP
+		log.Printf("scionLabServerIP = %v", scionLabServer.IP)
+		remoteIP = scionLabServer.IP
+
+		if newUser {
+			remotePort = scionLabServer.LastAssignedPort + 1
+			log.Printf("newPort to be assigned = %v", remotePort)
+			scionLabServer.LastAssignedPort = remotePort
+			if err := scionLabServer.Update(); err != nil {
+				return nil, fmt.Errorf("Error Updating SCIONLabServerTable for SCIONLab AS: %v : %v",
+					targetIA, err)
+			}
+		}
 	}
+
 	return &SCIONLabVMInfo{
 		IsNewUser:  newUser,
 		UserEmail:  userEmail,
+		IsVPN:      isVPN,
 		ISD_ID:     isdID,
 		AS_ID:      asID,
 		RemoteIA:   targetIA,
-		IP:         scionLabVMIP,
+		IP:         ip,
 		RemoteIP:   remoteIP,
 		RemotePort: remotePort,
+		VPNIP:      vpnIP,
 		SVM:        svm,
 	}, nil
 }
@@ -357,6 +411,83 @@ func (s *SCIONLabVMController) generateLocalGen(svmInfo *SCIONLabVMInfo) error {
 	errOutput, _ := ioutil.ReadAll(cmdErr)
 	fmt.Printf("STDOUT generateLocalGen: %s\n", stdOutput)
 	fmt.Printf("ERROUT generateLocalGen: %s\n", errOutput)
+	return nil
+}
+
+func (s *SCIONLabVMController) generateVPNConfig(svmInfo *SCIONLabVMInfo) error {
+	log.Printf("Creating VPN config for SCIONLab VM")
+	if err := s.generateVPNKeys(svmInfo); err != nil {
+		return err
+	}
+	t, err := template.ParseFiles("templates/client.conf.tmpl")
+	if err != nil {
+		return fmt.Errorf("Error parsing VPN template config: %v", err)
+	}
+
+	var caCert, clientCert, clientKey []byte
+	caCert, err = ioutil.ReadFile(CACertPath)
+	if err != nil {
+		return fmt.Errorf("Error reading CA certificate file: %v", err)
+	}
+	clientCert, err = ioutil.ReadFile(filepath.Join(RSAKeyPath, svmInfo.UserEmail+".crt"))
+	if err != nil {
+		return fmt.Errorf("Error reading VPN certificate file for user %v: %v",
+			svmInfo.UserEmail, err)
+	}
+	clientKey, err = ioutil.ReadFile(filepath.Join(RSAKeyPath, svmInfo.UserEmail+".key"))
+	if err != nil {
+		return fmt.Errorf("Error reading VPN key file for user %v: %v",
+			svmInfo.UserEmail, err)
+	}
+
+	config := map[string]string{
+		"ServerIP":   svmInfo.VPNIP,
+		"CACert":     string(caCert),
+		"ClientCert": string(clientCert),
+		"ClientKey":  string(clientKey),
+	}
+	f, err := os.Create(filepath.Join(PackagePath, svmInfo.UserEmail, "client.conf"))
+	if err != nil {
+		return fmt.Errorf("Error creating VPN config file for user %v: %v", svmInfo.UserEmail, err)
+	}
+	if err = t.Execute(f, config); err != nil {
+		return fmt.Errorf("Error executing VPN template file for user %v: %v",
+			svmInfo.UserEmail, err)
+	}
+	return nil
+}
+
+// Creates the keys for VPN setup
+func (s *SCIONLabVMController) generateVPNKeys(svmInfo *SCIONLabVMInfo) error {
+	log.Printf("Generating RSA keys")
+	if _, err := os.Stat(filepath.Join(RSAKeyPath, svmInfo.UserEmail+".key")); err == nil {
+		log.Printf("Previous VPN keys exist. Revoking...")
+
+		cmd := exec.Command("/bin/bash", "-c", "source vars; ./revoke-full "+svmInfo.UserEmail)
+		cmd.Dir = EasyRSAPath
+		if err := cmd.Run(); err != nil {
+			log.Printf("Error during revocation of VPN keys for user %v: %v", svmInfo.UserEmail, err)
+			return err
+		}
+	} else if err != os.ErrNotExist {
+		log.Printf("Error checking for existence of VPN keys for user %v: %v", svmInfo.UserEmail, err)
+		return err
+	}
+
+	cmd := exec.Command("/bin/bash", "-c", "source vars; ./build-keys "+svmInfo.UserEmail)
+	cmd.Dir = EasyRSAPath
+	cmdOut, _ := cmd.StdoutPipe()
+	cmdErr, _ := cmd.StderrPipe()
+	if err := cmd.Run(); err != nil {
+		log.Printf("Error during generation of VPN keys for user %v: %v", svmInfo.UserEmail, err)
+		return err
+	}
+
+	// read stdout and stderr
+	stdOutput, _ := ioutil.ReadAll(cmdOut)
+	errOutput, _ := ioutil.ReadAll(cmdErr)
+	fmt.Printf("STDOUT generateVPNKeys: %s\n", stdOutput)
+	fmt.Printf("ERROUT generateVPNKeys: %s\n", errOutput)
 	return nil
 }
 
