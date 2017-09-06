@@ -15,14 +15,28 @@ Vagrant.configure(2) do |config|
     git clone --recursive -b scionlab git@github.com:ercanucan/scion
     cd scion
     bash -c 'yes | GO_INSTALL=true ./env/deps'
+    cp -r /vagrant/gen .
+  SCRIPT
+  $setup_openvpn = <<-SCRIPT
+    if [ -e /vagrant/client.conf ] # do OpenVPN setup only if config file is present
+    then
+        echo "Setting up OpenVPN."
+        apt-get -y install openvpn
+        cp /vagrant/client.conf /etc/openvpn
+        chmod 600 /etc/openvpn/client.conf
+        systemctl start openvpn@client
+        systemctl enable openvpn@client
+    else
+        echo "No OpenVPN configuration present; keeping standard setup."
+    fi
   SCRIPT
   config.vm.box = "ubuntu/xenial64"
+  # Port forwarding not necessary for OpenVPN setup...
   config.vm.network "forwarded_port", guest: 50000, host: 50000, protocol: "udp"
   config.vm.provider "virtualbox" do |vb|
     vb.memory = "2048"
     vb.name = "SCIONLabVM"
   end
   config.vm.provision "shell", privileged: false, inline: $setup_scion
-  config.vm.provision "file", source: "gen", destination: "go/src/github.com/netsec-ethz/scion"
+  config.vm.provision "shell", privileged: true, inline: $setup_openvpn
 end
-

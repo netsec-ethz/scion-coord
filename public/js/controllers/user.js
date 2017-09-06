@@ -12,7 +12,8 @@ scionApp
                         console.log(data);
                         $scope.user = data["User"];
                         $scope.vmInfo = data["VMInfo"];
-                        $scope.buttonConfig = data["UIButtons"]
+                        $scope.buttonConfig = data["UIButtons"];
+                        $scope.user.isNotVPN = false;
                     },
                     function (response) {
                         console.log(response);
@@ -25,8 +26,10 @@ scionApp
             $scope.submitForm = function (action, user) {
                 switch (action) {
                     case "update":
-                        $scope.scionLabVMForm.scionLabVMIP.$setValidity("required", user.scionLabVMIP != null);
-                        if (!$scope.scionLabVMForm.scionLabVMIP.$valid) {
+                        if (user.isNotVPN) {
+                            $scope.scionLabVMForm.scionLabVMIP.$setValidity("required", user.scionLabVMIP != null);
+                        }
+                        if (user.isNotVPN && !$scope.scionLabVMForm.scionLabVMIP.$valid) {
                             $scope.error = "Please enter a correct public IP address.";
                         } else {
                             $scope.generateSCIONLabVM(user);

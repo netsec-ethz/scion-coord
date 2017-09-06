@@ -64,8 +64,8 @@ You can start SCION by executing the following commands:
 'cd /go/src/github.com/netsec-ethz/scion', and
 './scion.sh run'
 
-After your setup is activated at SCIONLab, you should be able to see the beacons being received from SCIONLab AS 1-7.
-You can test this, for example, by using 'tail -f logs/bs1-1014-1.DEBUG'.
+After your setup is activated at the designated SCIONLab AS, you should be able to see the beacons being received.
+You can test this, for example, by using 'tail -f logs/bs1-[[Your AS ID]]-1.DEBUG'.
 
 
 ## Stopping and Restarting the VM

@@ -75,8 +75,6 @@ def create_scionlab_vm_local_gen(args, tp):
     new_ia = ISD_AS(args.joining_ia)
     core_ia = ISD_AS(args.core_ia)
     local_gen_path = os.path.join(args.package_path, args.user_id, 'gen')
-    # XXX (ercanucan): we remove user's past configs when he re-requests!
-    rmtree(local_gen_path, ignore_errors=True)
     as_obj = generate_certificate(
         new_ia, core_ia, args.core_sign_priv_key_file, args.core_cert_file, args.trc_file)
     write_dispatcher_config(local_gen_path)
