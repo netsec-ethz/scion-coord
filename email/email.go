@@ -60,7 +60,8 @@ func Send(mail *Email) error {
 // ConstructAndSend builds and then sends an email to the user specified by
 // their userEmail by filling in the specified template with the given subject
 // and information in the data object
-func ConstructAndSend(emailTemplate string, subject string, data interface{}, tag string, userEmail string) (err error) {
+func ConstructAndSend(emailTemplate string, subject string, data interface{},
+	tag string, userEmail string) (err error) {
 
 	tmpl, err := template.ParseFiles("email/templates/" + emailTemplate)
 	if err != nil {

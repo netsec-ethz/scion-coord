@@ -60,11 +60,10 @@ type meData struct {
 }
 
 func populateVMStatus(userEmail string) (vmInfo, error) {
-	vm, err := models.FindSCIONLabVMByUserEmail(userEmail)
 
 	vmInfo := vmInfo{}
 
-	vmInfo.ShowIP = false
+	vm, err := models.FindSCIONLabVMByUserEmail(userEmail)
 	if err != nil {
 		if err == orm.ErrNoRows {
 			vmInfo.VMText = "You currently do not have an active SCIONLab VM."

@@ -9,7 +9,7 @@
   <p><b>Secret:</b> {{user.Secret}}</p>
   <div class="alert alert-info"><p>{{vmInfo.VMText}} <span ng-if="vmInfo.ShowIP">Your registered IP address is <b>{{vmInfo.VMIP}}</b>.</span></p></div>
 
-  <div class="alert alert-warning">
+  <div style="color:red">
     <p>When you fill out and submit the form below, your SCIONLab VM configuration for connecting to SCIONLab AS 1-7 will be packaged
       and downloaded. Please extract the downloaded tarball in a desired location and refer to the README file inside for instructions.</p>
     <p><b>Please note:</b> SCIONLab currently requires that your machine has a public IP address and can receive UDP traffic at port 50000.</p></div>
