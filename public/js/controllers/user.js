@@ -1,13 +1,13 @@
 angular.module('scionApp')
-    .controller('adminCtrl', ['$scope', 'adminService', '$location', '$window', '$http',
-        function($scope, adminService, $location, $window, $http) {
+    .controller('userCtrl', ['$scope', 'userService', '$location', '$window', '$http',
+        function($scope, userService, $location, $window, $http) {
 
             $scope.error = "";
             $scope.message = "";
 
             $scope.me = function() {
 
-                adminService.me().then(
+                userService.me().then(
                     function(data) {
                         console.log(data);
                         $scope.user = data;
@@ -22,7 +22,7 @@ angular.module('scionApp')
                 $scope.error = "";
                 $scope.message = "";
 
-                adminService.generateSCIONLabVM(user).then(
+                userService.generateSCIONLabVM(user).then(
                     function(data) {
                         console.log(data);
                         window.location.assign('/api/as/downloads?filename=' + data);
@@ -38,7 +38,7 @@ angular.module('scionApp')
                 $scope.error = "";
                 $scope.message = "";
 
-                adminService.removeSCIONLabVM(user).then(
+                userService.removeSCIONLabVM(user).then(
                     function(data) {
                         console.log(data);
                         $scope.message = data;

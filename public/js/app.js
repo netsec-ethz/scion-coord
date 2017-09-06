@@ -18,9 +18,9 @@ angular.module('scionApp', [
         templateUrl: '/public/partials/login.html',
         controller: 'loginCtrl'
       })
-      .when('/admin', {
-        templateUrl: '/public/partials/admin.html',
-        controller: 'adminCtrl'
+      .when('/user', {
+        templateUrl: '/public/partials/user.html',
+        controller: 'userCtrl'
       })
       .otherwise({
         redirectTo: '/login'

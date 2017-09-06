@@ -7,7 +7,7 @@ angular.module('scionApp')
 
                 loginService.login(user).then(
                     function(data) {
-                        $location.path('/admin');
+                        $location.path('/user');
                     },
                     function(response) {
                         console.log(response);
