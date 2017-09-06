@@ -21,8 +21,7 @@ http.bind_address = "127.0.0.1"
 http.bind_port = 8080
 
 # Address visible from outside
-#http.host_address = "coord.scionproto.net"
-http.host_address = "127.0.0.1:8080"
+http.host_address = "localhost:8080"
 
 # PostMark email service configs
 email.from = "no-reply@scionlab.org"
@@ -30,8 +29,8 @@ email.pm_server_token = ""
 email.pm_account_token = ""
 
 # Captcha configs
-captcha.site_key = ""
-captcha.secret_key = ""
+captcha.site_key = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
+captcha.secret_key = "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe"
 
 # Session configs
 session.path = "/tmp"
@@ -46,3 +45,11 @@ db.user = "root"
 db.pass = "development_pass"
 db.max_connections = 15
 db.max_idle = 3
+
+# SCIONLab AS configs
+server.IA = "1-7"
+server.IP = "127.0.0.1"
+server.startPort = "50050"
+server.VPN.IP = "10.0.8.1"
+server.VPN.startIP = "10.0.8.10"
+server.VPN.startPort = "50050"

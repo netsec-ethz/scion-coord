@@ -20,13 +20,55 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/astaxie/beego/orm"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/controllers/api"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
+	"github.com/netsec-ethz/scion-coord/models"
+	"github.com/netsec-ethz/scion-coord/utility"
 )
+
+func init() {
+	sls, err := models.FindSCIONLabServer(config.SERVER_IA)
+	if err != nil {
+		if err == orm.ErrNoRows { // Server does not exist
+			newSLS := models.SCIONLabServer{
+				IA:                  config.SERVER_IA,
+				IP:                  config.SERVER_IP,
+				LastAssignedPort:    config.SERVER_START_PORT,
+				VPNIP:               config.SERVER_VPN_IP,
+				VPNLastAssignedIP:   config.SERVER_VPN_START_IP,
+				VPNLastAssignedPort: config.SERVER_VPN_START_PORT,
+			}
+			fmt.Println("Inserting SCIONLab AS configuration into database.")
+			if err := newSLS.Insert(); err != nil {
+				fmt.Printf("ERROR: Cannot insert SCIONLab AS configuration into database: %v", err)
+			}
+		} else {
+			fmt.Printf("ERROR: Cannot get SCIONLab AS configuration from database: %v", err)
+		}
+	} else { // Server exists and needs to be updated
+		sls.IP = config.SERVER_IP
+		sls.VPNIP = config.SERVER_VPN_IP
+		if sls.LastAssignedPort < config.SERVER_START_PORT {
+			sls.LastAssignedPort = config.SERVER_START_PORT
+		}
+		if sls.VPNLastAssignedIP == "" || utility.IPToInt(sls.VPNLastAssignedIP) < utility.IPToInt(config.SERVER_VPN_START_IP) {
+			sls.VPNLastAssignedIP = config.SERVER_VPN_START_IP
+		}
+		if sls.VPNLastAssignedPort < config.SERVER_VPN_START_PORT {
+			sls.VPNLastAssignedPort = config.SERVER_VPN_START_PORT
+		}
+
+		fmt.Printf("Updating SCIONLab AS configuration in database: %v", sls)
+		if err := sls.Update(); err != nil {
+			fmt.Printf("ERROR: Cannot update SCIONLab AS configuration in database: %v", err)
+		}
+	}
+}
 
 func main() {
 	// check if credential files exist and create necessary directories

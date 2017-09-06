@@ -18,12 +18,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/astaxie/beego/orm"
-	"github.com/netsec-ethz/scion-coord/config"
-	"github.com/netsec-ethz/scion-coord/controllers"
-	"github.com/netsec-ethz/scion-coord/email"
-	"github.com/netsec-ethz/scion-coord/models"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -34,6 +28,13 @@ import (
 	"strconv"
 	"text/template"
 	"time"
+
+	"github.com/astaxie/beego/orm"
+	"github.com/netsec-ethz/scion-coord/config"
+	"github.com/netsec-ethz/scion-coord/controllers"
+	"github.com/netsec-ethz/scion-coord/email"
+	"github.com/netsec-ethz/scion-coord/models"
+	"github.com/netsec-ethz/scion-coord/utility"
 )
 
 var (
@@ -111,7 +112,7 @@ func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http
 		return
 	}
 	// Target SCIONLab ISD and AS to connect to is fixed for now (1-7)
-	svmInfo, err := s.getSCIONLabVMInfo(scionLabVMIP, userEmail, "1-7", 1)
+	svmInfo, err := s.getSCIONLabVMInfo(scionLabVMIP, userEmail, config.SERVER_IA, 1)
 	if err != nil {
 		log.Printf("Error getting SCIONLabVMInfo: %v", err)
 		s.Error500(err, w, r)
@@ -311,7 +312,7 @@ func (s *SCIONLabVMController) generateTopologyFile(svmInfo *SCIONLabVMInfo) err
 			err)
 	}
 	// Topo file parameters
-	config := map[string]string{
+	data := map[string]string{
 		"IP":           svmInfo.IP,
 		"ISD_ID":       strconv.Itoa(svmInfo.ISD_ID),
 		"AS_ID":        strconv.Itoa(svmInfo.AS_ID),
@@ -319,7 +320,7 @@ func (s *SCIONLabVMController) generateTopologyFile(svmInfo *SCIONLabVMInfo) err
 		"REMOTE_ADDR":  svmInfo.RemoteIP,
 		"REMOTE_PORT":  strconv.Itoa(svmInfo.RemotePort),
 	}
-	if err = t.Execute(f, config); err != nil {
+	if err = t.Execute(f, data); err != nil {
 		return fmt.Errorf("Error executing topology template file. User: %v, %v", svmInfo.UserEmail,
 			err)
 	}
@@ -376,7 +377,7 @@ func (s *SCIONLabVMController) packageSCIONLabVM(userEmail string) error {
 		src := filepath.Join(vagrantPath, obj.Name())
 		dst := filepath.Join(userPackagePath, obj.Name())
 		if !obj.IsDir() {
-			if err = CopyFile(src, dst); err != nil {
+			if err = utility.CopyFile(src, dst); err != nil {
 				return fmt.Errorf("Failed to copy files. User: %v, src: %v, dst: %v, %v",
 					userEmail, src, dst, err)
 			}
@@ -388,28 +389,6 @@ func (s *SCIONLabVMController) packageSCIONLabVM(userEmail string) error {
 		return fmt.Errorf("Failed to create SCIONLabVM tarball. User: %v, %v", userEmail, err)
 	}
 	return nil
-}
-
-// Simple utility function to copy a file.
-// TODO (ercanucan): consider moving this to a utility library.
-func CopyFile(source string, dest string) (err error) {
-	sourcefile, err := os.Open(source)
-	if err != nil {
-		return err
-	}
-	defer sourcefile.Close()
-	destfile, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-	defer destfile.Close()
-	_, err = io.Copy(destfile, sourcefile)
-	if err == nil {
-		sourceinfo, _ := os.Stat(source)
-		// TODO (jonghoonkwon): do proper error logging!
-		err = os.Chmod(dest, sourceinfo.Mode())
-	}
-	return
 }
 
 // The struct used for API calls between scion-coord and SCIONLab ASes

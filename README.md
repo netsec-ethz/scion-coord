@@ -38,13 +38,9 @@ Set the corresponding fields in the configuration file accordingly.
 ##### Captcha
 
 In the configuration file also populate the captcha fields with the keys generated [on this site](https://www.google.com/recaptcha/admin "Google ReCaptcha admin page").
-For a quick start and for testing these keys can be used:
+For a quick start and for testing the keys in the `development.conf.default` can be used.
 
-```
-Site key: 6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI
-Secret key: 6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe
-```
-Warning: Use above keys only for testing purposes as they circumvent the captcha.
+Warning: Use these keys only for testing purposes as they circumvent the captcha.
 
 
 #### MySQL database
