@@ -20,13 +20,56 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/astaxie/beego/orm"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/controllers/api"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
+	"github.com/netsec-ethz/scion-coord/models"
+	"github.com/netsec-ethz/scion-coord/utility"
 )
+
+func init() {
+	sls, err := models.FindSCIONLabServer(config.SERVER_IA)
+	if err != nil {
+		if err == orm.ErrNoRows { // Server does not exist
+			newSLS := models.SCIONLabServer{
+				IA:                  config.SERVER_IA,
+				IP:                  config.SERVER_IP,
+				LastAssignedPort:    config.SERVER_START_PORT,
+				VPNIP:               config.SERVER_VPN_IP,
+				VPNLastAssignedIP:   config.SERVER_VPN_START_IP,
+				VPNLastAssignedPort: config.SERVER_VPN_START_PORT,
+			}
+			fmt.Println("Inserting SCIONLab AS configuration into database.")
+			if err := newSLS.Insert(); err != nil {
+				fmt.Printf("ERROR: Cannot insert SCIONLab AS configuration into database: %v", err)
+			}
+		} else {
+			fmt.Printf("ERROR: Cannot get SCIONLab AS configuration from database: %v", err)
+		}
+	} else { // Server exists and needs to be updated
+		sls.IP = config.SERVER_IP
+		sls.VPNIP = config.SERVER_VPN_IP
+		if sls.LastAssignedPort < config.SERVER_START_PORT {
+			sls.LastAssignedPort = config.SERVER_START_PORT
+		}
+		if sls.VPNLastAssignedIP == "" || utility.IPCompare(sls.VPNLastAssignedIP,
+			config.SERVER_VPN_START_IP) == -1 {
+			sls.VPNLastAssignedIP = config.SERVER_VPN_START_IP
+		}
+		if sls.VPNLastAssignedPort < config.SERVER_VPN_START_PORT {
+			sls.VPNLastAssignedPort = config.SERVER_VPN_START_PORT
+		}
+
+		fmt.Printf("Updating SCIONLab AS configuration in database: %v", sls)
+		if err := sls.Update(); err != nil {
+			fmt.Printf("ERROR: Cannot update SCIONLab AS configuration in database: %v", err)
+		}
+	}
+}
 
 func main() {
 	// check if credential files exist and create necessary directories
@@ -58,8 +101,8 @@ func main() {
 	// public chain does not require authentication but serves back the XSRF Token
 	xsrfChain := middleware.New(middleware.LoggingHandler, middleware.XSRFHandler)
 
-	// Api chain goes through the authentication handler, which verifies either the session or the account_id.secret
-	// combination
+	// Api chain goes through the authentication handler, which verifies either the session or the
+	// account_id.secret combination
 	apiChain := middleware.New(middleware.LoggingHandler, middleware.AuthHandler)
 
 	// 404 on favicon requests
@@ -72,8 +115,10 @@ func main() {
 	// SCION Coord API
 
 	// user registration
-	router.Handle("/api/register", loggingChain.ThenFunc(registrationController.Register)).Methods("POST")
-	router.Handle("/api/captchaSiteKey", loggingChain.ThenFunc(registrationController.LoadCaptchaSiteKey))
+	router.Handle("/api/register", loggingChain.ThenFunc(
+		registrationController.Register)).Methods("POST")
+	router.Handle("/api/captchaSiteKey", loggingChain.ThenFunc(
+		registrationController.LoadCaptchaSiteKey))
 	// user login
 	router.Handle("/api/login", loggingChain.ThenFunc(loginController.Login))
 	// user Logout
@@ -82,7 +127,8 @@ func main() {
 	router.Handle("/api/me", apiChain.ThenFunc(loginController.Me))
 
 	//email validation
-	router.Handle("/api/verifyEmail/{uuid}", loggingChain.ThenFunc(registrationController.VerifyEmail))
+	router.Handle("/api/verifyEmail/{uuid}", loggingChain.ThenFunc(
+		registrationController.VerifyEmail))
 
 	// generates a SCIONLab VM
 	// TODO(ercanucan): fix the authentication
@@ -97,27 +143,36 @@ func main() {
 	// ==========================================================
 	// SCION Web API
 
-	router.Handle("/api/as/exists/{as_id}/{account_id}/{secret}", apiChain.ThenFunc(asController.Exists))
+	router.Handle("/api/as/exists/{as_id}/{account_id}/{secret}", apiChain.ThenFunc(
+		asController.Exists))
 
 	// ISD join request
-	router.Handle("/api/as/uploadJoinRequest/{account_id}/{secret}", apiChain.ThenFunc(asController.UploadJoinRequest))
-	router.Handle("/api/as/uploadJoinReply/{account_id}/{secret}", apiChain.ThenFunc(asController.UploadJoinReply))
-	router.Handle("/api/as/pollJoinReply/{account_id}/{secret}", apiChain.ThenFunc(asController.PollJoinReply))
+	router.Handle("/api/as/uploadJoinRequest/{account_id}/{secret}", apiChain.ThenFunc(
+		asController.UploadJoinRequest))
+	router.Handle("/api/as/uploadJoinReply/{account_id}/{secret}", apiChain.ThenFunc(
+		asController.UploadJoinReply))
+	router.Handle("/api/as/pollJoinReply/{account_id}/{secret}", apiChain.ThenFunc(
+		asController.PollJoinReply))
 
 	// AS connection request
-	router.Handle("/api/as/uploadConnRequest/{account_id}/{secret}", apiChain.ThenFunc(asController.UploadConnRequest))
-	router.Handle("/api/as/uploadConnReply/{account_id}/{secret}", apiChain.ThenFunc(asController.UploadConnReply))
+	router.Handle("/api/as/uploadConnRequest/{account_id}/{secret}", apiChain.ThenFunc(
+		asController.UploadConnRequest))
+	router.Handle("/api/as/uploadConnReply/{account_id}/{secret}", apiChain.ThenFunc(
+		asController.UploadConnReply))
 
 	// show all request TO this AS
-	router.Handle("/api/as/pollEvents/{account_id}/{secret}", apiChain.ThenFunc(asController.PollEvents))
+	router.Handle("/api/as/pollEvents/{account_id}/{secret}", apiChain.ThenFunc(
+		asController.PollEvents))
 
 	// list the ASes the requesting AS can connect to
-	router.Handle("/api/as/listASes/{account_id}/{secret}", apiChain.ThenFunc(asController.ListASes))
+	router.Handle("/api/as/listASes/{account_id}/{secret}", apiChain.ThenFunc(
+		asController.ListASes))
 
 	// serve static files
 	static := http.StripPrefix("/public/", http.FileServer(http.Dir("public")))
 	router.PathPrefix("/public/").Handler(xsrfChain.Then(static))
 
 	// listen to HTTP requests
-	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", config.HTTP_BIND_ADDRESS, config.HTTP_BIND_PORT), handlers.CompressHandler(router)))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", config.HTTP_BIND_ADDRESS,
+		config.HTTP_BIND_PORT), handlers.CompressHandler(router)))
 }

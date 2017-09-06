@@ -12,17 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# If uncommented and non-empty it switches logging from
-# console to a file
+# File and directory overwrites
+# If uncommented and non-empty it switches logging from console to a file
 #log.file = ""
+
+# If uncommented and non-empty, this directory is used to store generated
+# VM configurations instead of "~/scionLabConfigs"
+#directory.package_directory = ""
 
 # Address and port to listen to incoming requests
 http.bind_address = "127.0.0.1"
 http.bind_port = 8080
 
 # Address visible from outside
-#http.host_address = "coord.scionproto.net"
-http.host_address = "127.0.0.1:8080"
+http.host_address = "localhost:8080"
 
 # PostMark email service configs
 email.from = "no-reply@scionlab.org"
@@ -30,15 +33,16 @@ email.pm_server_token = ""
 email.pm_account_token = ""
 
 # Captcha configs
-captcha.site_key = ""
-captcha.secret_key = ""
+captcha.site_key = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
+captcha.secret_key = "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe"
 
 # Session configs
 session.path = "/tmp"
 session.encryption_key = "x290jdxmcam9q2dci:LWC92cqwop,0rt"
 session.verification_key = "c23omc2o,pb45,-34l=12ms21odmx1;f"
 
-# Database configs: at the moment only MySQL is supported, although it could be easy to support others
+# Database configs: at the moment only MySQL is supported, although it could be easy to support
+# others
 db.name = "scion_coord_test"
 db.host = "127.0.0.1"
 db.port = 3306
@@ -46,3 +50,12 @@ db.user = "root"
 db.pass = "development_pass"
 db.max_connections = 15
 db.max_idle = 3
+
+# SCIONLab AS configs
+server.ia = "1-7"
+server.ip = "127.0.0.1"
+server.start_port = "50050"
+server.vpn.ip = "10.0.8.1"
+server.vpn.start_ip = "10.0.8.2"
+server.vpn.end_ip = "10.0.8.254"
+server.vpn.start_port = "50050"
