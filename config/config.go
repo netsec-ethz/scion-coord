@@ -15,6 +15,9 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/sec51/goconf"
 )
 
@@ -32,7 +35,8 @@ var (
 	SESSION_ENCRYPTION_KEY   = goconf.AppConf.String("session.encryption_key")
 	SESSION_VERIFICATION_KEY = goconf.AppConf.String("session.verification_key")
 	LOG_FILE                 = goconf.AppConf.String("log.file")
-	PACKAGE_DIRECTORY        = goconf.AppConf.String("directory.package_directory")
+	PACKAGE_DIRECTORY        = goconf.AppConf.DefaultString("directory.package_directory",
+		filepath.Join(os.Getenv("HOME"), "scionLabConfigs"))
 	DB_NAME                  = goconf.AppConf.String("db.name")
 	DB_HOST                  = goconf.AppConf.String("db.host")
 	DB_PORT, _               = goconf.AppConf.Int("db.port")

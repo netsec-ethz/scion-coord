@@ -1,7 +1,7 @@
 client
 dev tun
 proto udp
-remote {{ServerIP}} 1194
+remote {{.ServerIP}} 1194
 resolv-retry infinite
 nobind
 persist-key
@@ -10,11 +10,8 @@ comp-lzo
 verb 3
 mute 10
 <ca>
-{{CACert}}
-</ca>
+{{.CACert}}</ca>
 <cert>
-{{ClientCert}}
-</cert>
+{{.ClientCert}}</cert>
 <key>
-{{ClientKey}}
-</key>
+{{.ClientKey}}</key>

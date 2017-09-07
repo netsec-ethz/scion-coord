@@ -31,7 +31,7 @@ func CopyFile(source string, dest string) (err error) {
 
 // Some helper functions for IP addresses
 func IPToInt(ip string) uint32 {
-	return binary.BigEndian.Uint32(net.ParseIP(ip))
+	return binary.BigEndian.Uint32(net.ParseIP(ip)[12:])
 }
 
 func IntToIP(ipInt uint32) string {

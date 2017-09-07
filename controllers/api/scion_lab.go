@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"text/template"
 	"time"
 
@@ -48,14 +49,14 @@ var (
 	pythonPath      = filepath.Join(scionPath, "python")
 	vagrantPath     = filepath.Join(scionCoordPath, "vagrant")
 	homePath        = os.Getenv("HOME")
-	PackagePath     = filepath.Join(homePath, "scionLabConfigs")
+	PackagePath     = config.PACKAGE_DIRECTORY
 	credentialsPath = filepath.Join(scionCoordPath, "credentials")
 	CoreCertFile    = filepath.Join(credentialsPath, "ISD1-AS1-V0.crt")
 	CoreSigKey      = filepath.Join(credentialsPath, "as-sig.key")
 	TrcFile         = filepath.Join(credentialsPath, "ISD1-V0.trc")
-	EasyRSAPath     string
-	RSAKeyPath      string
-	CACertPath      string
+	EasyRSAPath     = filepath.Join(PackagePath, "easy-rsa")
+	RSAKeyPath      = filepath.Join(EasyRSAPath, "keys")
+	CACertPath      = filepath.Join(RSAKeyPath, "ca.crt")
 )
 
 // The states in which a user's SCIONLab VM can be in.
@@ -74,13 +75,8 @@ const (
 	REMOVED = "Removed"
 )
 
-func init() {
-	if config.PACKAGE_DIRECTORY != "" {
-		PackagePath = config.PACKAGE_DIRECTORY
-	}
-	EasyRSAPath = filepath.Join(PackagePath, "easy-rsa")
-	RSAKeyPath = filepath.Join(EasyRSAPath, "keys")
-	CACertPath = filepath.Join(RSAKeyPath, "ca.crt")
+func UserPackagePath(email string) string {
+	return filepath.Join(PackagePath, email)
 }
 
 type SCIONLabVMController struct {
@@ -132,6 +128,8 @@ func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http
 		s.Error500(err, w, r)
 		return
 	}
+	// Remove all existing files from UserPackagePath TODO: May want to archive somewhere?
+	os.RemoveAll(UserPackagePath(svmInfo.UserEmail) + "/")
 	// Generate topology file
 	if err = s.generateTopologyFile(svmInfo); err != nil {
 		log.Printf("Error generating topology file: %v", err)
@@ -306,6 +304,7 @@ func (s *SCIONLabVMController) updateDB(svmInfo *SCIONLabVMInfo) error {
 			UserEmail:    svmInfo.UserEmail,
 			IP:           svmInfo.IP,
 			IA:           newAs,
+			IsVPN:        svmInfo.IsVPN,
 			RemoteIAPort: svmInfo.RemotePort,
 			Status:       CREATE,
 			RemoteIA:     svmInfo.RemoteIA,
@@ -316,6 +315,7 @@ func (s *SCIONLabVMController) updateDB(svmInfo *SCIONLabVMInfo) error {
 	} else {
 		// Update the SCIONLabVM Table
 		svmInfo.SVM.IP = svmInfo.IP
+		svmInfo.SVM.IsVPN = svmInfo.IsVPN
 		if svmInfo.SVM.Status == INACTIVE {
 			svmInfo.SVM.Status = CREATE
 		} else {
@@ -434,6 +434,8 @@ func (s *SCIONLabVMController) generateVPNConfig(svmInfo *SCIONLabVMInfo) error 
 		return fmt.Errorf("Error reading VPN certificate file for user %v: %v",
 			svmInfo.UserEmail, err)
 	}
+	clientCertStr := string(clientCert)
+	startCert := strings.Index(clientCertStr, "-----BEGIN CERTIFICATE-----")
 	clientKey, err = ioutil.ReadFile(filepath.Join(RSAKeyPath, svmInfo.UserEmail+".key"))
 	if err != nil {
 		return fmt.Errorf("Error reading VPN key file for user %v: %v",
@@ -443,10 +445,10 @@ func (s *SCIONLabVMController) generateVPNConfig(svmInfo *SCIONLabVMInfo) error 
 	config := map[string]string{
 		"ServerIP":   svmInfo.VPNIP,
 		"CACert":     string(caCert),
-		"ClientCert": string(clientCert),
+		"ClientCert": clientCertStr[startCert:],
 		"ClientKey":  string(clientKey),
 	}
-	f, err := os.Create(filepath.Join(PackagePath, svmInfo.UserEmail, "client.conf"))
+	f, err := os.Create(filepath.Join(UserPackagePath(svmInfo.UserEmail), "client.conf"))
 	if err != nil {
 		return fmt.Errorf("Error creating VPN config file for user %v: %v", svmInfo.UserEmail, err)
 	}
@@ -465,16 +467,16 @@ func (s *SCIONLabVMController) generateVPNKeys(svmInfo *SCIONLabVMInfo) error {
 
 		cmd := exec.Command("/bin/bash", "-c", "source vars; ./revoke-full "+svmInfo.UserEmail)
 		cmd.Dir = EasyRSAPath
-		if err := cmd.Run(); err != nil {
+		if err := cmd.Run(); err != nil && err.Error() != "exit status 2" {
 			log.Printf("Error during revocation of VPN keys for user %v: %v", svmInfo.UserEmail, err)
 			return err
 		}
-	} else if err != os.ErrNotExist {
+	} else if !os.IsNotExist(err) {
 		log.Printf("Error checking for existence of VPN keys for user %v: %v", svmInfo.UserEmail, err)
 		return err
 	}
 
-	cmd := exec.Command("/bin/bash", "-c", "source vars; ./build-keys "+svmInfo.UserEmail)
+	cmd := exec.Command("/bin/bash", "-c", "source vars; ./build-key --batch "+svmInfo.UserEmail)
 	cmd.Dir = EasyRSAPath
 	cmdOut, _ := cmd.StdoutPipe()
 	cmdErr, _ := cmd.StderrPipe()
@@ -495,7 +497,7 @@ func (s *SCIONLabVMController) generateVPNKeys(svmInfo *SCIONLabVMInfo) error {
 // generated file.
 func (s *SCIONLabVMController) packageSCIONLabVM(userEmail string) error {
 	log.Printf("Packaging SCIONLab VM")
-	userPackagePath := filepath.Join(PackagePath, userEmail)
+	userPackagePath := UserPackagePath(userEmail)
 	vagrantDir, err := os.Open(vagrantPath)
 	if err != nil {
 		return fmt.Errorf("Failed to open directory. Path: %v, %v", vagrantPath, err)
@@ -525,6 +527,7 @@ func (s *SCIONLabVMController) packageSCIONLabVM(userEmail string) error {
 // The struct used for API calls between scion-coord and SCIONLab ASes
 type SCIONLabVM struct {
 	ASID         string // ISD-AS of the VM
+	IsVPN        bool
 	RemoteIAPort int    // port number of the remote SCIONLab AS being connected to
 	UserEmail    string // The email address of the user owning this SCIONLab VM AS
 	VMIP         string // IP address of the SCIONLab VM
@@ -563,6 +566,7 @@ func (s *SCIONLabVMController) GetSCIONLabVMASes(w http.ResponseWriter, r *http.
 	for _, v := range vms {
 		vmResp := SCIONLabVM{
 			ASID:         strconv.Itoa(v.IA.Isd) + "-" + strconv.Itoa(v.IA.As),
+			IsVPN:        v.IsVPN,
 			VMIP:         v.IP,
 			RemoteIAPort: v.RemoteIAPort,
 			UserEmail:    v.UserEmail,

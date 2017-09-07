@@ -45,11 +45,11 @@ type SCIONLabVM struct {
 	UserEmail    string `orm:"unique"`        // Email address of the Owning user
 	IP           string `orm:"unique"`        // IP address of the SCIONLab VM
 	IA           *As    `orm:"rel(fk);index"` // The AS belonging to the VM
-	RemoteVPN    bool   // is this VM connected via the VPN
-	RemoteIA     string // the SCIONLab AS it connects to
-	RemoteIAPort int    // port number of the remote SCIONLab AS being connected to
-	RemoteBR     string // the name of the remote border router for this AS
-	Status       uint8  `orm:"default(0)"` // Status of the VM (i.e Active, Create, Update, Remove)
+	IsVPN        bool                         // is this VM connected via the VPN
+	RemoteIA     string                       // the SCIONLab AS it connects to
+	RemoteIAPort int                          // port number of the remote SCIONLab AS being connected to
+	RemoteBR     string                       // the name of the remote border router for this AS
+	Status       uint8  `orm:"default(0)"`    // Status of the VM (i.e Active, Create, Update, Remove)
 }
 
 func FindSCIONLabVMByUserEmail(email string) (*SCIONLabVM, error) {
