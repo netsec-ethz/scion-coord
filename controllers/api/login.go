@@ -281,7 +281,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 		c.JSON(&user, w, r)
 
 	} else {
-		log.Println("AUth error")
+		log.Println("Auth error")
 		c.Forbidden(err, w, r)
 		return
 	}
