@@ -5,20 +5,15 @@
   <br/>
   <p>Welcome to SCIONLab! Your account credentials are the following:</p>
 
-  <p><b>AccountId:</b> {{user.AccountId}}</p>
+  <p><b>AccountId:</b> {{user.AccountID}}</p>
   <p><b>Secret:</b> {{user.Secret}}</p>
-  <div ng-show="error" ng-model="error" class="alert alert-danger alert-dismissible">
-    {{error}}
-  </div>
-  <div ng-if="message" class="alert alert-success alert-dismissible">
-    {{message}}
-  </div>
-  <br/>
-  <br/>
-  <p><font color="red">When you fill out and submit the form below, your SCIONLab VM configuration for connecting to SCIONLab AS 1-7 will be packaged
-  and downloaded. Please extract the downloaded tarball in a desired location and refer to the README file inside for instructions.</font></p>
+  <div class="alert alert-info"><p>{{vmInfo.VMText}} <span ng-if="vmInfo.ShowIP">Your registered IP address is <b>{{vmInfo.VMIP}}</b>.</span></p></div>
 
-  <p><font color="red"><b>Please note:</b> SCIONLab currently requires that your machine has a public IP address and can receive UDP traffic at port 50000.</font></p>
+  <div style="color:red">
+    <p>When you fill out and submit the form below, your SCIONLab VM configuration for connecting to SCIONLab AS 1-7 will be packaged
+      and downloaded. Please extract the downloaded tarball in a desired location and refer to the README file inside for instructions.</p>
+    <p><b>Please note:</b> SCIONLab currently requires that your machine has a public IP address and can receive UDP traffic at port 50000.</p></div>
+  <br/>
 
   <form name="scionLabVMForm" ng-submit="generateSCIONLabVM(user)">
     <div class="form-group has-feedback">
@@ -33,11 +28,17 @@
     <br/>
     <div class="row">
       <div class="col-xs-12">
-        <button ng-click="removeSCIONLabVM(user)" type="button" class="btn btn-primary btn-block btn-flat">Remove my SCIONLab VM</button>
+        <button ng-click="removeSCIONLabVM(user)" type="button" class="btn btn-primary btn-block btn-flat btn-danger">Remove my SCIONLab VM</button>
       </div>
     </div>
   </form>
+  <br/>
+  <div ng-show="error" ng-model="error" class="alert alert-danger alert-dismissible">
+    {{error}}
+  </div>
+  <div ng-if="message" class="alert alert-success alert-dismissible">
+    {{message}}
+  </div>
 
 </div>
 <!-- ./wrapper -->
-
