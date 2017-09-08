@@ -79,7 +79,7 @@ func main() {
 	// user Logout
 	router.Handle("/api/logout", loggingChain.ThenFunc(loginController.Logout))
 	// user information
-	router.Handle("/api/me", loggingChain.ThenFunc(loginController.Me))
+	router.Handle("/api/me", apiChain.ThenFunc(loginController.Me))
 
 	//email validation
 	router.Handle("/api/verifyEmail/{uuid}", loggingChain.ThenFunc(registrationController.VerifyEmail))

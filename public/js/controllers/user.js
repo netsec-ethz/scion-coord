@@ -1,4 +1,4 @@
-angular.module('scionApp')
+scionApp
     .controller('userCtrl', ['$scope', 'userService', '$location', '$window', '$http',
         function ($scope, userService, $location, $window, $http) {
 
@@ -11,13 +11,38 @@ angular.module('scionApp')
                     function (data) {
                         console.log(data);
                         $scope.user = data["User"];
-                        $scope.vmInfo = data["VMInfo"]
-                        $scope.buttonConfig = data["ButtonConfig"]
+                        $scope.vmInfo = data["VMInfo"];
+                        $scope.buttonConfig = data["UIButtons"]
                     },
                     function (response) {
                         console.log(response);
-                        //$location.path('/');
+                        if (response.status === 401 || response.status === 403) {
+                            $location.path('/login');
+                        }
                     });
+            };
+            
+            $scope.submitForm = function (action, user) {
+                switch (action) {
+                    case "update":
+                        $scope.scionLabVMForm.scionLabVMIP.$setValidity("required", user.scionLabVMIP != null);
+                        if (!$scope.scionLabVMForm.scionLabVMIP.$valid) {
+                            $scope.error = "Please enter a correct public IP address.";
+                        } else {
+                            $scope.generateSCIONLabVM(user);
+                        }
+                        break;
+                    case "download":
+                        $scope.downloadSCIONLabVM(user);
+                        break;
+                    case "remove":
+                        $scope.removeSCIONLabVM(user);
+                        break;
+                }
+            };
+
+            downloadlink = function (user) {
+                return ('/api/as/downloads?filename=' + user["Email"] + '.tar.gz');
             };
 
             $scope.generateSCIONLabVM = function (user) {
@@ -27,8 +52,9 @@ angular.module('scionApp')
                 userService.generateSCIONLabVM(user).then(
                     function (data) {
                         console.log(data);
-                        window.location.assign('/api/as/downloads?filename=' + data["filename"]);
-                        $scope.message = data["message"];
+                        window.location.assign(downloadlink(user));
+                        $scope.message = data;
+                        $scope.me();
                     },
                     function (response) {
                         console.log(response);
@@ -40,7 +66,7 @@ angular.module('scionApp')
                 $scope.error = "";
                 $scope.message = "";
 
-                window.location.assign('/api/as/downloads?filename=' + user["Email"] + '.tar.gz');
+                window.location.assign(downloadlink(user));
             };
 
             $scope.removeSCIONLabVM = function (user) {
@@ -51,6 +77,7 @@ angular.module('scionApp')
                     function (data) {
                         console.log(data);
                         $scope.message = data;
+                        $scope.me();
                     },
                     function (response) {
                         console.log(response);
@@ -75,7 +102,7 @@ angular.module('scionApp')
                 },
                 true
             );
-            angular.element($window).bind('resize', function(){
+            angular.element($window).bind('resize', function (){
                 $scope.$apply();
             });
 
