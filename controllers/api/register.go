@@ -45,32 +45,94 @@ type registrationRequest struct {
 	Captcha              string `json:"captcha"`
 }
 
+type passwordRequest struct {
+	UUID                 string `json:"uuid"`
+	Password             string `json:"password"`
+	PasswordConfirmation string `json:"password_confirmation"`
+}
+
+// check if the password match and that the length is at least 8 chars
+func passwordsAreValid(password, passwordConfirmation string) error {
+	if len(password) < 8 {
+
+		return fmt.Errorf("%s\n", "Please use at least 8 characters for your password.")
+	}
+
+	if password != passwordConfirmation {
+		return fmt.Errorf("%s\n", "Please enter matching passwords.")
+	}
+
+	return nil
+}
+
 // Method used to validate the registration request
-func (r *registrationRequest) isValid() (bool, error) {
+func (r *registrationRequest) isValid() error {
 
 	//check recaptcha
 	rc := recaptcha.R{Secret: config.CAPTCHA_SECRET_KEY}
 	if !rc.VerifyResponse(r.Captcha) {
-		return false, fmt.Errorf("ReCaptcha error: %s", strings.Join(rc.LastError()[1:], ", "))
+		return fmt.Errorf("ReCaptcha error: %s", strings.Join(rc.LastError()[1:], ", "))
 	}
 
 	// check if any of this is empty
 	if r.Email == "" || r.Password == "" || r.PasswordConfirmation == "" ||
 		r.First == "" || r.Last == "" {
-		return false, fmt.Errorf("%s\n", "You entered incomplete data. First and last name, email and password are mandatory fields.")
+		return fmt.Errorf("%s\n", "You entered incomplete data. First and last name, email and password are mandatory fields.")
 	}
 
 	// check if the password match and that the length is at least 8 chars
-	if len(r.Password) < 8 {
+	return passwordsAreValid(r.Password, r.PasswordConfirmation)
+}
 
-		return false, fmt.Errorf("%s\n", "Please use at least 8 characters for your password.")
+// Method used to set password after pre-approved registration or password reset
+func (c *RegistrationController) SetPassword(w http.ResponseWriter, r *http.Request) {
+
+	// parse the form value
+	if err := r.ParseForm(); err != nil {
+		log.Println(err)
+		c.Error500(fmt.Errorf("Parsing form values failed."), w, r)
+		return
 	}
 
-	if r.Password != r.PasswordConfirmation {
-		return false, fmt.Errorf("%s\n", "Please enter matching passwords.")
+	// parse the JSON coming from the client
+	var passRequest passwordRequest
+	decoder := json.NewDecoder(r.Body)
+
+	// check if the parsing succeeded
+	if err := decoder.Decode(&passRequest); err != nil {
+		log.Println(err)
+		c.Error500(fmt.Errorf("Parsing form values failed."), w, r)
+		return
 	}
 
-	return true, nil
+	if err := passwordsAreValid(passRequest.Password, passRequest.PasswordConfirmation); err != nil {
+		log.Println(err)
+		c.Error500(err, w, r)
+		return
+	}
+
+	//validate link
+	user, err := models.FindUserByVerificationUUID(passRequest.UUID)
+
+	if err != nil {
+		log.Printf("Error setting password. %v is not a valid UUID.", passRequest.UUID)
+		c.BadRequest(fmt.Errorf("Error verifying email address. %v is not a valid user identifier.", passRequest.UUID), w, r)
+		return
+	}
+
+	if !user.PasswordInvalid {
+		c.Error500(fmt.Errorf("Password is already set."), w, r)
+		return
+	}
+
+	if err := user.UpdatePassword(passRequest.Password); err != nil {
+		log.Printf("Error updating the password in the database: %v", err)
+		c.Error500(fmt.Errorf("Error updating the password in the database"), w, r)
+		return
+	}
+
+	c.Plain("", w, r)
+	return
 }
 
 // Method used to validate email address
@@ -133,7 +195,7 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 	}
 
 	// validate the data
-	if valid, err := regRequest.isValid(); !valid {
+	if err := regRequest.isValid(); err != nil {
 		log.Println(err)
 		c.Error500(err, w, r)
 		return

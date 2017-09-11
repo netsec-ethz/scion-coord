@@ -39,12 +39,51 @@ angular.module('scionApp')
             $scope.error = "";
             $scope.message = "";
 
+            $scope.addChoice = function () {
+                $scope.invitations.push($scope.defaultInvitation());
+            };
+
+            $scope.removeChoice = function () {
+                $scope.invitations.pop();
+            };
+
             $scope.dismissSuccess = function () {
                 $scope.message = "";
             };
 
             $scope.dismissError = function () {
                 $scope.error = "";
+            };
+
+            $scope.sendInvitations = function (invitations) {
+                // TODO (mlegner): Maybe check for duplicates before api call.
+                adminService.sendInvitations(invitations).then(
+                    function (data) {
+                        if (data["emails"].length == 0) {
+                            $scope.error = "";
+                            $scope.message = "All email invitations sent successfully.";
+                            $scope.resetInvitations();
+                        } else {
+                            let emails = data["emails"];
+                            let messages = data["messages"];
+                            err = "There was a problem sending emails to the following addresses: ";
+                            for (let i = 0; i < invitations.length; i++) {
+                                invitations[i].error = messages[i];
+                            }
+                            for (let i = 0; i < emails.length; i++) {
+                                err += emails[i];
+                                if (i < emails.length - 1) {
+                                    err += ", ";
+                                }
+                            }
+                            $scope.error = err;
+                        }
+                    },
+                    function (response) {
+                        $scope.error = "There was an error sending email invitations.";
+                        $scope.message = "";
+                        console.log(response);
+                    });
             };
         }
     ]);

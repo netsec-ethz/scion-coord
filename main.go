@@ -176,8 +176,14 @@ func main() {
 	router.Handle("/api/verifyEmail/{uuid}", loggingChain.ThenFunc(
 		registrationController.VerifyEmail))
 
+	// set password after pre-approved registration or password reset
+	router.Handle("/api/setPassword", loggingChain.ThenFunc(
+		registrationController.SetPassword)).Methods(http.MethodPost)
+
 	// admin page
 	router.Handle("/api/adminPageData", adminChain.ThenFunc(adminController.AdminInformation))
+	router.Handle("/api/sendInvitations", adminChain.ThenFunc(
+		adminController.SendInvitationEmails)).Methods(http.MethodPost)
 
 	// generates a SCIONLab VM
 	// TODO(ercanucan): fix the authentication
