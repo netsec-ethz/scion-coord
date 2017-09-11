@@ -53,6 +53,7 @@ db.max_idle = 3
 
 # SCIONLab AS configs
 server.ia = "1-7"
+server.as_id_base = 1000
 server.ip = "127.0.0.1"
 server.start_port = "50050"
 server.vpn.ip = "10.0.8.1"
