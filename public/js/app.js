@@ -13,6 +13,10 @@ const scionApp = angular.module('scionApp', [
                 }]
             }
         })
+        .when('/setPassword/:uuid', {
+            templateUrl: '/public/partials/set_password.html',
+            controller: 'passwordCtrl'
+        })
         .when('/login', {
             templateUrl: '/public/partials/login.html',
             controller: 'loginCtrl'
