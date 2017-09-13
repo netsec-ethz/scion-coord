@@ -1,73 +1,98 @@
 <!-- Site wrapper -->
-<div class="wrapper" ng-show="user">
+<div class="wrapper">
 
-  <br/>
-  <br/>
+  <div class="spacer"></div>
   <p>Welcome to SCIONLab! Your account credentials are the following:</p>
 
   <p><strong>AccountId:</strong> {{user.AccountID}}</p>
   <p><strong>Secret:</strong> {{user.Secret}}</p>
   <div class="alert alert-info">
-    <p>{{vmInfo.VMText}} <span
-        ng-if="vmInfo.ShowIP">Your registered IP address is <strong>{{vmInfo.VMIP}}</strong>.</span>
-      <span ng-if="vmInfo.ShowVPN">You have chosen a <strong>VPN-based</strong> setup.</span>
+    <p>
+      <span ng-if="activeVMs.length == 0">
+        You currently have no active SCIONLab VM configurations.
+        Please check pending update request or create a new configuration for one of the available SCIONLab servers below.
+      </span>
+      <span ng-if="activeVMs.length > 0">
+        You currently have <strong>{{activeVMs.length}}</strong> active SCIONLab configurations
+        connected to the following AS<span ng-if="activeVMs.length > 1">es</span>: <span
+          ng-repeat="vm in activeVMs">
+        <strong>{{vm.RemoteIA}}</strong><span ng-if="!$last">, </span><span ng-if="$last">.</span></span>
+        <br/>
+        Please select one of the available SCIONLab ASes below for further details.
+      </span>
     </p>
   </div>
-  <div style="color:red">
-    <p>When you fill out and submit the form below, your SCIONLab VM configuration
-      for connecting to the designated SCIONLab AS will be packaged and downloaded.
-      Please extract the downloaded tarball in a desired location and refer to the
-      README file inside for instructions.</p>
-    <p>If you have a static public IP address and can receive traffic at port 50000, the border
-      router listens on the public IP address. Otherwise, a vpn-based setup is set up for you,
-      such that you do not need to apply any further configuration.</p>
-  </div>
-  <br/>
 
-  <form name="scionLabVMForm">
-    <div class="form-group has-feedback">
-      <label class="btn btn-block btn-primary" ng-disabled="buttonConfig.Update.Disable"
-             data-toggle="tooltip"
-             title="{{buttonConfig.Update.Disable ? buttonConfig.Update.TooltipDisabled :
-             'If you do not have a static public IP address, a vpn-based setup will be ' +
-             'configured for you.'}}">
-        <input type="checkbox" ng-model="user.isNotVPN" name="isNotVPN"
-               ng-disabled="buttonConfig.Update.Disable">
-        My host has a static public IP address and can receive traffic at port 50000.</label>
+  <div class="spacer"></div>
+  <select class="form-control btn btn-primary dropdown-toggle" ng-model="user.vm"
+          ng-options="'Connection to SCIONLab AS ' + x.vmInfo.RemoteIA for x in vmsAndButtons">
+  </select>
 
-      <input type="text" class="form-control" ng-model="user.scionLabVMIP" name="scionLabVMIP"
-             placeholder="My host's public IP address" ng-if="user.isNotVPN"
-             ng-pattern="/^(?!.*\.$)((1?\d?\d|25[0-5]|2[0-4]\d)(\.|$)){4}$/">
-      <span class="form-control-feedback"></span>
+  <div ng-show="user.vm">
+    <div>
+      <br/>
+      <p>{{user.vm.vmInfo.VMText}}
+        <span ng-if="user.vm.vmInfo.ShowIP">
+        Your registered IP address is <strong>{{user.vm.vmInfo.VMIP}}</strong>.
+        </span>
+        <span ng-if="user.vm.vmInfo.ShowVPN">
+          You have chosen a <strong>VPN-based</strong> setup.
+        </span>
+      </p>
     </div>
-    <div class="row">
-      <div class="col-xs-12">
-        <div id="buttongroup" ng-class="{true:'btn-group-vertical btn-block',
-        false:'btn-group btn-group-justified'}[isSmall]">
-          <!--<div ng-repeat="button in buttonConfig">-->
-          <div ng-repeat="button in buttonConfig" class="btn-group" role="group"
-               ng-if="button.Hide == false">
-            <button ng-click="submitForm(button.Action, user)" ng-disabled="button.Disable"
-                    class="btn btn-primary {{button.Class}}" data-toggle="tooltip"
-                    title="{{button.Disable ? button.TooltipDisabled : ''}}">
-              {{button.Text}}
-            </button>
+    <div style="color:red">
+      <p ng-if="user.vm.vmInfo.VMStatus == 0">
+        When you fill out and submit the form below, your SCIONLab VM configuration for connecting to the designated
+        SCIONLab AS will be packaged and downloaded. Please extract the downloaded tarball in a desired location and
+        refer to the README file inside for instructions.
+      </p>
+      <p ng-if="user.vm.vmInfo.VMStatus">
+        You can update or remove your SCIONLab VM configuration using the form below.
+      </p>
+    </div>
+    <br/>
+
+    <form name="scionLabVMForm">
+      <div class="form-group has-feedback">
+        <label class="btn btn-block btn-primary" ng-disabled="user.vm.buttons.Update.Disable"
+               data-toggle="tooltip"
+               title="{{user.vm.buttons.Update.Disable ? user.vm.buttons.Update.TooltipDisabled : ''}}">
+          <input type="checkbox" ng-model="user.isNotVPN" name="isNotVPN" ng-disabled="user.vm.buttons.Update.Disable">
+          My host has a static public IP address and can receive traffic at port {{user.vm.vmInfo.UserPort}}.
+        </label>
+
+        <input type="text" class="form-control" ng-model="user.scionLabVMIP" name="scionLabVMIP"
+               placeholder="My host's public IP address" ng-if="user.isNotVPN"
+               ng-pattern="/^(?!.*\.$)((1?\d?\d|25[0-5]|2[0-4]\d)(\.|$)){4}$/">
+        <span class="form-control-feedback"></span>
+      </div>
+      <div class="row">
+        <div class="col-xs-12">
+          <div id="buttongroup"
+               ng-class="{true:'btn-group-vertical btn-block', false:'btn-group btn-group-justified'}[isSmall]">
+            <div ng-repeat="button in user.vm.buttons" class="btn-group" role="group" ng-if="button.Hide == false">
+              <button ng-click="submitForm(button.Action, user)" ng-disabled="button.Disable"
+                      class="btn btn-primary {{button.Class}}" data-toggle="tooltip"
+                      title="{{button.Disable ? button.TooltipDisabled : ''}}">
+                {{button.Text}}
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </form>
+    </form>
+  </div>
+
   <br/>
   <div ng-show="error" class="alert alert-danger alert-dismissible fade in">
-    <button type="button" class="close" aria-label="Close" ng-click="dismissError()">&times;
-    </button>
+    <button type="button" class="close" aria-label="Close" ng-click="dismissError()">&times;</button>
     {{error}}
   </div>
   <div ng-show="message" class="alert alert-success alert-dismissible fade in">
-    <button type="button" class="close" aria-label="Close" ng-click="dismissSuccess()">&times;
-    </button>
+    <button type="button" class="close" aria-label="Close" ng-click="dismissSuccess()">&times;</button>
     {{message}}
   </div>
 
+  <div class="spacer"></div>
 </div>
 <!-- ./wrapper -->

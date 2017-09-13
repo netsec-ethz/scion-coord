@@ -17,9 +17,21 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/sec51/goconf"
 )
+
+type SCIONLabServerConfig struct {
+	IA               string // ISD and AS number of the server
+	IP               string // IP address
+	VPNIP            string // VPN IP address
+	UserPort         int    // port on user end
+	ServerStartPort  int    // first port assigned on server side
+	ServerVPNStartIP string // first VPN IP address assigned to users
+	ServerVPNEndIP   string // last VPN IP address assigned to users
+}
 
 // Settings are specified in conf/development.conf
 var (
@@ -47,8 +59,7 @@ var (
 	DB_PASS               = goconf.AppConf.String("db.pass")
 	DB_MAX_CONNECTIONS, _ = goconf.AppConf.Int("db.max_connections")
 	DB_MAX_IDLE, _        = goconf.AppConf.Int("db.max_idle")
-	SERVER_IA             = goconf.AppConf.String("server.ia")
-	SERVER_IP             = goconf.AppConf.String("server.ip")
+	SERVERS               = []SCIONLabServerConfig{}
 	SERVER_START_PORT, _  = goconf.AppConf.Int("server.start_port")
 	SERVER_VPN_IP         = goconf.AppConf.String("server.vpn.ip")
 	SERVER_VPN_START_IP   = goconf.AppConf.String("server.vpn.start_ip")
@@ -57,3 +68,21 @@ var (
 	// vagrant and may have to be adjusted if vagrant configuration is changed
 	VM_LOCAL_IP = "10.0.2.15"
 )
+
+// TODO (mlegner): Include some error handling
+func init() {
+	servers := goconf.AppConf.Strings("servers")
+	for _, s := range servers {
+		server := strings.Split(s, ",")
+		port, _ := strconv.ParseInt(server[2], 10, 64)
+		SERVERS = append(SERVERS, SCIONLabServerConfig{
+			IA:               server[0],
+			IP:               server[1],
+			VPNIP:            SERVER_VPN_IP,
+			UserPort:         int(port),
+			ServerStartPort:  SERVER_START_PORT,
+			ServerVPNStartIP: SERVER_VPN_START_IP,
+			ServerVPNEndIP:   SERVER_VPN_END_IP,
+		})
+	}
+}
