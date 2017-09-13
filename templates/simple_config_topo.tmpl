@@ -35,11 +35,11 @@
           "ISD_AS": "{{.TARGET_ISDAS}}",
           "Public": {
             "Addr": "{{.IP}}",
-            "L4Port": 50000
+            "L4Port": {{.USER_PORT}}
           },
           "Bind": {
             "Addr": "{{.BIND_IP}}",
-            "L4Port": 50000
+            "L4Port": {{.USER_PORT}}
           }
         }
       }
