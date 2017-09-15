@@ -33,6 +33,13 @@ type Email struct {
 	Tag     string
 }
 
+type EmailData struct {
+	FirstName        string
+	LastName         string
+	HostAddress      string
+	VerificationUUID string
+}
+
 // Send connects to the PostMark email API and sends the email
 func Send(mail *Email) error {
 

@@ -164,6 +164,10 @@ func main() {
 	router.Handle("/api/resendLink", tollbooth.LimitHandler(resendLimit, loggingChain.ThenFunc(
 		registrationController.ResendActivationLink))).Methods(http.MethodPost)
 
+	// Reset user password
+	router.Handle("/api/resetPassword", tollbooth.LimitHandler(resendLimit, loggingChain.ThenFunc(
+		registrationController.ResetPassword))).Methods(http.MethodPost)
+
 	// user login
 	router.Handle("/api/login", loggingChain.ThenFunc(loginController.Login))
 

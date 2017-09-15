@@ -5,12 +5,13 @@
   <div class="register-box-body">
     <p class="login-box-msg">Register a new membership</p>
 
-
-    <div ng-show="error" class="alert alert-danger alert-dismissible">
-      {{error}}
+    <div ng-show="error" class="alert alert-danger alert-dismissible fade in">
+      <button type="button" class="close" aria-label="Close" ng-click="dismissError()">&times;</button>
+    {{error}}
     </div>
-    <div ng-show="message" class="alert alert-success alert-dismissible">
-      {{message}}
+    <div ng-show="message" class="alert alert-success alert-dismissible fade in">
+      <button type="button" class="close" aria-label="Close" ng-click="dismissSuccess()">&times;</button>
+    {{message}}
     </div>
 
 

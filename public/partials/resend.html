@@ -6,16 +6,19 @@
   <div class="login-box-body">
     <p class="login-box-msg">Resend the verification email</p>
 
-    <div ng-show="error" class="alert alert-danger alert-dismissible" >
-      {{error}}
+    <div ng-show="error" class="alert alert-danger alert-dismissible fade in">
+      <button type="button" class="close" aria-label="Close" ng-click="dismissError()">&times;</button>
+    {{error}}
     </div>
-    <div ng-show="message" class="alert alert-success alert-dismissible" >
-      {{message}}
+    <div ng-show="message" class="alert alert-success alert-dismissible fade in">
+      <button type="button" class="close" aria-label="Close" ng-click="dismissSuccess()">&times;</button>
+    {{message}}
     </div>
 
     <form name="loginForm" ng-submit="resendEmail(email)">
       <div class="form-group has-feedback">
-        <input type="email" class="form-control" ng-model="email" name="email" placeholder="Email" ng-required="true">
+        <input type="email" class="form-control" ng-model="email" name="email"
+               placeholder="Email" required>
         <span class="glyphicon glyphicon-envelope form-control-feedback"></span>
       </div>
       <div class="row">
