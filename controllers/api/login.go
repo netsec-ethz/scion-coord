@@ -121,7 +121,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 	// if stored password is invalid due to reset or pre-approved registration
 	if dbUser.PasswordInvalid {
 		log.Printf("Password is not set for user %v.", dbUser.Email)
-		c.Forbidden(w, err, "Password is not set for user %v", dbUser.Email)
+		c.Forbidden(w, err, "902 Password is not set for user %v", dbUser.Email)
 		return
 	}
 
@@ -164,7 +164,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 
 	// save the session status
 	if err := session.Save(r, w); err != nil {
-		log.Println("Error while saving the session", err)
+		log.Printf("Error while saving the session: %v", err)
 		c.Error500(w, err, "Error while saving the session")
 		return
 	}
@@ -173,7 +173,6 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 	if userSession != nil && userSession.HasLoggedIn {
 		// the session is valid, therefore continue
 		c.JSON(&user, w, r)
-
 	} else {
 		log.Println("Authentication error")
 		c.Forbidden(w, nil, "Authentication error")
