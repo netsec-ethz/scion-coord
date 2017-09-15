@@ -16,6 +16,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"log"
@@ -81,6 +82,54 @@ func (r *registrationRequest) isValid() error {
 
 	// check if the password match and that the length is at least 8 chars
 	return passwordsAreValid(r.Password, r.PasswordConfirmation)
+}
+
+// Method used to reset password and send user an email
+func (c *RegistrationController) ResetPassword(w http.ResponseWriter, r *http.Request) {
+
+	// parse the form value
+	if err := r.ParseForm(); err != nil {
+		log.Println(err)
+		c.Error500(fmt.Errorf("Parsing form values failed."), w, r)
+		return
+	}
+
+	userEmail := r.FormValue("userEmail")
+	u, err := models.FindUserByEmail(userEmail)
+	if err != nil {
+		log.Println(err)
+		c.BadRequest(errors.New("User not found"), w, r)
+		return
+	}
+
+	if err = u.ResetUUID(); err != nil {
+		log.Printf("Error resetting UUID for user %v: %v", u.Email, err)
+		c.BadRequest(errors.New("Error resetting UUID"), w, r)
+		return
+	}
+	if err = u.UpdatePassword(""); err != nil {
+		log.Printf("Error resetting password for user %v: %v", u.Email, err)
+		c.BadRequest(errors.New("Error resetting password"), w, r)
+		return
+	}
+	data := email.EmailData{
+		FirstName:        u.FirstName,
+		LastName:         u.LastName,
+		HostAddress:      config.HTTP_HOST_ADDRESS,
+		VerificationUUID: u.VerificationUUID,
+	}
+	if err = email.ConstructAndSend(
+		"password_reset.html",
+		"[SCIONLab] Password reset",
+		data,
+		"password-reset",
+		userEmail); err != nil {
+		log.Printf("Error sending password-reset email to user %v: %v", u.Email, err)
+		c.BadRequest(errors.New("Error sending email"), w, r)
+		return
+	}
+
+	return
 }
 
 // Method used to set password after pre-approved registration or password reset
@@ -256,12 +305,12 @@ func sendVerificationEmail(userID uint64) error {
 		return err
 	}
 
-	data := struct {
-		FirstName        string
-		LastName         string
-		HostAddress      string
-		VerificationUUID string
-	}{user.FirstName, user.LastName, config.HTTP_HOST_ADDRESS, user.VerificationUUID}
+	data := email.EmailData{
+		FirstName:        user.FirstName,
+		LastName:         user.LastName,
+		HostAddress:      config.HTTP_HOST_ADDRESS,
+		VerificationUUID: user.VerificationUUID,
+	}
 
 	if err := email.ConstructAndSend(
 		"verification.html",
