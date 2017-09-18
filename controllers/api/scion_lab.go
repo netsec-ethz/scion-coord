@@ -130,8 +130,7 @@ func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http
 		return
 	}
 	// Package the VM
-	var fileName string
-	if fileName, err = s.packageSCIONLabVM(svmInfo.UserEmail); err != nil {
+	if err = s.packageSCIONLabVM(svmInfo.UserEmail); err != nil {
 		log.Printf("Error packaging SCIONLabVM: %v", err)
 		s.Error500(err, w, r)
 		return
@@ -143,20 +142,9 @@ func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http
 		return
 	}
 
-	jsonResponse := map[string]string{
-		"filename": fileName,
-		"message": "Your VM will be activated within a few minutes. " +
-			"You will receive an email confirmation as soon as the process is complete.",
-	}
-
-	b, err := json.Marshal(jsonResponse)
-	if err != nil {
-		log.Printf("Error during JSON Marshaling: %v", err)
-		s.Error500(err, w, r)
-		return
-	}
-	log.Printf(string(b))
-	fmt.Fprintln(w, string(b))
+	message := "Your VM will be activated within a few minutes. " +
+		"You will receive an email confirmation as soon as the process is complete."
+	fmt.Fprintln(w, message)
 }
 
 // Parses the necessary parameters from the URL: the user's email address and the public
@@ -373,23 +361,23 @@ func (s *SCIONLabVMController) generateLocalGen(svmInfo *SCIONLabVMInfo) error {
 
 // Packages the SCIONLab VM configuration as a tarball and returns the name of the
 // generated file.
-func (s *SCIONLabVMController) packageSCIONLabVM(userEmail string) (string, error) {
+func (s *SCIONLabVMController) packageSCIONLabVM(userEmail string) error {
 	log.Printf("Packaging SCIONLab VM")
 	userPackagePath := filepath.Join(PackagePath, userEmail)
 	vagrantDir, err := os.Open(vagrantPath)
 	if err != nil {
-		return "", fmt.Errorf("Failed to open directory. Path: %v, %v", vagrantPath, err)
+		return fmt.Errorf("Failed to open directory. Path: %v, %v", vagrantPath, err)
 	}
 	objects, err := vagrantDir.Readdir(-1)
 	if err != nil {
-		return "", fmt.Errorf("Failed to read directory contents. Path: %v, %v", vagrantPath, err)
+		return fmt.Errorf("Failed to read directory contents. Path: %v, %v", vagrantPath, err)
 	}
 	for _, obj := range objects {
 		src := filepath.Join(vagrantPath, obj.Name())
 		dst := filepath.Join(userPackagePath, obj.Name())
 		if !obj.IsDir() {
 			if err = CopyFile(src, dst); err != nil {
-				return "", fmt.Errorf("Failed to copy files. User: %v, src: %v, dst: %v, %v",
+				return fmt.Errorf("Failed to copy files. User: %v, src: %v, dst: %v, %v",
 					userEmail, src, dst, err)
 			}
 		}
@@ -397,9 +385,9 @@ func (s *SCIONLabVMController) packageSCIONLabVM(userEmail string) (string, erro
 	cmd := exec.Command("tar", "zcvf", userEmail+".tar.gz", userEmail)
 	cmd.Dir = PackagePath
 	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("Failed to create SCIONLabVM tarball. User: %v, %v", userEmail, err)
+		return fmt.Errorf("Failed to create SCIONLabVM tarball. User: %v, %v", userEmail, err)
 	}
-	return userEmail + ".tar.gz", nil
+	return nil
 }
 
 // Simple utility function to copy a file.
