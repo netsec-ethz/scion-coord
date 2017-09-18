@@ -32,6 +32,7 @@ import (
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/models"
 	"github.com/netsec-ethz/scion-coord/utility"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 // make sure that data about SCIONLab ASes in database is correct
@@ -210,7 +211,19 @@ func main() {
 	static := http.StripPrefix("/public/", http.FileServer(http.Dir("public")))
 	router.PathPrefix("/public/").Handler(xsrfChain.Then(static))
 
-	// listen to HTTP requests
-	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", config.HTTP_BIND_ADDRESS,
-		config.HTTP_BIND_PORT), handlers.CompressHandler(router)))
+	// serve website using https or standard http
+	if config.HTTP_ENABLE_HTTPS {
+		// redirect HTTP traffic to HTTPS
+		go http.ListenAndServe(":80", http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, "https://"+r.Host+r.URL.String(), http.StatusMovedPermanently)
+			}))
+
+		// listen to HTTP requests
+		log.Fatal(http.Serve(autocert.NewListener(
+			config.HTTP_HOST_ADDRESS), handlers.CompressHandler(router)))
+	} else {
+		log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d",
+			config.HTTP_BIND_ADDRESS, config.HTTP_BIND_PORT), handlers.CompressHandler(router)))
+	}
 }
