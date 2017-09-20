@@ -64,7 +64,7 @@ func main() {
 	// rate limitation
 	resendLimit := tollbooth.NewLimiter(1, time.Minute*10,
 		&limiter.ExpirableOptions{DefaultExpirationTTL: time.Hour})
-	resendLimit.SetRejectFunc(func() {
+	resendLimit.SetOnLimitReached(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("A request to '/api/resendLink' was blocked due to rate limitation")
 	})
 	resendLimit.SetMessage("You can request an email every 10 minutes")
