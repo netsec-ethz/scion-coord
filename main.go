@@ -62,8 +62,11 @@ func main() {
 	scionLabVMController := api.SCIONLabVMController{}
 
 	// rate limitation
-	resendLimit := tollbooth.NewLimiter(1, time.Minute*10, &limiter.ExpirableOptions{DefaultExpirationTTL: time.Hour})
-	resendLimit.SetRejectFunc(func() { log.Printf("A request to '/api/resendLink' was blocked due to rate limitation") })
+	resendLimit := tollbooth.NewLimiter(1, time.Minute*10,
+		&limiter.ExpirableOptions{DefaultExpirationTTL: time.Hour})
+	resendLimit.SetRejectFunc(func() {
+		log.Printf("A request to '/api/resendLink' was blocked due to rate limitation")
+	})
 	resendLimit.SetMessage("You can request an email every 10 minutes")
 
 	// router
@@ -74,8 +77,8 @@ func main() {
 	// public chain does not require authentication but serves back the XSRF Token
 	xsrfChain := middleware.New(middleware.LoggingHandler, middleware.XSRFHandler)
 
-	// Api chain goes through the authentication handler, which verifies either the session or the account_id.secret
-	// combination
+	// Api chain goes through the authentication handler, which verifies either the session
+	//or the account_id.secret combination
 	apiChain := middleware.New(middleware.LoggingHandler, middleware.AuthHandler)
 
 	// 404 on favicon requests
@@ -88,14 +91,21 @@ func main() {
 	// SCION Coord API
 
 	// user registration
-	router.Handle("/api/register", loggingChain.ThenFunc(registrationController.Register)).Methods("POST")
-	router.Handle("/api/captchaSiteKey", loggingChain.ThenFunc(registrationController.LoadCaptchaSiteKey))
+	router.Handle("/api/register", loggingChain.ThenFunc(
+		registrationController.Register)).Methods("POST")
+	router.Handle("/api/captchaSiteKey", loggingChain.ThenFunc(
+		registrationController.LoadCaptchaSiteKey))
+
 	// Resend verification email
-	router.Handle("/api/resendLink", tollbooth.LimitHandler(resendLimit, loggingChain.ThenFunc(registrationController.ResendActivationLink))).Methods("POST")
+	router.Handle("/api/resendLink", tollbooth.LimitHandler(resendLimit, loggingChain.ThenFunc(
+		registrationController.ResendActivationLink))).Methods("POST")
+
 	// user login
 	router.Handle("/api/login", loggingChain.ThenFunc(loginController.Login))
+
 	// user Logout
 	router.Handle("/api/logout", loggingChain.ThenFunc(loginController.Logout))
+
 	// user information
 	router.Handle("/api/me", apiChain.ThenFunc(loginController.Me))
 
@@ -115,19 +125,26 @@ func main() {
 	// ==========================================================
 	// SCION Web API
 
-	router.Handle("/api/as/exists/{as_id}/{account_id}/{secret}", apiChain.ThenFunc(asController.Exists))
+	router.Handle("/api/as/exists/{as_id}/{account_id}/{secret}", apiChain.ThenFunc(
+		asController.Exists))
 
 	// ISD join request
-	router.Handle("/api/as/uploadJoinRequest/{account_id}/{secret}", apiChain.ThenFunc(asController.UploadJoinRequest))
-	router.Handle("/api/as/uploadJoinReply/{account_id}/{secret}", apiChain.ThenFunc(asController.UploadJoinReply))
-	router.Handle("/api/as/pollJoinReply/{account_id}/{secret}", apiChain.ThenFunc(asController.PollJoinReply))
+	router.Handle("/api/as/uploadJoinRequest/{account_id}/{secret}", apiChain.ThenFunc(
+		asController.UploadJoinRequest))
+	router.Handle("/api/as/uploadJoinReply/{account_id}/{secret}", apiChain.ThenFunc(
+		asController.UploadJoinReply))
+	router.Handle("/api/as/pollJoinReply/{account_id}/{secret}", apiChain.ThenFunc(
+		asController.PollJoinReply))
 
 	// AS connection request
-	router.Handle("/api/as/uploadConnRequest/{account_id}/{secret}", apiChain.ThenFunc(asController.UploadConnRequest))
-	router.Handle("/api/as/uploadConnReply/{account_id}/{secret}", apiChain.ThenFunc(asController.UploadConnReply))
+	router.Handle("/api/as/uploadConnRequest/{account_id}/{secret}", apiChain.ThenFunc(
+		asController.UploadConnRequest))
+	router.Handle("/api/as/uploadConnReply/{account_id}/{secret}", apiChain.ThenFunc(
+		asController.UploadConnReply))
 
 	// show all request TO this AS
-	router.Handle("/api/as/pollEvents/{account_id}/{secret}", apiChain.ThenFunc(asController.PollEvents))
+	router.Handle("/api/as/pollEvents/{account_id}/{secret}", apiChain.ThenFunc(
+		asController.PollEvents))
 
 	// list the ASes the requesting AS can connect to
 	router.Handle("/api/as/listASes/{account_id}/{secret}", apiChain.ThenFunc(asController.ListASes))
@@ -137,5 +154,6 @@ func main() {
 	router.PathPrefix("/public/").Handler(xsrfChain.Then(static))
 
 	// listen to HTTP requests
-	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", config.HTTP_BIND_ADDRESS, config.HTTP_BIND_PORT), handlers.CompressHandler(router)))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(
+		"%s:%d", config.HTTP_BIND_ADDRESS, config.HTTP_BIND_PORT), handlers.CompressHandler(router)))
 }

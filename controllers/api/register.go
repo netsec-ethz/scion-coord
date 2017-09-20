@@ -168,7 +168,7 @@ func (c *RegistrationController) ResendActivationLink(w http.ResponseWriter, r *
 
 	user, err := models.FindUserByEmail(r.PostFormValue("email"))
 	if err != nil {
-		c.Error500(err, w, r)
+		c.Error500(fmt.Errorf("User %v was not found", r.PostFormValue("email")), w, r)
 		return
 	}
 
@@ -177,9 +177,9 @@ func (c *RegistrationController) ResendActivationLink(w http.ResponseWriter, r *
 		return
 	}
 
-	if err := sendMail(user.Id); err != nil {
+	if err := sendVerificationEmail(user.Id); err != nil {
 		log.Printf("Error sending verification email: %v", err)
-		c.Error500(err, w, r)
+		c.Error500(fmt.Errorf("Error sending verification email: %v", err), w, r)
 		return
 	}
 
