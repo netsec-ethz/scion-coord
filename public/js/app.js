@@ -21,6 +21,10 @@ const scionApp = angular.module('scionApp', [
             templateUrl: '/public/partials/user.html',
             controller: 'userCtrl'
         })
+        .when('/resend', {
+            templateUrl: '/public/partials/resend.html',
+            controller: 'resendCtrl'
+          })
         .otherwise({
             redirectTo: '/login'
         });
