@@ -21,6 +21,30 @@
 			"revisionTime": "2017-07-11T18:34:51Z"
 		},
 		{
+			"checksumSHA1": "LWSc/x0uRpsG/Q5yi6X6tkx1QQA=",
+			"path": "github.com/didip/tollbooth",
+			"revision": "8a5832d289e4375d2fc658ed42ef08975b66dceb",
+			"revisionTime": "2017-09-14T16:02:52Z"
+		},
+		{
+			"checksumSHA1": "TH1jNcNejXHDDjQge0Bpq4lrzFY=",
+			"path": "github.com/didip/tollbooth/errors",
+			"revision": "8a5832d289e4375d2fc658ed42ef08975b66dceb",
+			"revisionTime": "2017-09-14T16:02:52Z"
+		},
+		{
+			"checksumSHA1": "5NOpkqOsSjGd53RZGLg8ghkeeMc=",
+			"path": "github.com/didip/tollbooth/libstring",
+			"revision": "8a5832d289e4375d2fc658ed42ef08975b66dceb",
+			"revisionTime": "2017-09-14T16:02:52Z"
+		},
+		{
+			"checksumSHA1": "bPm9P3nXAmXmjXXKq7DnNEPzhyQ=",
+			"path": "github.com/didip/tollbooth/limiter",
+			"revision": "8a5832d289e4375d2fc658ed42ef08975b66dceb",
+			"revisionTime": "2017-09-14T16:02:52Z"
+		},
+		{
 			"checksumSHA1": "i3UtE7/Cn57eX1hO5Z0CqY/Eeb4=",
 			"path": "github.com/go-sql-driver/mysql",
 			"revision": "3955978caca48c1658a4bb7a9c6a0f084e326af3",
@@ -117,6 +141,12 @@
 			"revisionTime": "2017-08-02T12:00:39Z"
 		},
 		{
+			"checksumSHA1": "JVGDxPn66bpe6xEiexs1r+y6jF0=",
+			"path": "github.com/patrickmn/go-cache",
+			"revision": "a3647f8e31d79543b2d0f0ae2fe5c379d72cedc0",
+			"revisionTime": "2017-07-22T04:01:10Z"
+		},
+		{
 			"checksumSHA1": "Se195FlZ160eaEk/uVx4KdTPSxU=",
 			"path": "github.com/pborman/uuid",
 			"revision": "e790cca94e6cc75c7064b1332e63811d4aae1a53",
@@ -159,10 +189,22 @@
 			"revisionTime": "2017-07-23T04:49:35Z"
 		},
 		{
+			"checksumSHA1": "dr5+PfIRzXeN+l1VG+s0lea9qz8=",
+			"path": "golang.org/x/net/context",
+			"revision": "b60f3a92103dfd93dfcb900ec77c6d0643510868",
+			"revisionTime": "2017-09-18T06:10:02Z"
+		},
+		{
 			"checksumSHA1": "e/1sucokv1jK2HvWMMQMZd1QEeU=",
 			"path": "golang.org/x/sys/unix",
 			"revision": "47bdb838cce8879fca08207206a5dfde2f2538bc",
 			"revisionTime": "2017-08-08T10:31:41Z"
+		},
+		{
+			"checksumSHA1": "vGfePfr0+weQUeTM/71mu+LCFuE=",
+			"path": "golang.org/x/time/rate",
+			"revision": "8be79e1e0910c292df4e79c241bb7e8f7e725959",
+			"revisionTime": "2017-04-24T23:28:54Z"
 		}
 	],
 	"rootPath": "github.com/netsec-ethz/scion-coord"

@@ -164,6 +164,29 @@ func (c *RegistrationController) LoadCaptchaSiteKey(w http.ResponseWriter, r *ht
 	c.Plain(config.CAPTCHA_SITE_KEY, w, r)
 }
 
+func (c *RegistrationController) ResendActivationLink(w http.ResponseWriter, r *http.Request) {
+
+	user, err := models.FindUserByEmail(r.PostFormValue("email"))
+	if err != nil {
+		c.Error500(fmt.Errorf("User %v was not found", r.PostFormValue("email")), w, r)
+		return
+	}
+
+	if user.Verified {
+		c.Error500(fmt.Errorf("User %v is already verified", user.Email), w, r)
+		return
+	}
+
+	if err := sendVerificationEmail(user.Id); err != nil {
+		log.Printf("Error sending verification email: %v", err)
+		c.Error500(fmt.Errorf("Error sending verification email: %v", err), w, r)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // Function which sends verification emails to newly registered users
 func sendVerificationEmail(userID uint64) error {
 
