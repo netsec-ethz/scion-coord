@@ -15,13 +15,12 @@
 package models
 
 type SCIONLabServer struct {
-	Id                  uint64 `orm:"column(id);auto;pk"`
-	IA                  string `orm:"unique"` // ISD-AS in which the server is located
-	IP                  string // IP address of the machine
-	LastAssignedPort    int    // the last given out port number
-	VPNIP               string // IP address of the machine inside the VPN
-	VPNLastAssignedIP   string // the last given out IP address for the VPN
-	VPNLastAssignedPort int    // the last given out port number inside the VPN
+	Id                uint64 `orm:"column(id);auto;pk"`
+	IA                string `orm:"unique"` // ISD-AS in which the server is located
+	IP                string // IP address of the machine
+	LastAssignedPort  int    // the last given out port number
+	VPNIP             string // IP address of the machine inside the VPN
+	VPNLastAssignedIP string // the last given out IP address for the VPN
 }
 
 func (sls *SCIONLabServer) Insert() error {
@@ -45,11 +44,11 @@ type SCIONLabVM struct {
 	UserEmail    string `orm:"unique"`        // Email address of the Owning user
 	IP           string `orm:"unique"`        // IP address of the SCIONLab VM
 	IA           *As    `orm:"rel(fk);index"` // The AS belonging to the VM
-	IsVPN        bool                         // is this VM connected via the VPN
-	RemoteIA     string                       // the SCIONLab AS it connects to
-	RemoteIAPort int                          // port number of the remote SCIONLab AS being connected to
-	RemoteBR     string                       // the name of the remote border router for this AS
-	Status       uint8  `orm:"default(0)"`    // Status of the VM (i.e Active, Create, Update, Remove)
+	IsVPN        bool   // is this VM connected via the VPN
+	RemoteIA     string // the SCIONLab AS it connects to
+	RemoteIAPort int    // port number of the remote SCIONLab AS being connected to
+	RemoteBR     string // the name of the remote border router for this AS
+	Status       uint8  `orm:"default(0)"` // Status of the VM (i.e Active, Create, Update, Remove)
 }
 
 func FindSCIONLabVMByUserEmail(email string) (*SCIONLabVM, error) {

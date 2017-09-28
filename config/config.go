@@ -53,5 +53,5 @@ var (
 	SERVER_VPN_IP            = goconf.AppConf.String("server.vpn.ip")
 	SERVER_VPN_START_IP      = goconf.AppConf.String("server.vpn.start_ip")
 	SERVER_VPN_END_IP        = goconf.AppConf.String("server.vpn.end_ip")
-	SERVER_VPN_START_PORT, _ = goconf.AppConf.Int("server.vpn.start_port")
+	VM_LOCAL_IP              = "10.0.2.15" // Local IP address in VM
 )
