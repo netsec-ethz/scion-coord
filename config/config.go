@@ -48,10 +48,13 @@ var (
 	DB_MAX_CONNECTIONS, _    = goconf.AppConf.Int("db.max_connections")
 	DB_MAX_IDLE, _           = goconf.AppConf.Int("db.max_idle")
 	SERVER_IA                = goconf.AppConf.String("server.ia")
+	SERVER_AS_ID_BASE        = goconf.AppConf.DefaultInt("server.as_id_base", 1000)
 	SERVER_IP                = goconf.AppConf.String("server.ip")
 	SERVER_START_PORT, _     = goconf.AppConf.Int("server.start_port")
 	SERVER_VPN_IP            = goconf.AppConf.String("server.vpn.ip")
 	SERVER_VPN_START_IP      = goconf.AppConf.String("server.vpn.start_ip")
 	SERVER_VPN_END_IP        = goconf.AppConf.String("server.vpn.end_ip")
 	SERVER_VPN_START_PORT, _ = goconf.AppConf.Int("server.vpn.start_port")
+	VAGRANT_LOCAL_ADDR       = "10.0.2.15"
+	LOCALHOST_ADDR           = "127.0.0.1"
 )

@@ -8,9 +8,13 @@
   <p><strong>AccountId:</strong> {{user.AccountID}}</p>
   <p><strong>Secret:</strong> {{user.Secret}}</p>
   <div class="alert alert-info">
-    <p>{{vmInfo.VMText}} <span
-        ng-if="vmInfo.ShowIP">Your registered IP address is <strong>{{vmInfo.VMIP}}</strong>.</span>
-      <span ng-if="vmInfo.ShowVPN">You have chosen a <strong>VPN-based</strong> setup.</span>
+    <p>{{vmInfo.VMText}}
+      <span ng-if="vmInfo.ShowIP">
+        Your registered IP address is <strong>{{vmInfo.VMIP}}</strong>.
+      </span>
+      <span ng-if="vmInfo.ShowVPN">
+        You have chosen a <strong>VPN-based</strong> setup.
+      </span>
     </p>
   </div>
   <div style="color:red">
@@ -21,19 +25,29 @@
     <p>If you have a static public IP address and can receive traffic at port 50000, the border
       router listens on the public IP address. Otherwise, a vpn-based setup is set up for you,
       such that you do not need to apply any further configuration.</p>
+    <p>If you already have a local installation of SCION, you can also choose to only download
+      the gen folder. In that case, no virtual machine will be generated and you can use your
+      local SCION installation.</p>
   </div>
   <br/>
 
   <form name="scionLabVMForm">
     <div class="form-group has-feedback">
-      <label class="btn btn-block btn-primary" ng-disabled="buttonConfig.Update.Disable"
-             data-toggle="tooltip"
-             title="{{buttonConfig.Update.Disable ? buttonConfig.Update.TooltipDisabled :
-             'If you do not have a static public IP address, a vpn-based setup will be ' +
-             'configured for you.'}}">
-        <input type="checkbox" ng-model="user.isNotVPN" name="isNotVPN"
-               ng-disabled="buttonConfig.Update.Disable">
-        My host has a static public IP address and can receive traffic at port 50000.</label>
+      <div class="btn-group-vertical btn-block">
+        <label class="btn btn-primary" ng-disabled="buttonConfig.Update.Disable"
+               data-toggle="tooltip" title="{{buttonConfig.Update.Disable ?
+               buttonConfig.Update.TooltipDisabled : 'If you do not have a static public IP ' +
+               'address, a vpn-based setup will be configured for you.'}}">
+          <input type="checkbox" ng-model="user.isNotVPN" name="isNotVPN"
+                 ng-disabled="buttonConfig.Update.Disable">
+          My host has a static public IP address and can receive traffic at port 50000.
+        </label>
+        <label class="btn btn-default" ng-if="user.isNotVPN" data-toggle="tooltip"
+               title="If in doubt, do not choose this option.">
+          <input type="checkbox" ng-model="user.isPureGen" name="isPureGen">
+          I have a local installation of SCION and only want to download the gen folder.
+        </label>
+      </div>
 
       <input type="text" class="form-control" ng-model="user.scionLabVMIP" name="scionLabVMIP"
              placeholder="My host's public IP address" ng-if="user.isNotVPN"
@@ -42,7 +56,7 @@
     </div>
     <div class="row">
       <div class="col-xs-12">
-        <div id="buttongroup" ng-class="{true:'btn-group-vertical btn-block',
+        <div ng-class="{true:'btn-group-vertical btn-block',
         false:'btn-group btn-group-justified'}[isSmall]">
           <!--<div ng-repeat="button in buttonConfig">-->
           <div ng-repeat="button in buttonConfig" class="btn-group" role="group"
