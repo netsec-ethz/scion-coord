@@ -7,10 +7,10 @@ scionApp
 
             $scope.register = function (user) {
 
-                if (!$scope.user.captcha){
+                if (!$scope.user.captcha) {
                     $scope.error = "Please resolve the captcha before submitting.";
                     $scope.message = "";
-                } else if (!$scope.register.$valid){
+                } else if (!$scope.registration.$valid) {
                     $scope.error = "Please fill out the form correctly."
                 } else {
                     registerService.register(user).then(
@@ -18,6 +18,7 @@ scionApp
                             $scope.message = "Registration completed successfully. We sent you an email to your inbox with a link to verify your account.";
                             $scope.error = "";
                             $scope.user = {};
+                            $scope.registration.$setPristine();
                             vcRecaptchaService.reload();
                         },
                         function (response) {
