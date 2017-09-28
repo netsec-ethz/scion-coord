@@ -38,15 +38,17 @@ import (
 // TODO (mlegner): remove deprecated servers?
 func initializeSLS() error {
 	sls, err := models.FindSCIONLabServer(config.SERVER_IA)
+	vpnLastAssignedIPStart := utility.IPIncrement(config.SERVER_VPN_START_IP, -1)
+	lastAssignedPortStart := config.SERVER_START_PORT - 1
+
 	if err != nil {
 		if err == orm.ErrNoRows { // Server does not exist
 			newSLS := models.SCIONLabServer{
-				IA:                  config.SERVER_IA,
-				IP:                  config.SERVER_IP,
-				LastAssignedPort:    config.SERVER_START_PORT,
-				VPNIP:               config.SERVER_VPN_IP,
-				VPNLastAssignedIP:   config.SERVER_VPN_START_IP,
-				VPNLastAssignedPort: config.SERVER_VPN_START_PORT,
+				IA:                config.SERVER_IA,
+				IP:                config.SERVER_IP,
+				LastAssignedPort:  lastAssignedPortStart,
+				VPNIP:             config.SERVER_VPN_IP,
+				VPNLastAssignedIP: vpnLastAssignedIPStart,
 			}
 			fmt.Println("Inserting SCIONLab AS configuration into database.")
 			if err := newSLS.Insert(); err != nil {
@@ -59,15 +61,12 @@ func initializeSLS() error {
 	} else { // Server exists and needs to be updated
 		sls.IP = config.SERVER_IP
 		sls.VPNIP = config.SERVER_VPN_IP
-		if sls.LastAssignedPort < config.SERVER_START_PORT {
-			sls.LastAssignedPort = config.SERVER_START_PORT
+		if sls.LastAssignedPort < lastAssignedPortStart {
+			sls.LastAssignedPort = lastAssignedPortStart - 1
 		}
 		if sls.VPNLastAssignedIP == "" || utility.IPCompare(sls.VPNLastAssignedIP,
-			config.SERVER_VPN_START_IP) == -1 {
-			sls.VPNLastAssignedIP = config.SERVER_VPN_START_IP
-		}
-		if sls.VPNLastAssignedPort < config.SERVER_VPN_START_PORT {
-			sls.VPNLastAssignedPort = config.SERVER_VPN_START_PORT
+			vpnLastAssignedIPStart) == -1 {
+			sls.VPNLastAssignedIP = vpnLastAssignedIPStart
 		}
 
 		fmt.Printf("Updating SCIONLab AS configuration in database: %v", sls)

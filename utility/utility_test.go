@@ -30,7 +30,7 @@ type ipConvertTest struct {
 type ipIncrementTest struct {
 	ip1 string
 	ip2 string
-	inc uint32
+	inc int32
 }
 
 func TestIPFunctions(t *testing.T) {
