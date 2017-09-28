@@ -21,6 +21,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/astaxie/beego/orm"
 	"github.com/didip/tollbooth"
 	"github.com/didip/tollbooth/limiter"
 	"github.com/gorilla/handlers"
@@ -29,10 +30,58 @@ import (
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/controllers/api"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
+	"github.com/netsec-ethz/scion-coord/models"
+	"github.com/netsec-ethz/scion-coord/utility"
 )
 
+// make sure that data about SCIONLab ASes in database is correct
+// TODO (mlegner): remove deprecated servers?
+func initializeSLS() error {
+	sls, err := models.FindSCIONLabServer(config.SERVER_IA)
+	if err != nil {
+		if err == orm.ErrNoRows { // Server does not exist
+			newSLS := models.SCIONLabServer{
+				IA:                  config.SERVER_IA,
+				IP:                  config.SERVER_IP,
+				LastAssignedPort:    config.SERVER_START_PORT,
+				VPNIP:               config.SERVER_VPN_IP,
+				VPNLastAssignedIP:   config.SERVER_VPN_START_IP,
+				VPNLastAssignedPort: config.SERVER_VPN_START_PORT,
+			}
+			fmt.Println("Inserting SCIONLab AS configuration into database.")
+			if err := newSLS.Insert(); err != nil {
+				return fmt.Errorf("ERROR: Cannot insert SCIONLab AS configuration into database:"+
+					" %v", err)
+			}
+		} else {
+			return fmt.Errorf("ERROR: Cannot get SCIONLab AS configuration from database: %v", err)
+		}
+	} else { // Server exists and needs to be updated
+		sls.IP = config.SERVER_IP
+		sls.VPNIP = config.SERVER_VPN_IP
+		if sls.LastAssignedPort < config.SERVER_START_PORT {
+			sls.LastAssignedPort = config.SERVER_START_PORT
+		}
+		if sls.VPNLastAssignedIP == "" || utility.IPCompare(sls.VPNLastAssignedIP,
+			config.SERVER_VPN_START_IP) == -1 {
+			sls.VPNLastAssignedIP = config.SERVER_VPN_START_IP
+		}
+		if sls.VPNLastAssignedPort < config.SERVER_VPN_START_PORT {
+			sls.VPNLastAssignedPort = config.SERVER_VPN_START_PORT
+		}
+
+		fmt.Printf("Updating SCIONLab AS configuration in database: %v", sls)
+		if err := sls.Update(); err != nil {
+			return fmt.Errorf("ERROR: Cannot update SCIONLab AS configuration in database: %v",
+				err)
+		}
+	}
+
+	return nil
+}
+
+// check if credential files exist and create necessary directories
 func checkCredentials() bool {
-	// check if credential files exist and create necessary directories
 	for _, f := range []string{api.TrcFile, api.CoreCertFile, api.CoreSigKey} {
 		if _, err := os.Stat(f); err != nil {
 			if os.IsNotExist(err) {
@@ -50,6 +99,11 @@ func checkCredentials() bool {
 }
 
 func main() {
+	// update database of SCIONLab ASes
+	if err := initializeSLS(); err != nil {
+		fmt.Printf("There was an error updating the server database: %v", err)
+		return
+	}
 
 	if !checkCredentials() {
 		return
@@ -78,8 +132,8 @@ func main() {
 	// public chain does not require authentication but serves back the XSRF Token
 	xsrfChain := middleware.New(middleware.LoggingHandler, middleware.XSRFHandler)
 
-	// Api chain goes through the authentication handler, which verifies either the session
-	//or the account_id.secret combination
+	// Api chain goes through the authentication handler, which verifies either the session or the
+	// account_id.secret combination
 	apiChain := middleware.New(middleware.LoggingHandler, middleware.AuthHandler)
 
 	// 404 on favicon requests
@@ -111,7 +165,8 @@ func main() {
 	router.Handle("/api/me", apiChain.ThenFunc(loginController.Me))
 
 	//email validation
-	router.Handle("/api/verifyEmail/{uuid}", loggingChain.ThenFunc(registrationController.VerifyEmail))
+	router.Handle("/api/verifyEmail/{uuid}", loggingChain.ThenFunc(
+		registrationController.VerifyEmail))
 
 	// generates a SCIONLab VM
 	// TODO(ercanucan): fix the authentication
@@ -148,13 +203,14 @@ func main() {
 		asController.PollEvents))
 
 	// list the ASes the requesting AS can connect to
-	router.Handle("/api/as/listASes/{account_id}/{secret}", apiChain.ThenFunc(asController.ListASes))
+	router.Handle("/api/as/listASes/{account_id}/{secret}", apiChain.ThenFunc(
+		asController.ListASes))
 
 	// serve static files
 	static := http.StripPrefix("/public/", http.FileServer(http.Dir("public")))
 	router.PathPrefix("/public/").Handler(xsrfChain.Then(static))
 
 	// listen to HTTP requests
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(
-		"%s:%d", config.HTTP_BIND_ADDRESS, config.HTTP_BIND_PORT), handlers.CompressHandler(router)))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", config.HTTP_BIND_ADDRESS,
+		config.HTTP_BIND_PORT), handlers.CompressHandler(router)))
 }

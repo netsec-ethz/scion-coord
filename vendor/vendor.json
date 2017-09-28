@@ -129,16 +129,16 @@
 			"revisionTime": "2017-03-22T23:44:13Z"
 		},
 		{
-			"checksumSHA1": "LGalz9Q5YY7z6K08NoQ7emxdYgU=",
+			"checksumSHA1": "dCGjjrVZJoiKUQmaICLhV2PdV40=",
 			"path": "github.com/netsec-ethz/scion/go/lib/addr",
-			"revision": "526daf7a7eeb0f3b1450cea58af7d7cbdd92c5db",
-			"revisionTime": "2017-08-02T12:00:39Z"
+			"revision": "f5066acf929241869b3b614de506d02c27c3b6b1",
+			"revisionTime": "2017-09-27T15:21:54Z"
 		},
 		{
-			"checksumSHA1": "orYxiFhlA/0AkS+Dt9KnR9xxNKs=",
+			"checksumSHA1": "xfkgazGxUH3P9yYobXakYXEgDSA=",
 			"path": "github.com/netsec-ethz/scion/go/lib/common",
-			"revision": "526daf7a7eeb0f3b1450cea58af7d7cbdd92c5db",
-			"revisionTime": "2017-08-02T12:00:39Z"
+			"revision": "f5066acf929241869b3b614de506d02c27c3b6b1",
+			"revisionTime": "2017-09-27T15:21:54Z"
 		},
 		{
 			"checksumSHA1": "JVGDxPn66bpe6xEiexs1r+y6jF0=",

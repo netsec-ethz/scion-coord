@@ -28,6 +28,7 @@ type vmInfo struct {
 	VMText   string
 	VMIP     string
 	ShowIP   bool
+	ShowVPN  bool
 }
 
 type buttonConfiguration struct {
@@ -105,7 +106,11 @@ func populateVMStatusButtons(userEmail string) (vmInfo, uiButtons, error) {
 		buttons.Download.Disable = true
 	}
 	if vmInfo.VMStatus == ACTIVE || vmInfo.VMStatus == CREATE || vmInfo.VMStatus == UPDATE {
-		vmInfo.ShowIP = true
+		if vm.IsVPN {
+			vmInfo.ShowVPN = true
+		} else {
+			vmInfo.ShowIP = true
+		}
 	}
 
 	return vmInfo, buttons, nil
