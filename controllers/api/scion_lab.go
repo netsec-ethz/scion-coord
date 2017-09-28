@@ -37,7 +37,6 @@ import (
 	"github.com/netsec-ethz/scion-coord/models"
 	"github.com/netsec-ethz/scion-coord/utility"
 	"github.com/netsec-ethz/scion/go/lib/addr"
-	"github.com/netsec-ethz/scion/go/lib/common"
 )
 
 var (
@@ -203,7 +202,6 @@ func (s *SCIONLabVMController) canCreateOrUpdate(userEmail string) (bool, error)
 }
 
 // Next unassigned VPN IP
-// TODO (mlegner): Check if incrementing by 1 is enough
 func getNextVPNIP(lastAssignedIP string) (string, error) {
 	if utility.IPCompare(lastAssignedIP, config.SERVER_VPN_END_IP) == -1 {
 		return utility.IPIncrement(lastAssignedIP, 1), nil
@@ -237,8 +235,8 @@ func (s *SCIONLabVMController) getSCIONLabVMInfo(scionLabVMIP, userEmail, target
 	log.Printf("AS ID given of the user %v: %v", userEmail, asID)
 
 	ia, err := addr.IAFromString(targetIA)
-	if e := err.(*common.CError); e != nil {
-		return nil, *e
+	if err != nil {
+		return nil, err
 	}
 
 	scionLabServer, err := models.FindSCIONLabServer(targetIA)
@@ -256,29 +254,21 @@ func (s *SCIONLabVMController) getSCIONLabVMInfo(scionLabVMIP, userEmail, target
 		remoteIP = scionLabServer.VPNIP
 		log.Printf("new VPN IP to be assigned to user %v: %v", userEmail, ip)
 		vpnIP = scionLabServer.IP
-
-		if newUser {
-			remotePort = scionLabServer.VPNLastAssignedPort + 1
-			log.Printf("new VPN Port to be assigned to user %v: %v", userEmail, remotePort)
-			scionLabServer.LastAssignedPort = remotePort
-		}
-		if err := scionLabServer.Update(); err != nil {
-			return nil, fmt.Errorf("Error Updating SCIONLabServerTable for SCIONLab AS: %v : %v",
-				targetIA, err)
-		}
 	} else {
 		ip = scionLabVMIP
 		log.Printf("scionLabServerIP = %v", scionLabServer.IP)
 		remoteIP = scionLabServer.IP
+	}
 
-		if newUser {
-			remotePort = scionLabServer.LastAssignedPort + 1
-			log.Printf("newPort to be assigned = %v", remotePort)
-			scionLabServer.LastAssignedPort = remotePort
-			if err := scionLabServer.Update(); err != nil {
-				return nil, fmt.Errorf("Error Updating SCIONLabServerTable for SCIONLab AS %v: %v",
-					targetIA, err)
-			}
+	if newUser {
+		remotePort = scionLabServer.LastAssignedPort + 1
+		log.Printf("new port to be assigned to user %v: %v", userEmail, remotePort)
+		scionLabServer.LastAssignedPort = remotePort
+	}
+	if newUser || isVPN {
+		if err := scionLabServer.Update(); err != nil {
+			return nil, fmt.Errorf("Error Updating SCIONLabServerTable for SCIONLab AS %v: %v",
+				targetIA, err)
 		}
 	}
 
@@ -383,9 +373,17 @@ func (s *SCIONLabVMController) generateTopologyFile(svmInfo *SCIONLabVMInfo) err
 		return fmt.Errorf("Error creating topology file config. User: %v, %v", svmInfo.UserEmail,
 			err)
 	}
+	var bindIP string
+	if svmInfo.IsVPN {
+		bindIP = svmInfo.IP
+	} else {
+		bindIP = config.VM_LOCAL_IP
+	}
+
 	// Topo file parameters
 	data := map[string]string{
 		"IP":           svmInfo.IP,
+		"BIND_IP":      bindIP,
 		"ISD_ID":       strconv.Itoa(svmInfo.ISD_ID),
 		"AS_ID":        strconv.Itoa(svmInfo.AS_ID),
 		"TARGET_ISDAS": svmInfo.RemoteIA,
@@ -481,9 +479,10 @@ type SCIONLabVM struct {
 //        {"Create":[],
 //         "Remove":[],
 //         "Update":[{"ASID":"1-1020",
+//                    "IsVPN":true,
 //                    "RemoteIAPort":50053,
 //                    "UserEmail":"user@example.com",
-//                    "VMIP":"203.0.113.0",
+//                    "VMIP":"10.0.8.42",
 //                    "RemoteBR":"br1-5-5"}]
 //        }
 // }

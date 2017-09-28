@@ -53,8 +53,14 @@ func IntToIP(ipInt uint32) string {
 		byte(ipInt>>24), byte(ipInt>>16), byte(ipInt>>8), byte(ipInt))
 }
 
-func IPIncrement(ip string, diff uint32) string {
-	return IntToIP(IPToInt(ip) + diff)
+func IPIncrement(ip string, diff int32) string {
+	temp := IPToInt(ip)
+	if diff > 0 {
+		temp += uint32(diff)
+	} else {
+		temp -= uint32(-diff)
+	}
+	return IntToIP(temp)
 }
 
 // returns -1, if ip1 < ip2, 0, if ip1 == ip2, +1, if ip1 > ip2
