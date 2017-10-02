@@ -123,8 +123,8 @@ func (c *LoginController) Me(w http.ResponseWriter, r *http.Request) {
 	_, userSession, err := middleware.GetUserSession(r)
 
 	if err != nil || userSession == nil {
-		log.Println(err)
-		http.Error(w, err.Error(), http.StatusForbidden)
+		log.Printf("Error authenticating user: Not logged in")
+		http.Error(w, "Error authenticating user: Not logged in", http.StatusForbidden)
 		return
 	}
 
