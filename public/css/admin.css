@@ -3206,9 +3206,11 @@ table.text-center th {
   padding: 20px;
   border-top: 0;
   color: #666;
+  position: relative;
 }
 .login-box-body .form-control-feedback,
-.register-box-body .form-control-feedback {
+.register-box-body .form-control-feedback,
+.admin-box .form-control-feedback {
   color: #777;
 }
 .login-box-msg,

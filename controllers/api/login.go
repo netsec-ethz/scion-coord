@@ -40,6 +40,7 @@ type user struct {
 	Password     string
 	FirstName    string
 	LastName     string
+	IsAdmin      bool
 	Account      string
 	Organisation string
 	AccountID    string
@@ -130,6 +131,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 	// TODO: rotate the session
 	userSession.Email = dbUser.Email
 	userSession.HasLoggedIn = true
+	userSession.IsAdmin = dbUser.IsAdmin
 	userSession.First = dbUser.FirstName
 	userSession.Last = dbUser.LastName
 	userSession.Organisation = dbUser.Account.Organisation
@@ -137,6 +139,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 	// fill in the properties of the struct to return to the front end app
 	user.FirstName = dbUser.FirstName
 	user.LastName = dbUser.LastName
+	user.IsAdmin = dbUser.IsAdmin
 	user.Account = dbUser.Account.Name
 	user.Organisation = dbUser.Account.Organisation
 

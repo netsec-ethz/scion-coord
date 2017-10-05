@@ -21,48 +21,73 @@ import (
 	"net/http"
 )
 
-// TODO: distinguish between web interface user authentication and account_id/secret authentication
-// The latter does not need a session
-func AuthHandler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+type CheckFunction func(r *http.Request) bool
 
-		// auth the user via the session
-		_, userSession, _ := GetUserSession(r)
-		if userSession != nil && userSession.HasLoggedIn {
+var (
+	AuthHandler  = constructHandler(checkAPI)
+	UserHandler  = constructHandler(checkLogin)
+	AdminHandler = constructHandler(checkAdmin)
+)
+
+func checkAccountSecret(r *http.Request) bool {
+	vars := mux.Vars(r)
+	account_id := vars["account_id"]
+	secret := vars["secret"]
+	// In this case we are receiving a request with account_id and secret params
+	if account_id != "" && secret != "" {
+		if account, err := models.FindUserByAccountIdSecret(account_id, secret); err == nil && account != nil {
 			// proceed with the next handler
-			next.ServeHTTP(w, r)
-			return
+			return true
 		}
 
-		// try then with the account_id and secret
-		vars := mux.Vars(r)
-		account_id := vars["account_id"]
-		secret := vars["secret"]
-		// In this case we are receiving a request with account_id and secret params
-		if account_id != "" && secret != "" {
-			if account, err := models.FindUserByAccountIdSecret(account_id, secret); err == nil && account != nil {
+	}
+
+	// try with standard Golang parameters
+	account_id = r.URL.Query().Get("account_id")
+	secret = r.URL.Query().Get("secret")
+
+	if account_id != "" && secret != "" {
+		if account, err := models.FindUserByAccountIdSecret(account_id, secret); err == nil && account != nil {
+			// proceed with the next handler
+			return true
+		}
+	}
+	return false
+}
+
+func checkLogin(r *http.Request) bool {
+	_, userSession, _ := GetUserSession(r)
+	if userSession != nil && userSession.HasLoggedIn {
+		return true
+	}
+	return false
+}
+
+func checkAdmin(r *http.Request) bool {
+	_, userSession, _ := GetUserSession(r)
+	if userSession != nil && userSession.HasLoggedIn && userSession.IsAdmin {
+		return true
+	}
+	return false
+}
+
+func checkAPI(r *http.Request) bool {
+	return checkAccountSecret(r) || checkLogin(r)
+}
+
+func constructHandler(checkFunc CheckFunction) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+			if checkFunc(r) {
 				// proceed with the next handler
 				next.ServeHTTP(w, r)
 				return
-			}
-
-		}
-
-		// try with standard Golang parameters
-		account_id = r.URL.Query().Get("account_id")
-		secret = r.URL.Query().Get("secret")
-
-		if account_id != "" && secret != "" {
-			if account, err := models.FindUserByAccountIdSecret(account_id, secret); err == nil && account != nil {
-				// proceed with the next handler
-				next.ServeHTTP(w, r)
+			} else {
+				http.Error(w, "Not authorized", http.StatusForbidden)
 				return
 			}
-		}
 
-		// if we got here means that the XSRF token was not valid
-		http.Error(w, "Not authorized", http.StatusForbidden)
-		return
-
-	})
+		})
+	}
 }
