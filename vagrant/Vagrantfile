@@ -30,7 +30,7 @@ Vagrant.configure(2) do |config|
         echo "No OpenVPN configuration present; keeping standard setup."
     fi
   SCRIPT
-  config.vm.box = "ubuntu/xenial64"
+  config.vm.box = "scion/ubuntu-16.04-64-scion"
   # Port forwarding not necessary for OpenVPN setup...
   config.vm.network "forwarded_port", guest: 50000, host: 50000, protocol: "udp"
   config.vm.provider "virtualbox" do |vb|
