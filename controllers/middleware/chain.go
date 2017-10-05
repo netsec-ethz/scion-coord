@@ -38,6 +38,11 @@ func New(constructors ...Constructor) Chain {
 	return Chain{append(([]Constructor)(nil), constructors...)}
 }
 
+// Creates a new chain including a LoggingHandler as first Handler
+func NewWithLogging(constructors ...Constructor) Chain {
+	return Chain{append([]Constructor{LoggingHandler}, constructors...)}
+}
+
 // Then chains the middleware and returns the final http.Handler.
 //     New(m1, m2, m3).Then(h)
 // is equivalent to:

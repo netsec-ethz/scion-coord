@@ -2,55 +2,65 @@
 <html lang="en" ng-app="scionApp" class="no-js">
 
 <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>SCIONLab Coordination Service</title>
-    <meta name="description" content="">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel='icon' type='image/x-icon' href='/public/img/favicon.ico' />
-    <link rel="stylesheet" href="/public/css/style.css">
-    <link rel="stylesheet" href="/public/css/bootstrap.css">
-    <link rel="stylesheet" href="/public/css/admin.css">
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.5.0/css/font-awesome.min.css">
-    <script src="/public/js/angular.js"></script>
-    <script src="/public/js/angular-route.js"></script>
-    <script src="/public/js/app.js"></script>
-    <script src="/public/js/controllers/register.js"></script>
-    <script src="/public/js/controllers/login.js"></script>
-    <script src="/public/js/controllers/user.js"></script>
-    <script src="/public/js/controllers/header.js"></script>
-    <script src="/public/js/controllers/resend.js"></script>
-    <script src="/public/js/services/register.js"></script>
-    <script src="/public/js/services/login.js"></script>
-    <script src="/public/js/services/user.js"></script>
-    <script src="/public/js/services/resend.js"></script>
-    <script src="/public/js/angular-recaptcha.min.js"></script>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>SCIONLab Coordination Service</title>
+  <meta name="description" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel='icon' type='image/x-icon' href='/public/img/favicon.ico'/>
+  <link rel="stylesheet" href="/public/css/style.css">
+  <link rel="stylesheet" href="/public/css/bootstrap.css">
+  <link rel="stylesheet" href="/public/css/admin.css">
+  <!-- Font Awesome -->
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.5.0/css/font-awesome.min.css">
+  <script src="/public/js/angular.js"></script>
+  <script src="/public/js/angular-route.js"></script>
+  <script src="/public/js/app.js"></script>
+  <script src="/public/js/controllers/register.js"></script>
+  <script src="/public/js/controllers/login.js"></script>
+  <script src="/public/js/controllers/user.js"></script>
+  <script src="/public/js/controllers/admin.js"></script>
+  <script src="/public/js/controllers/header.js"></script>
+  <script src="/public/js/controllers/resend.js"></script>
+  <script src="/public/js/services/register.js"></script>
+  <script src="/public/js/services/login.js"></script>
+  <script src="/public/js/services/user.js"></script>
+  <script src="/public/js/services/admin.js"></script>
+  <script src="/public/js/services/resend.js"></script>
+  <script src="/public/js/angular-recaptcha.min.js"></script>
 </head>
 
 <body>
 
 <div class="container">
-    <div style="position: relative">
-        <div class="header clearfix" ng-controller="headerCtrl">
-         <nav>
-              <ul class="nav nav-pills pull-right">
-                 <li role="presentation" ng-if="!isActive('/user')" ng-class="{ active: isActive('/login') }"><a href="#/login">Login</a></li>
-                 <li role="presentation" ng-if="!isActive('/user')" ng-class="{ active: isActive('/register') }"><a href="#/register">Register</a></li>
-                 <li role="presentation" ng-if="isActive('/user')"><a target="_self" href="" ng-click="logout()">Logout</a></li>
-              </ul>
-         </nav>
-            <h3 class="text-muted">SCIONLab Coordination Service</h3>
-        </div>
-            <div ng-view></div>
-
-
-        <footer class="footer">
-           <p>&copy; SCIONLab 2017</p>
-        </footer>
-
-    </div>
+  <div class="header clearfix" ng-controller="headerCtrl">
+    <nav>
+      <ul class="nav nav-pills pull-right">
+        <li role="presentation" ng-if="isActive('/login') || isActive('/register')"
+            ng-class="{ active: isActive('/login') }"><a href="#/login">Login</a></li>
+        <li role="presentation" ng-if="isActive('/login') || isActive('/register')"
+            ng-class="{ active: isActive('/register') }"><a href="#/register">Register</a></li>
+        <li role="presentation" ng-if="user.IsAdmin && (isActive('/user') || isActive('/admin'))"
+            ng-class="{ active: isActive('/admin') }"><a href="#/admin">Admin</a></li>
+        <li role="presentation" ng-if="user.IsAdmin && (isActive('/user') || isActive('/admin'))"
+            ng-class="{ active: isActive('/user') }"><a href="#/user">User</a></li>
+        <li role="presentation" ng-if="isActive('/user') || isActive('/admin')">
+          <a target="_self" href="" ng-click="logout()">Logout</a></li>
+      </ul>
+    </nav>
+    <h3 class="text-muted">SCIONLab Coordination Service</h3>
+  </div>
+  <div ng-view></div>
 </div>
+
+<footer class="navbar navbar-fixed-bottom navbar-default">
+  <div class="container">
+    <div class="footer">
+      <p>&copy; SCIONLab 2017</p>
+    </div>
+  </div>
+</footer>
 
 </body>
 

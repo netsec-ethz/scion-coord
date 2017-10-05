@@ -1,4 +1,4 @@
-// Copyright 2016 ETH Zurich
+// Copyright 2017 ETH Zurich
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,28 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package models
+package api
 
 import (
-	"encoding/gob"
+	"log"
+	"net/http"
+
+	"github.com/netsec-ethz/scion-coord/controllers"
 )
 
-type Session struct {
-	UserId       uint64
-	Email        string
-	First        string
-	Last         string
-	Organisation string
-	XSRFToken    string
-	HasLoggedIn  bool
-	IsAdmin      bool
-	Error        string // errors to display while rendering the template
+type AdminController struct {
+	controllers.HTTPController
 }
 
-type M map[string]interface{}
+type adminPageData struct {
+	User user
+}
 
-func init() {
+func (c AdminController) AdminInformation(w http.ResponseWriter, r *http.Request) {
 
-	gob.Register(&Session{})
-	gob.Register(&M{})
+	user, err := populateUserData(w, r)
+	if err != nil {
+		log.Println(err)
+		c.Forbidden(err, w, r)
+		return
+	}
+
+	adminData := adminPageData{
+		User: user,
+	}
+
+	c.JSON(&adminData, w, r)
+	return
 }
