@@ -27,26 +27,7 @@ type AdminController struct {
 
 type adminPageData struct {
 	User user
-	//EmailTemplate string // option to allow the email template to be changed
 }
-
-type invitationInfo struct {
-	FirstName    string
-	LastName     string
-	Email        string
-	Organisation string
-}
-
-type emailTemplateInfo struct {
-	FirstName        string
-	LastName         string
-	InvitorFirstName string
-	InvitorLastName  string
-	HostAddress      string
-	UUID             string
-}
-
-type invitationsData []invitationInfo
 
 func (c AdminController) AdminInformation(w http.ResponseWriter, r *http.Request) {
 
