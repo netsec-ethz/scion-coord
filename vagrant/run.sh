@@ -8,6 +8,7 @@ VM="vagrant-manager"
 
 run_vagrant() {
     echo "[SCIONLabVM] run vagrant"
+    vagrant box add scion/ubuntu-16.04-64-scion
     vagrant box update
     vagrant up
     vagrant ssh
