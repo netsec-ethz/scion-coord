@@ -54,7 +54,6 @@ type passwordRequest struct {
 // check if the password match and that the length is at least 8 chars
 func passwordsAreValid(password, passwordConfirmation string) error {
 	if len(password) < 8 {
-
 		return fmt.Errorf("%s\n", "Please use at least 8 characters for your password.")
 	}
 

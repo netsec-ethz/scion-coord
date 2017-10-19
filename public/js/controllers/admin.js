@@ -59,7 +59,7 @@ angular.module('scionApp')
                 // TODO (mlegner): Maybe check for duplicates before api call.
                 adminService.sendInvitations(invitations).then(
                     function (data) {
-                        if (data["emails"].length == 0) {
+                        if (data["emails"].length === 0) {
                             $scope.error = "";
                             $scope.message = "All email invitations sent successfully.";
                             $scope.resetInvitations();
