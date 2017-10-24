@@ -6,9 +6,12 @@
   <div class="login-box-body">
     <p class="login-box-msg">Sign in to start your session</p>
 
-    <div ng-show="error" ng-model="error" class="alert alert-danger alert-dismissible">
-        {{error}}
-      </div>
+    <div ng-show="error" class="alert alert-danger alert-dismissible" >
+      {{error}}
+    </div>
+    <div ng-show="message" class="alert alert-success alert-dismissible" >
+      {{message}}
+    </div>
 
     <form name="loginForm" ng-submit="login(user)">
       <div class="form-group has-feedback">
@@ -21,7 +24,7 @@
       </div>
       <div class="row">
         <div class="col-xs-12">
-          <button type="submit" class="btn btn-primary btn-block btn-flat">Login</button>
+          <button type="submit" class="btn btn-primary btn-block">Login</button>
         </div>
         <!-- /.col -->
       </div>
@@ -37,9 +40,10 @@
     <!-- /.social-auth-links -->
 
     <!-- <a href="#">I forgot my password</a><br> -->
-    <br />
+    <br>
     <a href="#/register" class="text-center">Register a new account</a>
 
   </div>
   <!-- /.login-box-body -->
 </div>
+<a href="#/resend" class="text-center" style="position: absolute; right: 20pt">Resend account verification email</a>

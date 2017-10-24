@@ -15,7 +15,6 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -90,17 +89,15 @@ func (c *RegistrationController) VerifyEmail(w http.ResponseWriter, r *http.Requ
 	}
 
 	if u.Verified {
-		log.Printf("Error verifying email address. User %v is already verified.", u.Email)
-		c.BadRequest(fmt.Errorf("The email %v is already verified. Please continue to the login page.", u.Email), w, r)
-		return
-	}
-
-	// update user
-	if err := u.UpdateVerified(true); err != nil {
-		log.Printf("Error verifying email address for user %v: %v.", u.Email, err)
-		// TODO: Pass the user a unique error ID which links to the specific error and allows for debugging
-		c.Error500(fmt.Errorf("Error verifying email address for user %v.", u.Email), w, r)
-		return
+		log.Printf("User %v is already verified.", u.Email)
+	} else {
+		// update user
+		if err := u.UpdateVerified(true); err != nil {
+			log.Printf("Error verifying email address for user %v: %v.", u.Email, err)
+			// TODO: Pass the user a unique error ID which links to the specific error and allows for debugging
+			c.Error500(fmt.Errorf("Error verifying email address for user %v.", u.Email), w, r)
+			return
+		}
 	}
 
 	// load validation page
@@ -156,7 +153,7 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 	}
 
 	// Send email address confirmation link
-	if err := sendMail(user.Id); err != nil {
+	if err := sendVerificationEmail(user.Id); err != nil {
 		log.Printf("Error sending verification email: %v", err)
 		c.Error500(err, w, r)
 	}
@@ -167,15 +164,33 @@ func (c *RegistrationController) LoadCaptchaSiteKey(w http.ResponseWriter, r *ht
 	c.Plain(config.CAPTCHA_SITE_KEY, w, r)
 }
 
-// Helper function which creates the email and server objects used to send emails to users
-func sendMail(userID uint64) error {
+func (c *RegistrationController) ResendActivationLink(w http.ResponseWriter, r *http.Request) {
 
-	user, err := models.FindUserById(fmt.Sprintf("%v", userID))
+	user, err := models.FindUserByEmail(r.PostFormValue("email"))
 	if err != nil {
-		return err
+		c.Error500(fmt.Errorf("User %v was not found", r.PostFormValue("email")), w, r)
+		return
 	}
 
-	tmpl, err := template.ParseFiles("email/templates/verification.html")
+	if user.Verified {
+		c.Error500(fmt.Errorf("User %v is already verified", user.Email), w, r)
+		return
+	}
+
+	if err := sendVerificationEmail(user.Id); err != nil {
+		log.Printf("Error sending verification email: %v", err)
+		c.Error500(fmt.Errorf("Error sending verification email: %v", err), w, r)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// Function which sends verification emails to newly registered users
+func sendVerificationEmail(userID uint64) error {
+
+	user, err := models.FindUserById(fmt.Sprintf("%v", userID))
 	if err != nil {
 		return err
 	}
@@ -187,17 +202,12 @@ func sendMail(userID uint64) error {
 		VerificationUUID string
 	}{user.FirstName, user.LastName, config.HTTP_HOST_ADDRESS, user.VerificationUUID}
 
-	buf := new(bytes.Buffer)
-	tmpl.Execute(buf, data)
-	body := buf.String()
-
-	mail := new(email.Email)
-	mail.From = config.EMAIL_FROM
-	mail.To = []string{user.Email}
-	mail.Subject = "[SCIONLab] Verify your email address for SCIONLab Coordination Service"
-	mail.Body = body
-
-	if err := email.Send(mail); err != nil {
+	if err := email.ConstructAndSend(
+		"verification.html",
+		"[SCIONLab] Verify your email address for SCIONLab Coordination Service",
+		data,
+		"email-verification",
+		user.Email); err != nil {
 		return err
 	}
 

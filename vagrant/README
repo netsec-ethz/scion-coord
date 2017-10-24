@@ -2,10 +2,9 @@
 SCIONLab Virtual Machine
 
 
+## Setup of the virtual machine
 
-## How to Run
-
-### For Ubuntu, OS X Users:
+### For Ubuntu and Mac OS users:
 
 The shell script 'run.sh' will automatically check your system and install
 the necessary packages to run SCIONLabVM, such as 'vagrant' and 'virtualbox'.
@@ -23,16 +22,23 @@ If you agree with these requirements, you can then simply setup your SCIONLabVM 
 './run.sh' from inside the downloaded folder.
 
 Once the setup is finished, you will automatically be inside the SCIONLabVM
-through SSH. After this step, you will be ready to run SCION as follows:
-
-'cd /go/src/github.com/netsec-ethz/scion', and
-'./scion.sh run'
-
-You should then be able to see the beacons being received from SCIONLab AS 1-7.
+through SSH. After this step, you will be ready to run SCION as described below.
 
 
+### For users of other Linux distributions:
 
-### For Windows Users:
+You need to install 'vagrant' and 'virtualbox' manually using your distribution's package manager.
+
+After the install is done, run the following commands from inside the downloaded folder:
+    vagrant box add ubuntu/xenial64
+    vagrant box update
+    vagrant up
+    vagrant ssh
+
+After this, you are connected to your VM via ssh, where you can run SCION as described below.
+
+
+### For Windows users:
 
 SCIONLabVM requires 'virtualbox' and 'vagrant'.
 First, you need to download and install the 'virtualbox' from:
@@ -49,12 +55,17 @@ install 'SCION' with all other dependencies.
 If the 'vagrant up' command returns the prompt, you are ready to have fun
 with 'SCIONLabVM'.
 
-Finally, you can run 'vagrant ssh' to connect to your VM, and then run SCION
-as follows:
+Finally, you can run 'vagrant ssh' to connect to your VM, where you can run SCION as described below.
 
+
+## Running SCION
+
+You can start SCION by executing the following commands:
 'cd /go/src/github.com/netsec-ethz/scion', and
 './scion.sh run'
 
+After your setup is activated at the designated SCIONLab AS, you should be able to see the beacons being received.
+You can test this, for example, by using 'tail -f logs/bs1-[[Your AS ID]]-1.DEBUG'.
 
 
 ## Stopping and Restarting the VM
@@ -64,7 +75,6 @@ In order to stop the VM, run 'vagrant halt' from the downloaded configuration fo
 If you want start the VM again, just run 'vagrant up'.
 More information for 'vagrant' commands can be found at:
 https://www.vagrantup.com/docs/cli
-
 
 
 ## Current Vagrant Configuration

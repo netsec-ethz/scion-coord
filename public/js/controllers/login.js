@@ -1,18 +1,24 @@
-angular.module('scionApp')
-    .controller('loginCtrl', ['$scope', 'loginService', '$location',
-        function($scope, loginService, $location) {
+scionApp
+    .controller('loginCtrl', ['$rootScope', '$scope', 'loginService', '$location',
+        function ($rootScope, $scope, loginService, $location) {
 
             // refresh the list of processes
             $scope.login = function (user) {
 
                 loginService.login(user).then(
-                    function(data) {
-                        $location.path('/admin');
+                    function (data) {
+                        $location.path('/user');
                     },
-                    function(response) {
+                    function (response) {
                         console.log(response);
-                        $scope.error = "Failed to log you in: Make sure your email address and password are correct and your email address is verified."
+                        if (response.data.trim() === "Email is not verified") {
+                            $rootScope.resendAddress = user.email;
+                            $location.path('/resend');
+                        } else{
+                            $scope.error = "Failed to log you in: Make sure your email address \
+                                and password are correct and your email address is verified."
+                            $scope.message = "";
+                        }
                     });
             };
-
  }]);

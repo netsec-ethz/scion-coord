@@ -15,10 +15,12 @@
 package models
 
 type SCIONLabServer struct {
-	Id               uint64 `orm:"column(id);auto;pk"`
-	IA               string `orm:"unique"` // ISD-AS in which the server is located
-	IP               string // IP address of the machine
-	LastAssignedPort int    // the last given out port number
+	Id                uint64 `orm:"column(id);auto;pk"`
+	IA                string `orm:"unique"` // ISD-AS in which the server is located
+	IP                string // IP address of the machine
+	LastAssignedPort  int    // the last given out port number
+	VPNIP             string // IP address of the machine inside the VPN
+	VPNLastAssignedIP string // the last given out IP address for the VPN
 }
 
 func (sls *SCIONLabServer) Insert() error {
@@ -42,6 +44,7 @@ type SCIONLabVM struct {
 	UserEmail    string `orm:"unique"`        // Email address of the Owning user
 	IP           string `orm:"unique"`        // IP address of the SCIONLab VM
 	IA           *As    `orm:"rel(fk);index"` // The AS belonging to the VM
+	IsVPN        bool   // is this VM connected via the VPN
 	RemoteIA     string // the SCIONLab AS it connects to
 	RemoteIAPort int    // port number of the remote SCIONLab AS being connected to
 	RemoteBR     string // the name of the remote border router for this AS
@@ -62,8 +65,7 @@ func FindSCIONLabVMByIPAndRemoteIA(ip, ia string) (*SCIONLabVM, error) {
 
 func FindSCIONLabVMsByRemoteIA(remoteIA string) ([]SCIONLabVM, error) {
 	var v []SCIONLabVM
-	// TODO (ercanucan): Find a better way to refer to the database table without absolute name
-	_, err := o.QueryTable("s_c_i_o_n_lab_v_m").Filter("RemoteIA", remoteIA).RelatedSel().All(&v)
+	_, err := o.QueryTable(new(SCIONLabVM)).Filter("RemoteIA", remoteIA).RelatedSel().All(&v)
 	return v, err
 }
 

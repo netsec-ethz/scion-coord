@@ -1,43 +1,75 @@
 'use strict';
 
-angular.module('scionApp', [
-  'ngRoute', 'vcRecaptcha'
-
+const scionApp = angular.module('scionApp', [
+    'ngRoute', 'vcRecaptcha'
 ]).config(function ($routeProvider, $locationProvider, $httpProvider) {
     $routeProvider
-      .when('/register', {
-        templateUrl: '/public/partials/register.html',
-        controller: 'registerCtrl',
-        resolve: {
-            ResolveSiteKey: ['registerService', function(registerService){
-            return registerService.getSiteKey()
-          }]
+        .when('/register', {
+            templateUrl: '/public/partials/register.html',
+            controller: 'registerCtrl',
+            resolve: {
+                ResolveSiteKey: ['registerService', function (registerService) {
+                    return registerService.getSiteKey()
+                }]
+            }
+        })
+        .when('/login', {
+            templateUrl: '/public/partials/login.html',
+            controller: 'loginCtrl'
+        })
+        .when('/user', {
+            templateUrl: '/public/partials/user.html',
+            controller: 'userCtrl'
+        })
+        .when('/resend', {
+            templateUrl: '/public/partials/resend.html',
+            controller: 'resendCtrl'
+          })
+        .otherwise({
+            redirectTo: '/login'
+        });
+
+    $httpProvider.defaults.xsrfHeaderName = 'X-Xsrf-Token';
+
+    $httpProvider.interceptors.push(function () {
+        return {
+            response: function (response) {
+                console.log(response.headers('X-Xsrf-Token'));
+                $httpProvider.defaults.headers.common['X-Xsrf-Token'] = response.headers('X-Xsrf-Token');
+                return response;
+            }
         }
-      })
-      .when('/login', {
-        templateUrl: '/public/partials/login.html',
-        controller: 'loginCtrl'
-      })
-      .when('/admin', {
-        templateUrl: '/public/partials/admin.html',
-        controller: 'adminCtrl'
-      })
-      .otherwise({
-        redirectTo: '/login'
-      });
+    });
+});
 
-      $httpProvider.defaults.xsrfHeaderName = 'X-Xsrf-Token';
+(function () {
+    let directiveId = 'checkMatch';
+    scionApp
+        .directive(directiveId, ['$parse', function ($parse) {
 
-          $httpProvider.interceptors.push(function() {
-              return {
-                  response: function(response) {
-                    console.log(response.headers('X-Xsrf-Token'));
-                      $httpProvider.defaults.headers.common['X-Xsrf-Token'] = response.headers('X-Xsrf-Token');
-                      return response;
-                  }
-              }
-          });
+            return {
+                require: 'ngModel',
+                link: function (scope, elem, attrs, ctrl) {
+                    // if ngModel is not defined, we don't need to do anything
+                    if (!ctrl) return;
+                    if (!attrs[directiveId]) return;
 
+                    let firstPassword = $parse(attrs[directiveId]);
 
-    //$locationProvider.html5Mode(false);
-  });
+                    let validator = function (value) {
+                        let temp = firstPassword(scope),
+                            v = value === temp;
+                        ctrl.$setValidity('match', v);
+                        return value;
+                    };
+
+                    ctrl.$parsers.unshift(validator);
+                    ctrl.$formatters.push(validator);
+                    attrs.$observe(directiveId, function () {
+                        validator(ctrl.$viewValue);
+                    });
+
+                }
+            };
+        }]);
+})();

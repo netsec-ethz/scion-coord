@@ -2,3 +2,4 @@ scion-coord
 vendor/*/
 temp/
 credentials/
+conf/development.conf

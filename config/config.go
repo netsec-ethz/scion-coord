@@ -15,14 +15,20 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/sec51/goconf"
 )
 
 // Settings are specified in conf/development.conf
 var (
-	HTTP_BIND_ADDRESS        = goconf.AppConf.String("http.bind_address") // address the service listens on
-	HTTP_BIND_PORT, _        = goconf.AppConf.Int("http.bind_port")       // port the service listens on
-	HTTP_HOST_ADDRESS        = goconf.AppConf.String("http.host_address") // address from which the service is reachable from outside
+	// address the service listens on
+	HTTP_BIND_ADDRESS = goconf.AppConf.String("http.bind_address")
+	// port the service listens on
+	HTTP_BIND_PORT, _ = goconf.AppConf.Int("http.bind_port")
+	// address from which the service is reachable from outside
+	HTTP_HOST_ADDRESS        = goconf.AppConf.String("http.host_address")
 	EMAIL_PM_SERVER_TOKEN    = goconf.AppConf.String("email.pm_server_token")
 	EMAIL_PM_ACCOUNT_TOKEN   = goconf.AppConf.String("email.pm_account_token")
 	EMAIL_FROM               = goconf.AppConf.String("email.from")
@@ -32,11 +38,22 @@ var (
 	SESSION_ENCRYPTION_KEY   = goconf.AppConf.String("session.encryption_key")
 	SESSION_VERIFICATION_KEY = goconf.AppConf.String("session.verification_key")
 	LOG_FILE                 = goconf.AppConf.String("log.file")
-	DB_NAME                  = goconf.AppConf.String("db.name")
-	DB_HOST                  = goconf.AppConf.String("db.host")
-	DB_PORT, _               = goconf.AppConf.Int("db.port")
-	DB_USER                  = goconf.AppConf.String("db.user")
-	DB_PASS                  = goconf.AppConf.String("db.pass")
-	DB_MAX_CONNECTIONS, _    = goconf.AppConf.Int("db.max_connections")
-	DB_MAX_IDLE, _           = goconf.AppConf.Int("db.max_idle")
+	PACKAGE_DIRECTORY        = goconf.AppConf.DefaultString("directory.package_directory",
+		filepath.Join(os.Getenv("HOME"), "scionLabConfigs"))
+	DB_NAME               = goconf.AppConf.String("db.name")
+	DB_HOST               = goconf.AppConf.String("db.host")
+	DB_PORT, _            = goconf.AppConf.Int("db.port")
+	DB_USER               = goconf.AppConf.String("db.user")
+	DB_PASS               = goconf.AppConf.String("db.pass")
+	DB_MAX_CONNECTIONS, _ = goconf.AppConf.Int("db.max_connections")
+	DB_MAX_IDLE, _        = goconf.AppConf.Int("db.max_idle")
+	SERVER_IA             = goconf.AppConf.String("server.ia")
+	SERVER_IP             = goconf.AppConf.String("server.ip")
+	SERVER_START_PORT, _  = goconf.AppConf.Int("server.start_port")
+	SERVER_VPN_IP         = goconf.AppConf.String("server.vpn.ip")
+	SERVER_VPN_START_IP   = goconf.AppConf.String("server.vpn.start_ip")
+	SERVER_VPN_END_IP     = goconf.AppConf.String("server.vpn.end_ip")
+	// Local IP address in VM; this is a default set by
+	// vagrant and may have to be adjusted if vagrant configuration is changed
+	VM_LOCAL_IP = "10.0.2.15"
 )

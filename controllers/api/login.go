@@ -42,40 +42,8 @@ type user struct {
 	LastName     string
 	Account      string
 	Organisation string
-	AccountId    string
+	AccountID    string
 	Secret       string
-}
-
-func (c *LoginController) Me(w http.ResponseWriter, r *http.Request) {
-	// get the current user session if present.
-	// if not then, abort
-	_, userSession, err := middleware.GetUserSession(r)
-
-	if err != nil || userSession == nil {
-		log.Println(err)
-		http.Error(w, err.Error(), http.StatusForbidden)
-		return
-	}
-
-	// retrieve the user via the email
-	storedUser, err := models.FindUserByEmail(userSession.Email)
-	if err != nil {
-		c.Forbidden(err, w, r)
-		return
-	}
-
-	user := user{
-		Email:        storedUser.Email,
-		FirstName:    storedUser.FirstName,
-		LastName:     storedUser.LastName,
-		Account:      storedUser.Account.Name,
-		Organisation: storedUser.Account.Organisation,
-		AccountId:    storedUser.Account.AccountId,
-		Secret:       storedUser.Account.Secret,
-	}
-
-	c.JSON(&user, w, r)
-
 }
 
 func (c *LoginController) Logout(w http.ResponseWriter, r *http.Request) {
@@ -191,7 +159,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 		c.JSON(&user, w, r)
 
 	} else {
-		log.Println("AUth error")
+		log.Println("Auth error")
 		c.Forbidden(err, w, r)
 		return
 	}
