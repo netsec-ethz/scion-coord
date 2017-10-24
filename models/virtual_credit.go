@@ -17,14 +17,13 @@ package models
 import (
 	"fmt"
 
+	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion/go/lib/addr"
 )
 
-// The start credits for every new AS
+// The start credits a new AS gets
 func StartCredits() int64 {
-	// 100 credits = 1000 MegaBits/s worth.
-	// Maybe will be later in- or decreased
-	return 100
+	return config.VIRTUAL_CREDIT_START_CREDITS
 }
 
 // Converts a bandwidth into credits (10 MegaBits/s=1 Credit)

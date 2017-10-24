@@ -22,8 +22,12 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/models"
 )
+
+// Dummy error to return if the virtual credit system is disabled
+var systemDisabledError error = errors.New("VirtualCredit system disabled. This error should be ignored")
 
 // REST resource to list the payed connections from one AS (identified by the parameter 'isdas')
 // Example Response:
@@ -45,6 +49,11 @@ import (
 }
 */
 func (c *ASController) ListAsesConnectionsWithCredits(w http.ResponseWriter, r *http.Request) {
+	if config.VIRTUAL_CREDIT_ENABLE == false {
+		c.NotFound(systemDisabledError, w, r)
+		return
+	}
+
 	var response struct {
 		ISD         int                            // The ISD of this AS
 		AS          int                            // This AS
@@ -87,6 +96,10 @@ func (c *ASController) ListAsesConnectionsWithCredits(w http.ResponseWriter, r *
 }
 
 func (c *ASController) checkAndUpdateCredits(w http.ResponseWriter, r *http.Request, cr *ConnRequest) error {
+	if config.VIRTUAL_CREDIT_ENABLE == false {
+		return systemDisabledError
+	}
+
 	as, err := models.FindAsByIsdAs(cr.RequestIA)
 	if err != nil {
 		log.Printf("Error: Unkown AS: %v, %v", r.Body, err)
@@ -112,6 +125,10 @@ func (c *ASController) checkAndUpdateCredits(w http.ResponseWriter, r *http.Requ
 }
 
 func (c *ASController) checkAndUpdateCreditsAtResponse(w http.ResponseWriter, r *http.Request, cr *models.ConnRequest, reply ConnReply) error {
+	if !config.VIRTUAL_CREDIT_ENABLE == false {
+		return systemDisabledError
+	}
+
 	as, _ := models.FindAsByIsdAs(cr.RequestIA)
 	var credits = models.BandwidthToCredits(cr.Bandwidth)
 	// If the connection is approved, add credits to the responding AS
@@ -140,6 +157,10 @@ func (c *ASController) checkAndUpdateCreditsAtResponse(w http.ResponseWriter, r 
 }
 
 func (c *ASController) rollBackCreditUpdate(w http.ResponseWriter, r *http.Request, cr *ConnRequest) {
+	if !config.VIRTUAL_CREDIT_ENABLE {
+		return
+	}
+
 	as, err := models.FindAsByIsdAs(cr.RequestIA)
 	if err != nil {
 		log.Printf("Error: Unkown AS: %v, %v", r.Body, err)
