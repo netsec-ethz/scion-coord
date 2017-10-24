@@ -335,25 +335,10 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	as, err := models.FindAsByIsdAs(cr.RequestIA)
-	if err != nil {
-		log.Printf("Error: Unkown AS: %v, %v", r.Body, err)
-		c.BadRequest(err, w, r)
-		return
-	}
+	// Check if the AS has enough credits for that connection and
+	// update new credits for both ASes
 
-	var creditsNeeded = models.BandwidthToCredits(cr.Bandwidth)
-	if (as.Credits - creditsNeeded) <= 0 {
-		err = errors.New(fmt.Sprintf("Error: Not enough credits to create a connection request! You need %v, but have only %v", creditsNeeded, as.Credits))
-		log.Printf("Info: Not enough credits! AS: %v, Request: %v, Error: %v", as, r.Body, err)
-		c.BadRequest(err, w, r)
-		return
-	}
-
-	// Subtract credits from AS
-	if err:= as.UpdateCurrency(-1* creditsNeeded); err != nil {
-		log.Printf("Error: Substracting credits! AS: %v, Request: %v, Error: %v", as, r.Body, err)
-		c.Error500(err, w, r)
+	if err := c.CheckAndUpdateCredits(w, r, &cr); err != nil {
 		return
 	}
 
@@ -378,11 +363,8 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 		log.Printf("Error inserting Connection Request. Account %v AS %v: %v", account,
 			cr.RequestIA, err)
 		c.Error500(err, w, r)
-
-		// Roll back UpdateCurrency changes
-		if err:= as.UpdateCurrency(creditsNeeded); err != nil {
-			log.Printf("Critical error: Can't roll back UpdateCurrency changes! Credits: %v, AS: %v, Request: %v, Error: %v", creditsNeeded, as, r.Body, err)
-		}
+		// The credits will be granted in hindsight and must be removed in case of an error (now)
+		c.RollBackCreditUpdate(w, r, &cr)
 		return
 	}
 	log.Printf("Connection Request Successfully Received: %v Request ID: %v",
@@ -650,46 +632,4 @@ func (c *ASController) ListASes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Fprintln(w, string(b))
-}
-func (c *ASController) ListAsesConnectionsWithCredits(w http.ResponseWriter, r *http.Request) {
-	var response struct {
-		ISD         int
-		AS          int
-		Credits     int64
-		Connections []models.ConnectionWithCredits
-	}
-
-	vars := mux.Vars(r)
-	isdas := vars["isdas"]
-
-	if isdas == "" {
-		c.BadRequest(errors.New("missing isdas parameter"), w, r)
-		return
-	}
-
-	requestingAS, err := models.FindAsByIsdAs(isdas)
-	if err != nil {
-		c.NotFound(errors.New(isdas+" not found"), w, r)
-		return
-	}
-	response.ISD = requestingAS.Isd
-	response.AS = requestingAS.As
-	response.Credits = requestingAS.Credits
-
-	connections, err := requestingAS.ListConnections()
-	if err != nil {
-		log.Printf("Error while retrieving list of ASes. ISD-AS: %v", requestingAS)
-		c.BadRequest(err, w, r)
-		return
-	}
-	response.Connections = connections
-
-	b, err := json.Marshal(response)
-	if err != nil {
-		log.Printf("Error during JSON Marshaling. ISD-AS: %v, %v", requestingAS, err)
-		c.Error500(err, w, r)
-		return
-	}
-	fmt.Fprintln(w, string(b))
-
 }
