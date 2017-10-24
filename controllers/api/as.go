@@ -337,8 +337,8 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 
 	// Check if the AS has enough credits for that connection and
 	// update new credits for both ASes
-
-	if err := c.CheckAndUpdateCredits(w, r, &cr); err != nil {
+	if err := c.checkAndUpdateCredits(w, r, &cr); err != nil {
+		// logs the error and writes back the response
 		return
 	}
 
@@ -364,7 +364,7 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 			cr.RequestIA, err)
 		c.Error500(err, w, r)
 		// The credits will be granted in hindsight and must be removed in case of an error (now)
-		c.RollBackCreditUpdate(w, r, &cr)
+		c.rollBackCreditUpdate(w, r, &cr)
 		return
 	}
 	log.Printf("Connection Request Successfully Received: %v Request ID: %v",
@@ -422,28 +422,13 @@ func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 		c.Error500(err, w, r)
 		return
 	}
-	var credits = models.BandwidthToCredits(cr.Bandwidth)
-	// If the connection is approved, add credits to the responding AS
-	if cr.Status == models.APPROVED {
-		otherAs, err := models.FindAsByIsdAs(cr.RespondIA)
-		if err != nil {
-			log.Printf("Error finding the RespondIA. Request ID: %v RequestIA: %v, RespondIA: %v, %v",
-				reply.RequestId, reply.RequestIA, reply.RespondIA, err)
-			c.Error500(err, w, r)
-			return
-		}
-		if err := otherAs.UpdateCurrency(credits); err != nil {
-			log.Printf("Error: Adding credits! OtherAS: %v, Request: %v, Error: %v", otherAs, r.Body, err)
-			c.Error500(err, w, r)
-			return
-		}
-		// If the connection request is denied, release the reserved credits for the connection
-	} else if cr.Status != models.PENDING {
-		if err := as.UpdateCurrency(credits); err != nil {
-			log.Printf("Error: Readding credits! ThisAS: %v, Request: %v, Error: %v", as, r.Body, err)
-			c.Error500(err, w, r)
-			return
-		}
+	
+	// Add / Substract the credits for the request depending on the ConnReply.Status
+	// APPROVED = add credits to the receiver
+	// DENIED = give credits back to the initiator
+	if err := c.checkAndUpdateCreditsAtResponse(w, r, cr, reply); err != nil {
+		// logs the error and writes back the response
+		return
 	}
 
 	log.Printf("Connection Reply Successfully Received. Account: %v Request ID: %v "+

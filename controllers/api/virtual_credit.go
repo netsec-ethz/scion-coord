@@ -25,12 +25,31 @@ import (
 	"github.com/netsec-ethz/scion-coord/models"
 )
 
+// REST resource to list the payed connections from one AS (identified by the parameter 'isdas')
+// Example Response:
+/*
+{
+  "ISD": 1,
+  "AS": 1,
+  "Credits": 10,
+  "Connections": [
+    {
+      "ISD": 1,
+      "AS": 2,
+      "CreditBalance": 10,
+      "Bandwidth": 100000,
+      "IsOutgoing": false,
+      "Timestamp": "2017-07-17 13:59:37.396791+00:00"
+    }
+  ]
+}
+*/
 func (c *ASController) ListAsesConnectionsWithCredits(w http.ResponseWriter, r *http.Request) {
 	var response struct {
-		ISD         int
-		AS          int
-		Credits     int64
-		Connections []models.ConnectionWithCredits
+		ISD         int                            // The ISD of this AS
+		AS          int                            // This AS
+		Credits     int64                          // The current credits of this AS
+		Connections []models.ConnectionWithCredits // List of connections and their costs / yields
 	}
 
 	vars := mux.Vars(r)
@@ -67,7 +86,7 @@ func (c *ASController) ListAsesConnectionsWithCredits(w http.ResponseWriter, r *
 	fmt.Fprintln(w, string(b))
 }
 
-func (c *ASController) CheckAndUpdateCredits(w http.ResponseWriter, r *http.Request, cr *ConnRequest) error {
+func (c *ASController) checkAndUpdateCredits(w http.ResponseWriter, r *http.Request, cr *ConnRequest) error {
 	as, err := models.FindAsByIsdAs(cr.RequestIA)
 	if err != nil {
 		log.Printf("Error: Unkown AS: %v, %v", r.Body, err)
@@ -92,7 +111,35 @@ func (c *ASController) CheckAndUpdateCredits(w http.ResponseWriter, r *http.Requ
 	return nil
 }
 
-func (c *ASController) RollBackCreditUpdate(w http.ResponseWriter, r *http.Request, cr *ConnRequest) {
+func (c *ASController) checkAndUpdateCreditsAtResponse(w http.ResponseWriter, r *http.Request, cr *models.ConnRequest, reply ConnReply) error {
+	as, _ := models.FindAsByIsdAs(cr.RequestIA)
+	var credits = models.BandwidthToCredits(cr.Bandwidth)
+	// If the connection is approved, add credits to the responding AS
+	if cr.Status == models.APPROVED {
+		otherAs, err := models.FindAsByIsdAs(cr.RespondIA)
+		if err != nil {
+			log.Printf("Error finding the RespondIA. Request ID: %v RequestIA: %v, RespondIA: %v, %v",
+				reply.RequestId, reply.RequestIA, reply.RespondIA, err)
+			c.Error500(err, w, r)
+			return err
+		}
+		if err := otherAs.UpdateCurrency(credits); err != nil {
+			log.Printf("Error: Adding credits! OtherAS: %v, Request: %v, Error: %v", otherAs, r.Body, err)
+			c.Error500(err, w, r)
+			return err
+		}
+		// If the connection request is denied, release the reserved credits for the connection
+	} else if cr.Status != models.PENDING {
+		if err := as.UpdateCurrency(credits); err != nil {
+			log.Printf("Error: Readding credits! ThisAS: %v, Request: %v, Error: %v", as, r.Body, err)
+			c.Error500(err, w, r)
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *ASController) rollBackCreditUpdate(w http.ResponseWriter, r *http.Request, cr *ConnRequest) {
 	as, err := models.FindAsByIsdAs(cr.RequestIA)
 	if err != nil {
 		log.Printf("Error: Unkown AS: %v, %v", r.Body, err)
