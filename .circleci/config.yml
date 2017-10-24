@@ -16,9 +16,9 @@ jobs:
       - run:
          name: Wait for db
          command: dockerize -wait tcp://localhost:3306 -timeout 1m
-      - 
-        run: "go get -v -t -d ./..."
-      - 
-        run: "go test -v ./..."
+      - run: "go get github.com/kardianos/govendor"
+      - run: "govendor sync -v"
+      - run: "govendor install ./vendor/..."
+      - run: "go test -v ./..."
     working_directory: "/go/src/github.com/netsec-ethz/scion-coord"
 version: 2
