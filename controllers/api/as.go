@@ -422,7 +422,7 @@ func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 		c.Error500(err, w, r)
 		return
 	}
-	
+
 	// Add / Substract the credits for the request depending on the ConnReply.Status
 	// APPROVED = add credits to the receiver
 	// DENIED = give credits back to the initiator

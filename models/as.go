@@ -70,7 +70,7 @@ func (as *As) deleteAs() error {
 func (as *As) Insert() error {
 	// First check whether this AS already exists, duplicates are not allowed.
 	existing_as := new(As)
-		// should always return with orm.ErrNoRows
+	// should always return with orm.ErrNoRows
 	err := o.QueryTable(as).Filter("Isd", as.Isd).Filter("As", as.As).RelatedSel().One(existing_as)
 	if err == nil {
 		log.Printf("ISD-AS (%v-%v) already exists, will not be re-inserted", as.Isd, as.As)
@@ -87,8 +87,8 @@ func (as *As) UpdateCurrency(Credits int64) error {
 	as.Credits += Credits
 	// Can't use update because of missing pk error (but pk is set, beego have some serious problems)
 	_, err := o.QueryTable(as).Filter("Isd", as.Isd).Filter("As", as.As).Update(orm.Params{
-		"credits" : as.Credits,
-		})
+		"credits": as.Credits,
+	})
 
 	return err
 }
