@@ -30,7 +30,7 @@ through SSH. After this step, you will be ready to run SCION as described below.
 You need to install 'vagrant' and 'virtualbox' manually using your distribution's package manager.
 
 After the install is done, run the following commands from inside the downloaded folder:
-    vagrant box add ubuntu/xenial64
+    vagrant box add scion/ubuntu-16.04-64-scion
     vagrant box update
     vagrant up
     vagrant ssh

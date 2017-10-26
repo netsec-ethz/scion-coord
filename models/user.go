@@ -48,13 +48,16 @@ type Account struct {
 }
 
 type user struct {
-	Id               uint64
-	Email            string `orm:"index"`
-	Password         string
+	Id       uint64
+	Email    string `orm:"index"`
+	Password string
+	// whether the password is invalid due to reset or pre-approved registration
+	PasswordInvalid  bool
 	Salt             string
 	FirstName        string
 	LastName         string
 	Verified         bool     // whether the user verified the email
+	IsAdmin          bool     // whether the user is marked as admin
 	VerificationUUID string   // uuid sent to user to verify email
 	Account          *Account `orm:"rel(fk);index"`
 	Created          time.Time
@@ -144,6 +147,9 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 		u.FirstName = first
 		u.LastName = last
 		u.Password = hex.EncodeToString(derivedPassword)
+		if password == "" {
+			u.PasswordInvalid = true
+		}
 		u.Salt = hex.EncodeToString(salt)
 		u.VerificationUUID = uuid.New()
 		//u.TwoFA = false // set it to false
@@ -307,4 +313,22 @@ func (u *user) UpdateVerified(value bool) error {
 	u.Updated = time.Now().UTC()
 	_, err := o.Update(u, "Verified", "Updated")
 	return err
+}
+
+func (u *user) UpdatePassword(password string) (err error) {
+	storedSalt, err := hex.DecodeString(u.Salt)
+	if err != nil {
+		return
+	}
+	derivedPassword, err := derivePassword(password, storedSalt)
+	if err != nil {
+		return
+	}
+
+	u.Password = hex.EncodeToString(derivedPassword)
+	u.PasswordInvalid = password == ""
+	u.Updated = time.Now().UTC()
+
+	_, err = o.Update(u, "Password", "PasswordInvalid", "Updated")
+	return
 }

@@ -69,7 +69,7 @@ func initializeSLS() error {
 			sls.VPNLastAssignedIP = vpnLastAssignedIPStart
 		}
 
-		fmt.Printf("Updating SCIONLab AS configuration in database: %v", sls)
+		fmt.Printf("Updating SCIONLab AS configuration in database: %v\n", sls)
 		if err := sls.Update(); err != nil {
 			return fmt.Errorf("ERROR: Cannot update SCIONLab AS configuration in database: %v",
 				err)
@@ -111,6 +111,7 @@ func main() {
 	// controllers
 	registrationController := api.RegistrationController{}
 	loginController := api.LoginController{}
+	adminController := api.AdminController{}
 	asController := api.ASController{}
 	scionLabVMController := api.SCIONLabVMController{}
 
@@ -126,17 +127,25 @@ func main() {
 	// router
 	router := mux.NewRouter()
 
-	loggingChain := middleware.New(middleware.LoggingHandler)
+	loggingChain := middleware.NewWithLogging()
 
 	// public chain does not require authentication but serves back the XSRF Token
-	xsrfChain := middleware.New(middleware.LoggingHandler, middleware.XSRFHandler)
+	xsrfChain := middleware.NewWithLogging(middleware.XSRFHandler)
 
 	// Api chain goes through the authentication handler, which verifies either the session or the
 	// account_id.secret combination
-	apiChain := middleware.New(middleware.LoggingHandler, middleware.AuthHandler)
+	apiChain := middleware.NewWithLogging(middleware.AuthHandler)
 
-	// 404 on favicon requests
-	router.Handle("/favicon.ico", http.HandlerFunc(http.NotFound))
+	// User chain goes through UserHandler which checks if the user is logged in
+	userChain := middleware.NewWithLogging(middleware.UserHandler)
+
+	// Admin chain goes through AdminHandler which checks if user is marked as admin
+	adminChain := middleware.NewWithLogging(middleware.AdminHandler)
+
+	// handle favicon requests
+	router.Handle("/favicon.ico", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "public/img/favicon.ico")
+	}))
 
 	// index page
 	router.Handle("/", xsrfChain.ThenFunc(controllers.Index))
@@ -146,13 +155,13 @@ func main() {
 
 	// user registration
 	router.Handle("/api/register", loggingChain.ThenFunc(
-		registrationController.Register)).Methods("POST")
+		registrationController.Register)).Methods(http.MethodPost)
 	router.Handle("/api/captchaSiteKey", loggingChain.ThenFunc(
 		registrationController.LoadCaptchaSiteKey))
 
 	// Resend verification email
 	router.Handle("/api/resendLink", tollbooth.LimitHandler(resendLimit, loggingChain.ThenFunc(
-		registrationController.ResendActivationLink))).Methods("POST")
+		registrationController.ResendActivationLink))).Methods(http.MethodPost)
 
 	// user login
 	router.Handle("/api/login", loggingChain.ThenFunc(loginController.Login))
@@ -161,17 +170,27 @@ func main() {
 	router.Handle("/api/logout", loggingChain.ThenFunc(loginController.Logout))
 
 	// user information
-	router.Handle("/api/me", apiChain.ThenFunc(loginController.Me))
+	router.Handle("/api/userPageData", apiChain.ThenFunc(loginController.UserInformation))
 
-	//email validation
+	// email validation
 	router.Handle("/api/verifyEmail/{uuid}", loggingChain.ThenFunc(
 		registrationController.VerifyEmail))
 
+	// set password after pre-approved registration or password reset
+	router.Handle("/api/setPassword", loggingChain.ThenFunc(
+		registrationController.SetPassword)).Methods(http.MethodPost)
+
+	// admin page
+	router.Handle("/api/adminPageData", adminChain.ThenFunc(adminController.AdminInformation))
+	router.Handle("/api/sendInvitations", adminChain.ThenFunc(
+		adminController.SendInvitationEmails)).Methods(http.MethodPost)
+
 	// generates a SCIONLab VM
 	// TODO(ercanucan): fix the authentication
-	router.Handle("/api/as/generateVM", apiChain.ThenFunc(scionLabVMController.GenerateSCIONLabVM))
-	router.Handle("/api/as/removeVM", apiChain.ThenFunc(scionLabVMController.RemoveSCIONLabVM))
-	router.Handle("/api/as/downloads", apiChain.ThenFunc(scionLabVMController.ReturnTarball))
+	router.Handle("/api/as/generateVM", userChain.ThenFunc(
+		scionLabVMController.GenerateSCIONLabVM))
+	router.Handle("/api/as/removeVM", userChain.ThenFunc(scionLabVMController.RemoveSCIONLabVM))
+	router.Handle("/api/as/downloads", userChain.ThenFunc(scionLabVMController.ReturnTarball))
 	router.Handle("/api/as/getSCIONLabVMASes/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabVMController.GetSCIONLabVMASes))
 	router.Handle("/api/as/confirmSCIONLabVMASes/{account_id}/{secret}",

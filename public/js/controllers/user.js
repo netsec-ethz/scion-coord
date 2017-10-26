@@ -1,16 +1,16 @@
 scionApp
-    .controller('userCtrl', ['$scope', 'userService', '$location', '$window', '$http',
-        function ($scope, userService, $location, $window, $http) {
+    .controller('userCtrl', ['$scope', '$rootScope', 'userService', '$location', '$window', '$http',
+        function ($scope, $rootScope, userService, $location, $window, $http) {
 
             $scope.error = "";
             $scope.message = "";
 
-            $scope.me = function () {
+            $scope.userPageData = function () {
 
-                userService.me().then(
+                userService.userPageData().then(
                     function (data) {
                         console.log(data);
-                        $scope.user = data["User"];
+                        $rootScope.user = data["User"];
                         $scope.vmInfo = data["VMInfo"];
                         $scope.buttonConfig = data["UIButtons"];
                         $scope.user.isNotVPN = false;
@@ -57,7 +57,7 @@ scionApp
                         console.log(data);
                         window.location.assign(downloadlink(user));
                         $scope.message = data;
-                        $scope.me();
+                        $scope.userPageData();
                     },
                     function (response) {
                         console.log(response);
@@ -80,7 +80,7 @@ scionApp
                     function (data) {
                         console.log(data);
                         $scope.message = data;
-                        $scope.me();
+                        $scope.userPageData();
                     },
                     function (response) {
                         console.log(response);
@@ -110,6 +110,6 @@ scionApp
             });
 
             // refresh the data when the controller is loaded
-            $scope.me();
+            $scope.userPageData();
         }
     ]);

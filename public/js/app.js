@@ -13,6 +13,10 @@ const scionApp = angular.module('scionApp', [
                 }]
             }
         })
+        .when('/setPassword/:uuid', {
+            templateUrl: '/public/partials/set_password.html',
+            controller: 'passwordCtrl'
+        })
         .when('/login', {
             templateUrl: '/public/partials/login.html',
             controller: 'loginCtrl'
@@ -25,6 +29,10 @@ const scionApp = angular.module('scionApp', [
             templateUrl: '/public/partials/resend.html',
             controller: 'resendCtrl'
           })
+        .when('/admin', {
+            templateUrl: '/public/partials/admin.html',
+            controller: 'adminCtrl'
+        })
         .otherwise({
             redirectTo: '/login'
         });
