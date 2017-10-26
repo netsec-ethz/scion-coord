@@ -120,6 +120,13 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// if stored password is invalid due to reset or pre-approved registration
+	if dbUser.PasswordInvalid {
+		log.Printf("Password is not set for user %v.", dbUser.Email)
+		c.Forbidden(err, w, r)
+		return
+	}
+
 	// if the authentication fails
 	if err := dbUser.Authenticate(password); err != nil {
 		log.Printf("Authentication failed for user %v: %v", dbUser.Email, err)
