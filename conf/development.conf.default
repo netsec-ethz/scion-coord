@@ -52,8 +52,10 @@ db.max_connections = 15
 db.max_idle = 3
 
 # SCIONLab AS configs
-server.ia = "1-7"
-server.ip = "127.0.0.1"
+# Structure: "IA1,IP1,UserPort1;IA2,IP2,UserPort2"
+# IA, IP, and UserPort must be unique
+servers = "1-7,127.0.0.1,50000;1-8,127.0.0.2,50001"
+
 server.start_port = "50050"
 server.vpn.ip = "10.0.8.1"
 server.vpn.start_ip = "10.0.8.2"

@@ -11,8 +11,14 @@ scionApp
                     function (data) {
                         console.log(data);
                         $rootScope.user = data["User"];
-                        $scope.vmInfo = data["VMInfo"];
-                        $scope.buttonConfig = data["UIButtons"];
+                        $scope.activeVMs = data["ActiveVMs"];
+                        $scope.vmsAndButtons = data["VMsInfo"].map(function (e, i) {
+                            return {vmInfo: e, buttons: data["UIButtons"][i]};
+                        });
+                        if($scope.currentIndex === undefined)
+                            $scope.user.vm = $scope.vmsAndButtons[0];
+                        else
+                            $scope.user.vm = $scope.vmsAndButtons[$scope.currentIndex];
                         $scope.user.isNotVPN = false;
                     },
                     function (response) {
@@ -24,6 +30,8 @@ scionApp
             };
 
             $scope.submitForm = function (action, user) {
+                $scope.currentIndex = $scope.vmsAndButtons.indexOf(user.vm);
+
                 switch (action) {
                     case "update":
                         if (user.isNotVPN) {
@@ -44,8 +52,12 @@ scionApp
                 }
             };
 
+            serverIA = function (user) {
+                return user.vm.vmInfo.RemoteIA;
+            };
+
             let downloadlink = function (user) {
-                return ('/api/as/downloads?filename=' + user["Email"] + '.tar.gz');
+                return ('/api/as/downloads?filename=' + user["Email"] + '_' + serverIA(user) + '.tar.gz');
             };
 
             $scope.generateSCIONLabVM = function (user) {

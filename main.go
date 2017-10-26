@@ -21,7 +21,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/astaxie/beego/orm"
 	"github.com/didip/tollbooth"
 	"github.com/didip/tollbooth/limiter"
 	"github.com/gorilla/handlers"
@@ -31,48 +30,16 @@ import (
 	"github.com/netsec-ethz/scion-coord/controllers/api"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/models"
-	"github.com/netsec-ethz/scion-coord/utility"
+	"github.com/netsec-ethz/scion/go/lib/addr"
 )
 
 // make sure that data about SCIONLab ASes in database is correct
 // TODO (mlegner): remove deprecated servers?
+// TODO (mlegner): replace this by an init script and an admin interface at some point.
 func initializeSLS() error {
-	sls, err := models.FindSCIONLabServer(config.SERVER_IA)
-	vpnLastAssignedIPStart := utility.IPIncrement(config.SERVER_VPN_START_IP, -1)
-	lastAssignedPortStart := config.SERVER_START_PORT - 1
-
-	if err != nil {
-		if err == orm.ErrNoRows { // Server does not exist
-			newSLS := models.SCIONLabServer{
-				IA:                config.SERVER_IA,
-				IP:                config.SERVER_IP,
-				LastAssignedPort:  lastAssignedPortStart,
-				VPNIP:             config.SERVER_VPN_IP,
-				VPNLastAssignedIP: vpnLastAssignedIPStart,
-			}
-			fmt.Println("Inserting SCIONLab AS configuration into database.")
-			if err := newSLS.Insert(); err != nil {
-				return fmt.Errorf("ERROR: Cannot insert SCIONLab AS configuration into database:"+
-					" %v", err)
-			}
-		} else {
-			return fmt.Errorf("ERROR: Cannot get SCIONLab AS configuration from database: %v", err)
-		}
-	} else { // Server exists and needs to be updated
-		sls.IP = config.SERVER_IP
-		sls.VPNIP = config.SERVER_VPN_IP
-		if sls.LastAssignedPort < lastAssignedPortStart {
-			sls.LastAssignedPort = lastAssignedPortStart - 1
-		}
-		if sls.VPNLastAssignedIP == "" || utility.IPCompare(sls.VPNLastAssignedIP,
-			vpnLastAssignedIPStart) == -1 {
-			sls.VPNLastAssignedIP = vpnLastAssignedIPStart
-		}
-
-		fmt.Printf("Updating SCIONLab AS configuration in database: %v\n", sls)
-		if err := sls.Update(); err != nil {
-			return fmt.Errorf("ERROR: Cannot update SCIONLab AS configuration in database: %v",
-				err)
+	for _, s := range config.SERVERS {
+		if err := models.InsertUpdateSLS(s); err != nil {
+			return err
 		}
 	}
 
@@ -80,31 +47,41 @@ func initializeSLS() error {
 }
 
 // check if credential files exist and create necessary directories
-func checkCredentials() bool {
-	for _, f := range []string{api.TrcFile, api.CoreCertFile, api.CoreSigKey} {
-		if _, err := os.Stat(f); err != nil {
-			if os.IsNotExist(err) {
-				fmt.Println("ERROR: Please make sure that the necessary credential files exist.")
-				fmt.Println("Consult the README.md for further details.")
-			} else {
-				fmt.Println("An error occurred when accessing " + f + ".")
+func checkCredentialsDirectories() error {
+	for _, server := range config.SERVERS {
+		ia, err := addr.IAFromString(server.IA)
+		if err != nil {
+			return err
+		}
+		for _, f := range []string{api.TrcFile(ia.I), api.CoreCertFile(ia.I),
+			api.CoreSigKey(ia.I)} {
+			if _, err := os.Stat(f); err != nil {
+				if os.IsNotExist(err) {
+					return fmt.Errorf("ERROR: Credential file %s does not exist. Please make "+
+						"sure that the necessary credential files exist.\n"+
+						"Consult the README.md for further details.", f)
+				} else {
+					return fmt.Errorf("An error occurred when accessing " + f + ".")
+				}
 			}
-			return false
 		}
 	}
 	os.MkdirAll(api.TempPath, os.ModePerm)
 	os.MkdirAll(api.PackagePath, os.ModePerm)
-	return true
+	return nil
 }
 
 func main() {
+
 	// update database of SCIONLab ASes
-	if err := initializeSLS(); err != nil {
-		fmt.Printf("There was an error updating the server database: %v", err)
+	if err := checkCredentialsDirectories(); err != nil {
+		fmt.Printf("There was an error checking credential files: %v", err)
 		return
 	}
 
-	if !checkCredentials() {
+	// check if credential files exist and create necessary directories
+	if err := initializeSLS(); err != nil {
+		fmt.Printf("There was an error updating the server database: %v", err)
 		return
 	}
 
@@ -188,7 +165,7 @@ func main() {
 	// generates a SCIONLab VM
 	// TODO(ercanucan): fix the authentication
 	router.Handle("/api/as/generateVM", userChain.ThenFunc(
-		scionLabVMController.GenerateSCIONLabVM))
+		scionLabVMController.GenerateSCIONLabVM)).Methods(http.MethodPost)
 	router.Handle("/api/as/removeVM", userChain.ThenFunc(scionLabVMController.RemoveSCIONLabVM))
 	router.Handle("/api/as/downloads", userChain.ThenFunc(scionLabVMController.ReturnTarball))
 	router.Handle("/api/as/getSCIONLabVMASes/{account_id}/{secret}",

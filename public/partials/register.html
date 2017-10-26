@@ -16,20 +16,16 @@
 
     <form name="registration" ng-submit="register(user)">
       <div class="form-group has-feedback">
-        <input type="text" class="form-control" ng-model="user.first" name="first"
-               placeholder="First name"
-               ng-required="true">
+        <input type="text" class="form-control" ng-model="user.first" name="first" placeholder="First name" required>
         <span class="glyphicon glyphicon-user form-control-feedback"></span>
       </div>
       <div class="form-group has-feedback">
-        <input type="text" class="form-control" ng-model="user.last" name="last"
-               placeholder="Last name"
-               ng-required="true">
+        <input type="text" class="form-control" ng-model="user.last" name="last" placeholder="Last name" required>
         <span class="glyphicon glyphicon-user form-control-feedback"></span>
       </div>
       <div class="form-group has-feedback">
         <input type="text" class="form-control" ng-model="user.organisation" name="organisation"
-               placeholder="Organisation" ng-required="false">
+               placeholder="Organisation">
         <span class="glyphicon glyphicon-briefcase form-control-feedback"></span>
       </div>
       <div class="form-group has-feedback">

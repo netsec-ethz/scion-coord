@@ -22,7 +22,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"text/template"
+
+	"github.com/netsec-ethz/scion-coord/utility"
 )
 
 // Generates client keys and configuration necessary for a VPN-based setup
@@ -31,13 +32,9 @@ func (s *SCIONLabVMController) generateVPNConfig(svmInfo *SCIONLabVMInfo) error 
 	if err := s.generateVPNKeys(svmInfo); err != nil {
 		return err
 	}
-	t, err := template.ParseFiles("templates/client.conf.tmpl")
-	if err != nil {
-		return fmt.Errorf("Error parsing VPN template config: %v", err)
-	}
 
 	var caCert, clientCert, clientKey []byte
-	caCert, err = ioutil.ReadFile(CACertPath)
+	caCert, err := ioutil.ReadFile(CACertPath)
 	if err != nil {
 		return fmt.Errorf("Error reading CA certificate file: %v", err)
 	}
@@ -60,14 +57,12 @@ func (s *SCIONLabVMController) generateVPNConfig(svmInfo *SCIONLabVMInfo) error 
 		"ClientCert": clientCertStr[startCert:],
 		"ClientKey":  string(clientKey),
 	}
-	f, err := os.Create(filepath.Join(UserPackagePath(svmInfo.UserEmail), "client.conf"))
-	if err != nil {
-		return fmt.Errorf("Error creating VPN config file for user %v: %v", svmInfo.UserEmail, err)
+
+	if err := utility.FillTemplateAndSave("templates/client.conf.tmpl",
+		config, filepath.Join(UserPackagePath(svmInfo), "client.conf")); err != nil {
+		return err
 	}
-	if err = t.Execute(f, config); err != nil {
-		return fmt.Errorf("Error executing VPN template file for user %v: %v",
-			svmInfo.UserEmail, err)
-	}
+
 	return nil
 }
 

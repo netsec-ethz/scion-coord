@@ -20,6 +20,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"text/template"
 )
 
 // Simple utility function to copy a file.
@@ -72,4 +73,25 @@ func IPCompare(ip1, ip2 string) int8 {
 	} else {
 		return -1
 	}
+}
+
+// general helper function which fills a template with given data and saves it
+// to the specified path
+func FillTemplateAndSave(templatePath string, data interface{}, savePath string) error {
+
+	t, err := template.ParseFiles(templatePath)
+	if err != nil {
+		return fmt.Errorf("Error parsing template %v: %v", templatePath, err)
+	}
+	f, err := os.Create(savePath)
+	if err != nil {
+		return fmt.Errorf("Error creating file %v: %v", savePath, err)
+	}
+	err = t.Execute(f, data)
+	f.Close()
+
+	if err != nil {
+		return fmt.Errorf("Error executing template file %v: %v", templatePath, err)
+	}
+	return nil
 }

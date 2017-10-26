@@ -15,6 +15,7 @@
 package api
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -29,6 +30,8 @@ type vmInfo struct {
 	VMIP     string
 	ShowIP   bool
 	ShowVPN  bool
+	RemoteIA string
+	UserPort int
 }
 
 type buttonConfiguration struct {
@@ -48,72 +51,108 @@ type uiButtons struct {
 
 type userPageData struct {
 	User      user
-	VMInfo    vmInfo
-	UIButtons uiButtons
+	ActiveVMs []vmInfo
+	VMsInfo   []vmInfo
+	UIButtons []uiButtons
 }
 
 // generates the structs containing information about the user's VM and the
 // configuration of UI buttons
-func populateVMStatusButtons(userEmail string) (vmInfo, uiButtons, error) {
-	vmInfo := vmInfo{}
-	buttons := uiButtons{
-		Update: buttonConfiguration{
-			Text:            "Update and Download SCIONLab VM Configuration",
-			Action:          "update",
-			TooltipDisabled: "Updates are disabled as you have a pending request.",
-			Disable:         true,
-		},
-		Download: buttonConfiguration{
-			Text:            "Re-download my SCIONLab VM Configuration",
-			Action:          "download",
-			TooltipDisabled: "You currently do not have an active VM configuration.",
-		},
-		Remove: buttonConfiguration{
-			Text:            "Remove my SCIONLab VM Configuration",
-			Class:           "btn-danger",
-			Action:          "remove",
-			TooltipDisabled: "You currently do not have an active VM configuration.",
-			Disable:         true,
-		},
-	}
+func constructMeData(u user) (userPageData, error) {
 
-	vm, err := models.FindSCIONLabVMByUserEmail(userEmail)
+	var me userPageData
+	vmsInfo := []vmInfo{}
+	activeVMs := []vmInfo{}
+	allButtons := []uiButtons{}
+
+	scionLabServers, err := models.GetAllSCIONLabServerIAs()
 	if err != nil {
-		if err != orm.ErrNoRows {
-			return vmInfo, buttons, err
+		return me, err
+	}
+
+	for _, server := range scionLabServers {
+
+		vmInfo := vmInfo{
+			RemoteIA: server.IA,
+			UserPort: server.UserPort,
 		}
-	} else {
-		vmInfo.VMIP = vm.IP
-		vmInfo.VMStatus = vm.Status
-	}
-	switch vmInfo.VMStatus {
-	case INACTIVE:
-		vmInfo.VMText = "You currently do not have an active SCIONLab VM."
-		buttons.Update.Text = "Create and Download SCIONLab VM Configuration"
-		buttons.Update.Disable = false
-		buttons.Download.Hide = true
-		buttons.Remove.Hide = true
-	case ACTIVE:
-		vmInfo.VMText = "You currently have an active SCIONLab VM."
-		buttons.Update.Disable = false
-		buttons.Remove.Disable = false
-	case CREATE:
-		vmInfo.VMText = "You have a pending creation request for your SCIONLab VM."
-	case UPDATE:
-		vmInfo.VMText = "You have a pending update request for your SCIONLab VM."
-	case REMOVE:
-		vmInfo.VMText = "Your SCIONLab VM configuration is currently scheduled for removal."
-		buttons.Download.Disable = true
-	}
-	if vmInfo.VMStatus == ACTIVE || vmInfo.VMStatus == CREATE || vmInfo.VMStatus == UPDATE {
-		if vm.IsVPN {
-			vmInfo.ShowVPN = true
+		buttons := uiButtons{
+			Update: buttonConfiguration{
+				Text:            "Update and Download SCIONLab VM Configuration",
+				Action:          "update",
+				TooltipDisabled: "Updates are disabled as you have a pending request.",
+				Disable:         true,
+			},
+			Download: buttonConfiguration{
+				Text:            "Re-download my SCIONLab VM Configuration",
+				Action:          "download",
+				TooltipDisabled: "You currently do not have an active VM configuration.",
+			},
+			Remove: buttonConfiguration{
+				Text:            "Remove my SCIONLab VM Configuration",
+				Class:           "btn-danger",
+				Action:          "remove",
+				TooltipDisabled: "You currently do not have an active VM configuration.",
+				Disable:         true,
+			},
+		}
+
+		vm, err := models.FindSCIONLabVMByServerIAAndUserEmail(server.IA, u.Email)
+		if err != nil {
+			if err != orm.ErrNoRows {
+				return me, err
+			}
 		} else {
-			vmInfo.ShowIP = true
+			vmInfo.VMIP = vm.IP
+			vmInfo.VMStatus = vm.Status
+		}
+		switch vmInfo.VMStatus {
+		case INACTIVE:
+			vmInfo.VMText = fmt.Sprintf("You currently do not have "+
+				"an active VM configuration connected to AS %v.", server.IA)
+			buttons.Update.Text = "Create and Download SCIONLab VM Configuration"
+			buttons.Update.Disable = false
+			buttons.Download.Hide = true
+			buttons.Remove.Hide = true
+		case ACTIVE:
+			vmInfo.VMText = fmt.Sprintf("You currently have "+
+				"an active VM configuration connected to AS %v.", server.IA)
+			buttons.Update.Disable = false
+			buttons.Remove.Disable = false
+		case CREATE:
+			vmInfo.VMText = fmt.Sprintf("You have a pending creation request for your SCIONLab VM connected to AS %v.", server.IA)
+		case UPDATE:
+			vmInfo.VMText = fmt.Sprintf("You have a pending update request for your SCIONLab VM connected to AS %v.", server.IA)
+		case REMOVE:
+			vmInfo.VMText = "Your SCIONLab VM configuration is currently scheduled for removal."
+			buttons.Download.Disable = true
+		}
+		if vmInfo.VMStatus == ACTIVE || vmInfo.VMStatus == CREATE || vmInfo.VMStatus == UPDATE {
+			if vm.IsVPN {
+				vmInfo.ShowVPN = true
+			} else {
+				vmInfo.ShowIP = true
+			}
+		}
+
+		vmsInfo = append(vmsInfo, vmInfo)
+		allButtons = append(allButtons, buttons)
+	}
+
+	for _, vm := range vmsInfo {
+		if vm.VMStatus == ACTIVE {
+			activeVMs = append(activeVMs, vm)
 		}
 	}
 
-	return vmInfo, buttons, nil
+	me = userPageData{
+		User:      u,
+		VMsInfo:   vmsInfo,
+		ActiveVMs: activeVMs,
+		UIButtons: allButtons,
+	}
+
+	return me, nil
 }
 
 // generates the user-information struct to be used in dynamic HTML pages
@@ -158,7 +197,7 @@ func (c *LoginController) UserInformation(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	vmInfo, buttons, err := populateVMStatusButtons(user.Email)
+	me, err := constructMeData(user)
 	if err != nil {
 		c.Forbidden(err, w, r)
 		log.Printf("Error when generating VM info and button configuration for user %v: %v",
@@ -166,11 +205,5 @@ func (c *LoginController) UserInformation(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	userData := userPageData{
-		User:      user,
-		VMInfo:    vmInfo,
-		UIButtons: buttons,
-	}
-
-	c.JSON(&userData, w, r)
+	c.JSON(&me, w, r)
 }
