@@ -19,11 +19,14 @@ import (
 	"bytes"
 	"html/template"
 	"log"
+	"path/filepath"
 	"strings"
 
 	"github.com/keighl/postmark"
 	"github.com/netsec-ethz/scion-coord/config"
 )
+
+var EMAIL_TEMPLATES_PATH = "email/templates"
 
 type Email struct {
 	From    string
@@ -36,8 +39,13 @@ type Email struct {
 type EmailData struct {
 	FirstName        string
 	LastName         string
+	Protocol         string
 	HostAddress      string
 	VerificationUUID string
+}
+
+func EmailTemplatePath(template string) string {
+	return filepath.Join(EMAIL_TEMPLATES_PATH, template)
 }
 
 // Send connects to the PostMark email API and sends the email
@@ -71,7 +79,7 @@ func Send(mail *Email) error {
 func ConstructAndSend(emailTemplate string, subject string, data interface{},
 	tag string, userEmail string) (err error) {
 
-	tmpl, err := template.ParseFiles("email/templates/" + emailTemplate)
+	tmpl, err := template.ParseFiles(EmailTemplatePath(emailTemplate))
 	if err != nil {
 		log.Printf("Parsing template %v failed: %v", emailTemplate, err)
 		return err
