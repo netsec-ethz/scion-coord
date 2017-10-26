@@ -15,6 +15,7 @@
 package api
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -24,11 +25,12 @@ import (
 )
 
 type vmInfo struct {
-	VMStatus uint8
-	VMText   string
-	VMIP     string
-	ShowIP   bool
-	ShowVPN  bool
+	VMStatus uint8  // Current status of the VM
+	VMText   string // Text to be displayed by the frontent
+	VMIP     string // IP address of the VM
+	ShowIP   bool   // whether frontend should print the IP address
+	ShowVPN  bool   // whether frontend should print the VPN info
+	IA       string // ISD-AS information of the user's SCIONLab AS
 }
 
 type buttonConfiguration struct {
@@ -85,6 +87,7 @@ func populateVMStatusButtons(userEmail string) (vmInfo, uiButtons, error) {
 	} else {
 		vmInfo.VMIP = vm.IP
 		vmInfo.VMStatus = vm.Status
+		vmInfo.IA = fmt.Sprintf("%d-%d", vm.IA.Isd, vm.IA.As)
 	}
 	switch vmInfo.VMStatus {
 	case INACTIVE:

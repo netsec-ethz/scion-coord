@@ -76,7 +76,8 @@ func (r *registrationRequest) isValid() error {
 	// check if any of this is empty
 	if r.Email == "" || r.Password == "" || r.PasswordConfirmation == "" ||
 		r.First == "" || r.Last == "" {
-		return fmt.Errorf("%s\n", "You entered incomplete data. First and last name, email and password are mandatory fields.")
+		return fmt.Errorf("%s\n", "You entered incomplete data. First and last name, email and "+
+			"password are mandatory fields.")
 	}
 
 	// check if the password match and that the length is at least 8 chars
@@ -115,7 +116,8 @@ func (c *RegistrationController) SetPassword(w http.ResponseWriter, r *http.Requ
 
 	if err != nil {
 		log.Printf("Error setting password. %v is not a valid UUID.", passRequest.UUID)
-		c.BadRequest(fmt.Errorf("Error verifying email address. %v is not a valid user identifier.", passRequest.UUID), w, r)
+		c.BadRequest(fmt.Errorf("Error verifying email address. %v is not a valid user "+
+			"identifier.", passRequest.UUID), w, r)
 		return
 	}
 
@@ -145,7 +147,8 @@ func (c *RegistrationController) VerifyEmail(w http.ResponseWriter, r *http.Requ
 
 	if err != nil {
 		log.Printf("Error verifying email address. %v is not a valid UUID.", uuid)
-		c.BadRequest(fmt.Errorf("Error verifying email address. %v is not a valid user identifier.", uuid), w, r)
+		c.BadRequest(fmt.Errorf("Error verifying email address. %v is not a valid user "+
+			"identifier.", uuid), w, r)
 		return
 	}
 
@@ -155,12 +158,12 @@ func (c *RegistrationController) VerifyEmail(w http.ResponseWriter, r *http.Requ
 		// update user
 		if err := u.UpdateVerified(true); err != nil {
 			log.Printf("Error verifying email address for user %v: %v.", u.Email, err)
-			// TODO: Pass the user a unique error ID which links to the specific error and allows for debugging
 			c.Error500(fmt.Errorf("Error verifying email address for user %v.", u.Email), w, r)
 			return
 		}
 	}
 
+	// TODO (mlegner): Make verification page consistent with the rest of the website
 	// load validation page
 	t, err := template.ParseFiles("templates/layout.html", "templates/verified.html")
 	if err != nil {
@@ -256,12 +259,13 @@ func sendVerificationEmail(userID uint64) error {
 		return err
 	}
 
-	data := struct {
-		FirstName        string
-		LastName         string
-		HostAddress      string
-		VerificationUUID string
-	}{user.FirstName, user.LastName, config.HTTP_HOST_ADDRESS, user.VerificationUUID}
+	data := email.EmailData{
+		FirstName:        user.FirstName,
+		LastName:         user.LastName,
+		Protocol:         config.HTTP_PROTOCOL,
+		HostAddress:      config.HTTP_HOST_ADDRESS,
+		VerificationUUID: user.VerificationUUID,
+	}
 
 	if err := email.ConstructAndSend(
 		"verification.html",
