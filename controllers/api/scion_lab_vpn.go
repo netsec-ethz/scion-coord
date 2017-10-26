@@ -22,6 +22,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
 	"github.com/netsec-ethz/scion-coord/utility"
 )
 
@@ -64,7 +65,6 @@ func (s *SCIONLabVMController) generateVPNConfig(svmInfo *SCIONLabVMInfo) error 
 
 	return nil
 }
-
 
 // Creates the keys for VPN setup
 func (s *SCIONLabVMController) generateVPNKeys(svmInfo *SCIONLabVMInfo) error {

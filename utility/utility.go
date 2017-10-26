@@ -20,8 +20,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"strconv"
-	"strings"
 	"text/template"
 )
 
@@ -77,30 +75,23 @@ func IPCompare(ip1, ip2 string) int8 {
 	}
 }
 
-// Get ISD from IA string
-// TODO: Add some error handling
-func ISDFromIA(ia string) int {
-	i, _ := strconv.ParseInt(strings.Split(ia, "-")[0], 10, 64)
-	return int(i)
-}
-
 // general helper function which fills a template with given data and saves it
 // to the specified path
 func FillTemplateAndSave(templatePath string, data interface{}, savePath string) error {
 
 	t, err := template.ParseFiles(templatePath)
 	if err != nil {
-		return fmt.Errorf("Error parsing template %v: %v", templatePath,
-			err)
+		return fmt.Errorf("Error parsing template %v: %v", templatePath, err)
 	}
 	f, err := os.Create(savePath)
 	if err != nil {
 		return fmt.Errorf("Error creating file %v: %v", savePath, err)
 	}
-	if err = t.Execute(f, data); err != nil {
-		return fmt.Errorf("Error executing template file %v: %v", templatePath, err)
-	}
+	err = t.Execute(f, data)
 	f.Close()
 
+	if err != nil {
+		return fmt.Errorf("Error executing template file %v: %v", templatePath, err)
+	}
 	return nil
 }

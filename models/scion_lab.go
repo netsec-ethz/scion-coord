@@ -16,6 +16,7 @@ package models
 
 import (
 	"fmt"
+
 	"github.com/astaxie/beego/orm"
 	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/utility"
@@ -126,7 +127,8 @@ func InsertUpdateSLS(serverConfig config.SCIONLabServerConfig) error {
 		if sls.LastAssignedPort < serverConfig.ServerStartPort {
 			sls.LastAssignedPort = serverConfig.ServerStartPort
 		}
-		if sls.VPNLastAssignedIP == "" || utility.IPToInt(sls.VPNLastAssignedIP) < utility.IPToInt(serverConfig.ServerVPNStartIP) {
+		if sls.VPNLastAssignedIP == "" || utility.IPToInt(sls.VPNLastAssignedIP) < utility.IPToInt(
+			serverConfig.ServerVPNStartIP) {
 			sls.VPNLastAssignedIP = serverConfig.ServerVPNStartIP
 		}
 

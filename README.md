@@ -69,12 +69,12 @@ and then executing the following command:
 
 #### Credentials
 
-In order for the configurations to be generated, credentials for all ISDs (%) with SCIONLab ASes
-must exist:
+In order for the configurations to be generated, for each ISD with a SCIONLabServer the following
+files must exist (here shown for ISD1):
 ```
-credentials/ISD%.crt
-credentials/ISD%.key
-credentials/ISD%.trc
+credentials/ISD1.crt (certificate of one core AS in the ISD)
+credentials/ISD1.key (signing key of one core AS in the ISD)
+credentials/ISD1.trc (TRC of the ISD)
 ```
 
 

@@ -30,12 +30,12 @@ import (
 	"github.com/netsec-ethz/scion-coord/controllers/api"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/models"
-	"github.com/netsec-ethz/scion-coord/utility"
+	"github.com/netsec-ethz/scion/go/lib/addr"
 )
 
 // make sure that data about SCIONLab ASes in database is correct
 // TODO (mlegner): remove deprecated servers?
-// TODO (mlegner): replace this by an init script and a admin interface at some point.
+// TODO (mlegner): replace this by an init script and an admin interface at some point.
 func initializeSLS() error {
 	for _, s := range config.SERVERS {
 		if err := models.InsertUpdateSLS(s); err != nil {
@@ -49,12 +49,16 @@ func initializeSLS() error {
 // check if credential files exist and create necessary directories
 func checkCredentialsDirectories() error {
 	for _, server := range config.SERVERS {
-		isd := utility.ISDFromIA(server.IA)
-		for _, f := range []string{api.TrcFile(isd), api.CoreCertFile(isd), api.CoreSigKey(isd)} {
+		ia, err := addr.IAFromString(server.IA)
+		if err != nil {
+			return err
+		}
+		for _, f := range []string{api.TrcFile(ia.I), api.CoreCertFile(ia.I),
+			api.CoreSigKey(ia.I)} {
 			if _, err := os.Stat(f); err != nil {
 				if os.IsNotExist(err) {
-					return fmt.Errorf("ERROR: Credential file %s does not exist. Please make " +
-						"sure that the necessary credential files exist.\n" +
+					return fmt.Errorf("ERROR: Credential file %s does not exist. Please make "+
+						"sure that the necessary credential files exist.\n"+
 						"Consult the README.md for further details.", f)
 				} else {
 					return fmt.Errorf("An error occurred when accessing " + f + ".")

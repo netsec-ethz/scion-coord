@@ -15,10 +15,10 @@
 package api
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
-	"fmt"
 	"github.com/astaxie/beego/orm"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/models"
@@ -140,7 +140,7 @@ func constructMeData(u user) (userPageData, error) {
 	}
 
 	for _, vm := range vmsInfo {
-		if vm.VMStatus == 1 {
+		if vm.VMStatus == ACTIVE {
 			activeVMs = append(activeVMs, vm)
 		}
 	}
