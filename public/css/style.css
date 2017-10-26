@@ -4,3 +4,14 @@ input.ng-dirty.ng-invalid{
 .error{
   color: red;
 }
+.spacer{
+  margin: 0;
+  padding: 0;
+  height: 50px;
+}
+.footer {
+  padding-top: 10px;
+}
+td {
+  vertical-align:top;
+}

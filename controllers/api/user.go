@@ -46,7 +46,7 @@ type uiButtons struct {
 	Remove   buttonConfiguration // Button to remove VM
 }
 
-type meData struct {
+type userPageData struct {
 	User      user
 	VMInfo    vmInfo
 	UIButtons uiButtons
@@ -116,8 +116,8 @@ func populateVMStatusButtons(userEmail string) (vmInfo, uiButtons, error) {
 	return vmInfo, buttons, nil
 }
 
-// API function that generates all information necessary for displaying the user page
-func (c *LoginController) Me(w http.ResponseWriter, r *http.Request) {
+// generates the user-information struct to be used in dynamic HTML pages
+func populateUserData(w http.ResponseWriter, r *http.Request) (u user, err error) {
 	// get the current user session if present.
 	// if not then, abort
 	_, userSession, err := middleware.GetUserSession(r)
@@ -131,32 +131,46 @@ func (c *LoginController) Me(w http.ResponseWriter, r *http.Request) {
 	// retrieve the user via the email
 	storedUser, err := models.FindUserByEmail(userSession.Email)
 	if err != nil {
-		c.Forbidden(err, w, r)
 		return
 	}
 
-	user := user{
+	u = user{
 		Email:        storedUser.Email,
 		FirstName:    storedUser.FirstName,
 		LastName:     storedUser.LastName,
+		IsAdmin:      storedUser.IsAdmin,
 		Account:      storedUser.Account.Name,
 		Organisation: storedUser.Account.Organisation,
 		AccountID:    storedUser.Account.AccountId,
 		Secret:       storedUser.Account.Secret,
 	}
-	vmInfo, buttons, err := populateVMStatusButtons(userSession.Email)
+
+	return
+}
+
+// API function that generates all information necessary for displaying the user page
+func (c *LoginController) UserInformation(w http.ResponseWriter, r *http.Request) {
+
+	user, err := populateUserData(w, r)
 	if err != nil {
+		log.Println(err)
 		c.Forbidden(err, w, r)
-		log.Printf("Error when generating VM info and button configuration for user %v: %v",
-			userSession.Email, err)
 		return
 	}
 
-	me := meData{
+	vmInfo, buttons, err := populateVMStatusButtons(user.Email)
+	if err != nil {
+		c.Forbidden(err, w, r)
+		log.Printf("Error when generating VM info and button configuration for user %v: %v",
+			user.Email, err)
+		return
+	}
+
+	userData := userPageData{
 		User:      user,
 		VMInfo:    vmInfo,
 		UIButtons: buttons,
 	}
 
-	c.JSON(&me, w, r)
+	c.JSON(&userData, w, r)
 }
