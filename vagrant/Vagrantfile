@@ -16,6 +16,8 @@ Vagrant.configure(2) do |config|
     cd scion
     bash -c 'yes | GO_INSTALL=true ./env/deps'
     cp -r /vagrant/gen .
+    echo "alias cdscion='cd /home/ubuntu/go/src/github.com/netsec-ethz/scion'" >> ~/.bash_aliases
+    echo "alias checkbeacons='tail -f /home/ubuntu/go/src/github.com/netsec-ethz/scion/logs/bs*.DEBUG'" >> ~/.bash_aliases
   SCRIPT
   $setup_openvpn = <<-SCRIPT
     if [ -e /vagrant/client.conf ] # do OpenVPN setup only if config file is present
@@ -30,6 +32,11 @@ Vagrant.configure(2) do |config|
         echo "No OpenVPN configuration present; keeping standard setup."
     fi
   SCRIPT
+  $setup_systemd_service = <<-SCRIPT
+    cp /vagrant/scion.service /etc/systemd/system/
+    systemctl enable scion.service
+    systemctl start scion.service
+  SCRIPT
   config.vm.box = "scion/ubuntu-16.04-64-scion"
   # Port forwarding not necessary for OpenVPN setup...
   config.vm.network "forwarded_port", guest: 50000, host: 50000, protocol: "udp"
@@ -39,4 +46,5 @@ Vagrant.configure(2) do |config|
   end
   config.vm.provision "shell", privileged: false, inline: $setup_scion
   config.vm.provision "shell", privileged: true, inline: $setup_openvpn
+  config.vm.provision "shell", privileged: true, inline: $setup_systemd_service
 end
