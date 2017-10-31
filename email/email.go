@@ -17,11 +17,12 @@ package email
 
 import (
 	"bytes"
-	"github.com/keighl/postmark"
-	"github.com/netsec-ethz/scion-coord/config"
 	"html/template"
 	"log"
 	"strings"
+
+	"github.com/keighl/postmark"
+	"github.com/netsec-ethz/scion-coord/config"
 )
 
 type Email struct {
