@@ -17,6 +17,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -29,10 +30,10 @@ import (
 	"text/template"
 	"time"
 
-	"errors"
 	"github.com/astaxie/beego/orm"
 	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/controllers"
+	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/email"
 	"github.com/netsec-ethz/scion-coord/models"
 	"github.com/netsec-ethz/scion-coord/utility"
@@ -98,9 +99,7 @@ type SCIONLabVMInfo struct {
 }
 
 // The main handler function to generates a SCIONLab VM for the given user.
-// If successful, it will return the filename of the tarball to download
-// as well as a message to be printed.
-// The front-end will then initiate the downloading of the tarball.
+// If successful, the front-end will initiate the downloading of the tarball.
 func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http.Request) {
 	// Parse the arguments
 	isVPN, scionLabVMIP, userEmail, err := s.parseURLParameters(r)
@@ -171,11 +170,16 @@ func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http
 
 // Parses the necessary parameters from the URL: whether or not this is a VPN setup,
 // the user's email address, and the public IP of the user's machine.
-func (s *SCIONLabVMController) parseURLParameters(r *http.Request) (bool, string, string, error) {
+func (s *SCIONLabVMController) parseURLParameters(r *http.Request) (bool,
+	string, string, error) {
+	_, userSession, err := middleware.GetUserSession(r)
+	if err != nil {
+		return false, "", "", fmt.Errorf("Error getting the user session: %v", err)
+	}
+	userEmail := userSession.Email
 	if err := r.ParseForm(); err != nil {
 		return false, "", "", fmt.Errorf("Error parsing the form: %v", err)
 	}
-	userEmail := r.Form["userEmail"][0]
 	scionLabVMIP := r.Form["scionLabVMIP"][0]
 	isVPN, _ := strconv.ParseBool(r.Form["isVPN"][0])
 	if !isVPN && scionLabVMIP == "undefined" {
@@ -651,12 +655,12 @@ func sendConfirmationEmail(userEmail, action string) error {
 
 // API end-point to serve the generated SCIONLab VM configuration tarball.
 func (s *SCIONLabVMController) ReturnTarball(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Inside ReturnTarball = %v", r.URL.Query())
-	fileName := r.URL.Query().Get("filename")
-	if len(fileName) == 0 {
-		s.BadRequest(fmt.Errorf("fileName parameter missing."), w, r)
-		return
+	_, userSession, err := middleware.GetUserSession(r)
+	if err != nil {
+		log.Printf("Error getting the user session: %v", err)
+		s.Error500(err, w, r)
 	}
+	fileName := userSession.Email + ".tar.gz"
 	filePath := filepath.Join(PackagePath, fileName)
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
@@ -666,19 +670,19 @@ func (s *SCIONLabVMController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
 	w.Header().Set("Content-Transfer-Encoding", "binary")
-	http.ServeContent(w, r, "/api/as/downloads/"+fileName, time.Now(), bytes.NewReader(data))
+	http.ServeContent(w, r, fileName, time.Now(), bytes.NewReader(data))
 }
 
 // The handler function to remove a SCIONLab VM for the given user.
 // If successful, it will return a 200 status with an empty response.
 func (s *SCIONLabVMController) RemoveSCIONLabVM(w http.ResponseWriter, r *http.Request) {
-	// Parse the argument
-	if err := r.ParseForm(); err != nil {
-		log.Printf("Error parsing the form in RemoveSCIONLabVM: %v", err)
-		s.BadRequest(err, w, r)
-		return
+	_, userSession, err := middleware.GetUserSession(r)
+	if err != nil {
+		log.Printf("Error getting the user session: %v", err)
+		s.Error500(err, w, r)
 	}
-	userEmail := r.Form["userEmail"][0]
+	userEmail := userSession.Email
+
 	// check if there is an active VM which can be removed
 	canRemove, svm, err := s.canRemove(userEmail)
 	if err != nil {

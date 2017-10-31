@@ -93,7 +93,8 @@ func preregisterAndSendInvitation(userSession *models.Session, invitation *invit
 		UUID:             user.VerificationUUID,
 	}
 
-	email.ConstructAndSend("invitation.html", "[SCIONLab] Invitation to join the SCION network", data, "scion-invitation", invitation.Email)
+	email.ConstructAndSend("invitation.html", "[SCIONLab] Invitation to join the SCION network",
+		data, "scion-invitation", invitation.Email)
 
 	return nil
 }
