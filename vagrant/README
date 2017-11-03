@@ -62,8 +62,16 @@ Finally, you can run `vagrant ssh` to connect to your VM, where you can run SCIO
 
 The SCION infrastructure is automatically started when the VM boots up.
 
-After your setup is activated at the designated SCIONLab AS, you should be able to see the beacons being received.
-You can test this by checking the logs in `/go/src/github.com/netsec-ethz/scion/logs/` or by calling `checkbeacons`.
+After your setup is activated at the designated SCIONLab AS, you should be able to see the beacons
+being received.
+You can test this by checking the logs in `/go/src/github.com/netsec-ethz/scion/logs/` or by simply
+calling `checkbeacons`.
+
+
+## Displaying topology visualizations
+
+You can access the SCION AS Visualization Tool at `localhost:8000` from outside the VM.
+The tool is automatically started inside the VM and displays paths to other SCION ASes.
 
 
 ## Stopping and Restarting the VM
