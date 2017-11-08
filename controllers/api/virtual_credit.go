@@ -94,7 +94,17 @@ func (c *ASController) ListAsesConnectionsWithCredits(w http.ResponseWriter, r *
 	fmt.Fprintln(w, string(b))
 }
 
-func (c *ASController) checkAndUpdateCredits(w http.ResponseWriter, r *http.Request, cr *ConnRequest) error {
+/*
+	Checks if the requester has enough credits to open a ConnectionRequest.
+	If the requester has enough, he will pay the credit at this moment. If the request will
+	be not accepted later, the requester will get his Credits back.
+
+	The function will handle the response itself in case of an error. If everything was fine the
+	function returns nil.
+*/
+func (c *ASController) checkAndUpdateCredits(w http.ResponseWriter, r *http.Request,
+	cr *ConnRequest) error {
+
 	if config.VIRTUAL_CREDIT_ENABLE == false {
 		return systemDisabledError
 	}
@@ -108,13 +118,14 @@ func (c *ASController) checkAndUpdateCredits(w http.ResponseWriter, r *http.Requ
 
 	var creditsNeeded = models.BandwidthToCredits(cr.Bandwidth)
 	if (as.Credits - creditsNeeded) <= 0 {
-		err = errors.New(fmt.Sprintf("Error: Not enough credits to create a connection request! You need %v, but have only %v", creditsNeeded, as.Credits))
+		err = errors.New(fmt.Sprintf("Error: Not enough credits to create a connection request! "+
+			"You need %v, but have only %v", creditsNeeded, as.Credits))
 		log.Printf("Info: Not enough credits! AS: %v, Request: %v, Error: %v", as, r.Body, err)
 		c.BadRequest(err, w, r)
 		return err
 	}
 
-	// Subtract credits from AS
+	// Subtracting credits from AS
 	if err := as.UpdateCurrency(-1 * creditsNeeded); err != nil {
 		log.Printf("Error: Substracting credits! AS: %v, Request: %v, Error: %v", as, r.Body, err)
 		c.Error500(err, w, r)
@@ -123,7 +134,16 @@ func (c *ASController) checkAndUpdateCredits(w http.ResponseWriter, r *http.Requ
 	return nil
 }
 
-func (c *ASController) checkAndUpdateCreditsAtResponse(w http.ResponseWriter, r *http.Request, cr *models.ConnRequest, reply ConnReply) error {
+/*
+	Handles the credit transaction for the requester and the target when an ConnectionResponse is
+	sent.
+
+	The function will handle the response itself in case of an error and returns the error.
+	If everything was fine, the function returns nil.
+*/
+func (c *ASController) checkAndUpdateCreditsAtResponse(w http.ResponseWriter, r *http.Request,
+	cr *models.ConnRequest, reply ConnReply) error {
+
 	if !config.VIRTUAL_CREDIT_ENABLE == false {
 		return systemDisabledError
 	}
@@ -155,6 +175,12 @@ func (c *ASController) checkAndUpdateCreditsAtResponse(w http.ResponseWriter, r 
 	return nil
 }
 
+/*
+	If an error occurs while handling the COnnectionResponse, this function will rollback the change
+	in credits.
+
+	If everything was fine, the function returns nil.
+*/
 func (c *ASController) rollBackCreditUpdate(w http.ResponseWriter, r *http.Request, cr *ConnRequest) {
 	if !config.VIRTUAL_CREDIT_ENABLE {
 		return
@@ -170,6 +196,7 @@ func (c *ASController) rollBackCreditUpdate(w http.ResponseWriter, r *http.Reque
 	var creditsNeeded = models.BandwidthToCredits(cr.Bandwidth)
 	// Roll back UpdateCurrency changes
 	if err := as.UpdateCurrency(creditsNeeded); err != nil {
-		log.Printf("Critical error: Can't roll back UpdateCurrency changes! Credits: %v, AS: %v, Request: %v, Error: %v", creditsNeeded, as, r.Body, err)
+		log.Printf("Critical error: Can't roll back UpdateCurrency changes! "+
+			"Credits: %v, AS: %v, Request: %v, Error: %v", creditsNeeded, as, r.Body, err)
 	}
 }
