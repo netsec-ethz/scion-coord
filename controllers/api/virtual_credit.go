@@ -62,9 +62,8 @@ func (c *ASController) ListAsesConnectionsWithCredits(w http.ResponseWriter, r *
 	}
 
 	vars := mux.Vars(r)
-	isdas := vars["isdas"]
-
-	if isdas == "" {
+	isdas, ok := vars["isdas"]
+	if !ok {
 		c.BadRequest(errors.New("missing isdas parameter"), w, r)
 		return
 	}
