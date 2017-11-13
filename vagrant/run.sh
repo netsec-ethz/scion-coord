@@ -64,7 +64,8 @@ run_linux() {
         fi
         run_vagrant
     else
-        echo "Currently, SCIONLabVM does not support your linux distribution."
+        echo "Currently, this script does not support your linux distribution."
+        echo "Please follow the instructions in the README file to run the SCIONLab VM."
     fi
 }
 
@@ -75,5 +76,6 @@ case "$OSTYPE" in
   linux*)
         "run_linux" ;;
   solaris*|bsd*|msys|*) 
-    echo "Currently, SCIONLabVM does not support $OSTYPE system." ;;
+    echo "Currently, this script does not support $OSTYPE system."
+    echo "Please follow the instructions in the README file to run the SCIONLab VM." ;;
 esac
