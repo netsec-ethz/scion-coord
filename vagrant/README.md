@@ -11,8 +11,6 @@ the necessary packages to run SCIONLabVM, such as `vagrant` and `virtualbox`.
 It will also create and configure the SCIONLabVM automatically.
 
 Please Note: SCIONLabVM requires `vagrant 1.9.7`, `virtualbox 5.0.4` or above.
-SCIONLabVM also requires that your host machine has a public IP address and
-can receive UDP traffic on port 50000.
 
 In order to install the latest version of packages, the shell script will run
 apt-get update on your system. Please make sure that all the running VMs are
@@ -49,11 +47,10 @@ https://www.vagrantup.com/downloads.html
 
 Afterwards, open a terminal window and go to the SCIONLabVM folder where the
 `Vagrantfile` is located. Now, you can run `vagrant up`. The command will
-automatically download the base VM image storing `ubuntu/xenial64`, and
+automatically download the base VM image storing `ubuntu/ubuntu-16.04-64-scion`, and
 install SCION with all other dependencies.
 
-If the `vagrant up` command returns the prompt, you are ready to have fun
-with SCIONLabVM.
+If the `vagrant up` command returns the prompt, you are ready to have fun with SCIONLabVM.
 
 Finally, you can run `vagrant ssh` to connect to your VM, where you can run SCION as described below.
 
@@ -81,6 +78,20 @@ In order to stop the VM, run `vagrant halt` from the downloaded configuration fo
 If you want start the VM again, just run `vagrant up`.
 More information for `vagrant` commands can be found at:
 https://www.vagrantup.com/docs/cli
+
+## Troubleshooting
+
+If an error occurs during the setup process (e.g., a network disruption) the virtual machine may not
+be fully functional. In this case you can either manually run the commands specified in the
+`Vagrantfile` or alternatively call
+    vagrant destroy
+    vagrant up
+from inside the directory where you unpacked your vm configuration (i.e., where the `Vagrantfile` is
+located).
+
+If you experience problems with the topology visualization, you may want to manually restart the
+SCION infrastructure by either calling `sudo systemctl restart scion.service` or by moving to the
+scion directory and calling `./scion.sh stop` followed by `./scion.sh run`.
 
 
 ## Current Vagrant Configuration
