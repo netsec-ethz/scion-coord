@@ -190,7 +190,8 @@ func main() {
 	router.Handle("/api/as/generateVM", userChain.ThenFunc(
 		scionLabVMController.GenerateSCIONLabVM))
 	router.Handle("/api/as/removeVM", userChain.ThenFunc(scionLabVMController.RemoveSCIONLabVM))
-	router.Handle("/api/as/downloads", userChain.ThenFunc(scionLabVMController.ReturnTarball))
+	router.Handle("/api/as/downloadTarball", userChain.ThenFunc(
+		scionLabVMController.ReturnTarball))
 	router.Handle("/api/as/getSCIONLabVMASes/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabVMController.GetSCIONLabVMASes))
 	router.Handle("/api/as/confirmSCIONLabVMASes/{account_id}/{secret}",

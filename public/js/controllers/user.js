@@ -44,8 +44,8 @@ scionApp
                 }
             };
 
-            let downloadlink = function (user) {
-                return ('/api/as/downloads?filename=' + user["Email"] + '.tar.gz');
+            let downloadlink = function () {
+                return ('/api/as/downloadTarball');
             };
 
             $scope.generateSCIONLabVM = function (user) {
@@ -55,7 +55,7 @@ scionApp
                 userService.generateSCIONLabVM(user).then(
                     function (data) {
                         console.log(data);
-                        window.location.assign(downloadlink(user));
+                        window.location.assign(downloadlink());
                         $scope.message = data;
                         $scope.userPageData();
                     },
@@ -69,7 +69,7 @@ scionApp
                 $scope.error = "";
                 $scope.message = "";
 
-                window.location.assign(downloadlink(user));
+                window.location.assign(downloadlink());
             };
 
             $scope.removeSCIONLabVM = function (user) {

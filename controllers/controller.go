@@ -74,7 +74,7 @@ func (c HTTPController) JSON(data interface{}, w http.ResponseWriter, r *http.Re
 func (c HTTPController) Plain(data string, w http.ResponseWriter, r *http.Request) {
 
 	// Set plain text header
-	w.Header().Set("Content-Type", "test/plain; charset=utf-8")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	// write the content to socket
 	if _, err := w.Write([]byte(data)); err != nil {
 		log.Printf("Error writing data to socket: %v", err)
