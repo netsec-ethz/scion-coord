@@ -17,6 +17,7 @@ package models
 import (
 	"fmt"
 
+	"github.com/astaxie/beego/orm"
 	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion/go/lib/addr"
 )
@@ -88,4 +89,15 @@ func (as *As) ListConnections() ([]ConnectionWithCredits, error) {
 	}
 
 	return connections, err
+}
+
+// Changes the Credits the AS has. CreditsDiff can be negative to substract and be positive to add Credits
+func (as *As) UpdateCurrency(CreditsDiff int64) error {
+	as.Credits += CreditsDiff
+	// Can't use update because of missing pk error (but pk is set, beego have some serious problems)
+	_, err := o.QueryTable(as).Filter("Isd", as.Isd).Filter("As", as.As).Update(orm.Params{
+		"credits": as.Credits,
+	})
+
+	return err
 }
