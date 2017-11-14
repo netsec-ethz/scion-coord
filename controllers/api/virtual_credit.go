@@ -149,7 +149,7 @@ func (c *ASController) checkAndUpdateCreditsAtResponse(w http.ResponseWriter, r 
 	}
 
 	as, _ := models.FindAsByIsdAs(cr.RequestIA)
-	var credits = models.BandwidthToCredits(cr.Bandwidth)
+	credits := models.BandwidthToCredits(cr.Bandwidth)
 	// If the connection is approved, add credits to the responding AS
 	if cr.Status == models.APPROVED {
 		otherAs, err := models.FindAsByIsdAs(cr.RespondIA)
@@ -193,7 +193,7 @@ func (c *ASController) rollBackCreditUpdate(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	var creditsNeeded = models.BandwidthToCredits(cr.Bandwidth)
+	creditsNeeded := models.BandwidthToCredits(cr.Bandwidth)
 	// Roll back UpdateCurrency changes
 	if err := as.UpdateCurrency(creditsNeeded); err != nil {
 		log.Printf("Critical error: Can't roll back UpdateCurrency changes! "+
