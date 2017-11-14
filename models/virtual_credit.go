@@ -18,14 +18,8 @@ import (
 	"fmt"
 
 	"github.com/astaxie/beego/orm"
-	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion/go/lib/addr"
 )
-
-// The start credits a new AS gets
-func StartCredits() int64 {
-	return config.VIRTUAL_CREDIT_START_CREDITS
-}
 
 // Converts a bandwidth into credits (10 MegaBits/s=1 Credit)
 func BandwidthToCredits(bandwidthInKilobits uint64) int64 {

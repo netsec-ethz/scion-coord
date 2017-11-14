@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/astaxie/beego/orm"
+	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion/go/lib/addr"
 )
 
@@ -78,7 +79,7 @@ func (as *As) Insert() error {
 	} else if err != orm.ErrNoRows { // some other error occurred during lookup
 		return err
 	}
-	as.Credits = StartCredits()
+	as.Credits = config.VIRTUAL_CREDIT_START_CREDITS
 	_, err = o.Insert(as)
 	return err
 }
