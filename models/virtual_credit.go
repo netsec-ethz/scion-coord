@@ -50,7 +50,7 @@ type ConnectionWithCredits struct {
 // Look for all connection to and from this AS and calculates the necessary credits for it
 func (as *As) ListConnections() ([]ConnectionWithCredits, error) {
 	var connections []ConnectionWithCredits
-	var isdas = fmt.Sprintf("%v-%v", as.Isd, as.As)
+	isdas := fmt.Sprintf("%v-%v", as.Isd, as.As)
 
 	// Outgoing ones (this AS pays for)
 	var outGoings []ConnRequest
