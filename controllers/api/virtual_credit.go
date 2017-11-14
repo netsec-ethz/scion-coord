@@ -31,24 +31,24 @@ var systemDisabledError error = errors.New("VirtualCredit system disabled. This 
 
 // REST resource to list the payed connections from one AS (identified by the parameter 'isdas')
 // Example Response:
-/*
-{
-  "ISD": 1,
-  "AS": 1,
-  "Credits": 10,
-  "Connections": [
-    {
-      "ISD": 1,
-      "AS": 2,
-      "CreditBalance": 10,
-      "Bandwidth": 100000,
-      "IsOutgoing": false,
-      "Timestamp": "2017-07-17 13:59:37.396791+00:00"
-    }
-  ]
-}
-*/
-func (c *ASController) ListAsesConnectionsWithCredits(w http.ResponseWriter, r *http.Request) {
+//
+//{
+//  "ISD": 1,
+//  "AS": 1,
+//  "Credits": 10,
+//  "Connections": [
+//      {
+//        "ISD": 1,
+//        "AS": 2,
+//        "CreditBalance": 10,
+//        "Bandwidth": 100000,
+//        "IsOutgoing": false,
+//        "Timestamp": "2017-07-17 13:59:37.396791+00:00"
+//      }
+//  ]
+//}
+
+func (c *ASController) ListASesConnectionsWithCredits(w http.ResponseWriter, r *http.Request) {
 	if config.VIRTUAL_CREDIT_ENABLE == false {
 		c.NotFound(systemDisabledError, w, r)
 		return
@@ -94,14 +94,14 @@ func (c *ASController) ListAsesConnectionsWithCredits(w http.ResponseWriter, r *
 	fmt.Fprintln(w, string(b))
 }
 
-/*
-	Checks if the requester has enough credits to open a ConnectionRequest.
-	If the requester has enough, he will pay the credit at this moment. If the request will
-	be not accepted later, the requester will get his Credits back.
-
-	The function will handle the response itself in case of an error. If everything was fine the
-	function returns nil.
-*/
+//
+//	Checks if the requester has enough credits to open a ConnectionRequest.
+//	If the requester has enough, he will pay the credit at this moment. If the request will
+//	be not accepted later, the requester will get his Credits back.
+//
+//	The function will handle the response itself in case of an error. If everything was fine the
+//	function returns nil.
+//
 func (c *ASController) checkAndUpdateCredits(w http.ResponseWriter, r *http.Request,
 	cr *ConnRequest) error {
 
@@ -134,13 +134,13 @@ func (c *ASController) checkAndUpdateCredits(w http.ResponseWriter, r *http.Requ
 	return nil
 }
 
-/*
-	Handles the credit transaction for the requester and the target when an ConnectionResponse is
-	sent.
-
-	The function will handle the response itself in case of an error and returns the error.
-	If everything was fine, the function returns nil.
-*/
+//
+//	Handles the credit transaction for the requester and the target when a ConnectionResponse is
+//	sent.
+//
+//	The function will handle the response itself in case of an error and returns the error.
+//	If everything was fine, the function returns nil.
+//
 func (c *ASController) checkAndUpdateCreditsAtResponse(w http.ResponseWriter, r *http.Request,
 	cr *models.ConnRequest, reply ConnReply) error {
 
@@ -175,12 +175,12 @@ func (c *ASController) checkAndUpdateCreditsAtResponse(w http.ResponseWriter, r 
 	return nil
 }
 
-/*
-	If an error occurs while handling the COnnectionResponse, this function will rollback the change
-	in credits.
-
-	If everything was fine, the function returns nil.
-*/
+//
+//	If an error occurs while handling the ConnectionResponse, this function will rollback the change
+//	in credits.
+//
+//	If everything was fine, the function returns nil.
+//
 func (c *ASController) rollBackCreditUpdate(w http.ResponseWriter, r *http.Request, cr *ConnRequest) {
 	if !config.VIRTUAL_CREDIT_ENABLE {
 		return

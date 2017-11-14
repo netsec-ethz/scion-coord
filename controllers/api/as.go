@@ -338,7 +338,7 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 	// Check if the AS has enough credits for that connection and
 	// update new credits for both ASes
 	if err := c.checkAndUpdateCredits(w, r, &cr); err != nil {
-		// logs the error and writes back the response
+		// The function itself takes care of logging eventual errors and writing back the response
 		return
 	}
 
@@ -363,7 +363,7 @@ func (c *ASController) UploadConnRequest(w http.ResponseWriter, r *http.Request)
 		log.Printf("Error inserting Connection Request. Account %v AS %v: %v", account,
 			cr.RequestIA, err)
 		c.Error500(err, w, r)
-		// The credits will be granted in hindsight and must be removed in case of an error (now)
+		// The credits will be granted in foresight and must be removed in case of an error (now)
 		c.rollBackCreditUpdate(w, r, &cr)
 		return
 	}
@@ -427,7 +427,7 @@ func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 	// APPROVED = add credits to the receiver
 	// DENIED = give credits back to the initiator
 	if err := c.checkAndUpdateCreditsAtResponse(w, r, cr, reply); err != nil {
-		// logs the error and writes back the response
+		// The function itself takes care of logging eventual errors and writing back the response
 		return
 	}
 

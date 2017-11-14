@@ -51,7 +51,7 @@ func (as *As) ListConnections() ([]ConnectionWithCredits, error) {
 	var connections []ConnectionWithCredits
 	var isdas = fmt.Sprintf("%v-%v", as.Isd, as.As)
 
-	// Outgoing ones (this AS paid for)
+	// Outgoing ones (this AS pays for)
 	var outGoings []ConnRequest
 	_, err := o.QueryTable("conn_request").Filter("status", APPROVED).Filter("request_i_a", isdas).All(&outGoings)
 	if err != nil {
@@ -69,7 +69,7 @@ func (as *As) ListConnections() ([]ConnectionWithCredits, error) {
 		})
 	}
 
-	// incoming ones (this AS get Credits for)
+	// Incoming ones (this AS gets Credits for)
 	var inComings []ConnRequest
 	_, err = o.QueryTable("conn_request").Filter("status", APPROVED).Filter("respond_i_a", isdas).All(&inComings)
 	if err != nil {
