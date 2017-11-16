@@ -14,67 +14,197 @@
 
 package models
 
-type SCIONLabServer struct {
-	Id                uint64 `orm:"column(id);auto;pk"`
-	IA                string `orm:"unique"` // ISD-AS in which the server is located
-	IP                string // IP address of the machine
-	LastAssignedPort  int    // the last given out port number
-	VPNIP             string // IP address of the machine inside the VPN
-	VPNLastAssignedIP string // the last given out IP address for the VPN
+import (
+	"github.com/netsec-ethz/scion/go/lib/addr"
+	"strconv"
+)
+
+type AttachmentPoint struct {
+	Id          uint64 `orm:"column(id);auto;pk"`
+	VPNIP       string
+	StartVPNIP  string
+	EndVPNIP    string
+	AS          *SCIONLabAS   `orm:"reverse(one)"`
+	Connections []*Connection `orm:"reverse(many);index"` // List of Connections
 }
 
-func (sls *SCIONLabServer) Insert() error {
-	_, err := o.Insert(sls)
+type SCIONLabAS struct {
+	Id          uint64           `orm:"column(id);auto;pk"`
+	UserEmail   string           // Email address of the Owning user
+	PublicIP    string           // IP address of the SCIONLabAS
+	BindIP      string           // Used for VPN connections specific to each type of AS
+	IA          string           // IA in the form "ISD-AS"
+	Core        bool             `orm:"default(false)"` // Is this SCIONLabAS a core AS
+	Status      uint8            `orm:"default(0)"`     // Status of the AS (i.e Active, Create, Update, Remove)
+	Type        uint8            // Type of the AS: (VM, DEDICATED, BOX, SERVER)
+	AP          *AttachmentPoint `orm:"null;rel(one);on_delete(set_null)"`
+	Connections []*Connection    `orm:"reverse(many)"` // List of Connections
+}
+
+type Connection struct {
+	Id           uint64           `orm:"column(id);auto;pk"`
+	InitAS       *SCIONLabAS      `orm:"rel(fk)"` // AS which initiated the connection
+	AcceptAP     *AttachmentPoint `orm:"rel(fk)"` // AS which accepted the connection
+	InitIP       string
+	AcceptIP     string
+	InitPort     int    // Port used by initiating AS
+	AcceptPort   int    // Port used by accepting AS
+	Linktype     string // PARENT -> Acceptor is Parent
+	IsVPN        bool
+	InitStatus   string // "new", "up", "delete", "deleted"
+	AcceptStatus string
+}
+
+func (ap *AttachmentPoint) Insert() error {
+	_, err := o.Insert(ap)
 	return err
 }
 
-func (sls *SCIONLabServer) Update() error {
-	_, err := o.Update(sls)
+func (ap *AttachmentPoint) Update() error {
+	_, err := o.Update(ap)
 	return err
 }
 
-func FindSCIONLabServer(ia string) (*SCIONLabServer, error) {
-	s := new(SCIONLabServer)
-	err := o.QueryTable(s).Filter("IA", ia).One(s)
-	return s, err
+func (slas *SCIONLabAS) Insert() error {
+	_, err := o.Insert(slas)
+	return err
 }
 
-type SCIONLabVM struct {
-	Id           uint64 `orm:"column(id);auto;pk"`
-	UserEmail    string `orm:"unique"`        // Email address of the Owning user
-	IP           string `orm:"unique"`        // IP address of the SCIONLab VM
-	IA           *As    `orm:"rel(fk);index"` // The AS belonging to the VM
-	IsVPN        bool   // is this VM connected via the VPN
-	RemoteIA     string // the SCIONLab AS it connects to
-	RemoteIAPort int    // port number of the remote SCIONLab AS being connected to
-	RemoteBR     string // the name of the remote border router for this AS
-	Status       uint8  `orm:"default(0)"` // Status of the VM (i.e Active, Create, Update, Remove)
+func (slas *SCIONLabAS) Update() error {
+	_, err := o.Update(slas)
+	return err
 }
 
-func FindSCIONLabVMByUserEmail(email string) (*SCIONLabVM, error) {
-	v := new(SCIONLabVM)
-	err := o.QueryTable(v).Filter("UserEmail", email).RelatedSel().One(v)
+func (cn *Connection) Insert() error {
+	_, err := o.Insert(cn)
+	return err
+}
+
+func (cn *Connection) Update() error {
+	_, err := o.Update(cn)
+	return err
+}
+
+func (slas *SCIONLabAS) getConnections() ([]*Connection, error) {
+	_, err := o.LoadRelated(slas, "Connections")
+	if slas.AP != nil && err == nil {
+		APCns, err := slas.AP.getConnections()
+		return append(slas.Connections, APCns...), err
+	}
+	return slas.Connections, err
+}
+
+func (ap *AttachmentPoint) getConnections() ([]*Connection, error) {
+	_, err := o.LoadRelated(ap, "Connections")
+	return ap.Connections, err
+}
+
+func (cn *Connection) getInitAS() *SCIONLabAS {
+	v := new(SCIONLabAS)
+	o.QueryTable(v).Filter("Id", cn.InitAS.Id).RelatedSel().One(v)
+	return v
+}
+
+func (cn *Connection) getAcceptAS() *SCIONLabAS {
+	v := new(AttachmentPoint)
+	o.QueryTable(v).Filter("Id", cn.AcceptAP.Id).RelatedSel().One(v)
+	o.LoadRelated(v, "AS")
+	return v.AS
+}
+
+type ConnectionInfo struct {
+	NeighborISD int
+	NeighborAS  int
+	NeighborIP  string
+	LocalIP     string
+	RemotePort  int
+	LocalPort   int
+	Linktype    string //"PARENT","CHILD"
+	IsVPN       bool
+	Status      string
+}
+
+// Returns a list of connectionInfo
+// Contains all info needed to populate the topology file
+func (slas *SCIONLabAS) GetConnectionInfo() ([]ConnectionInfo, error) {
+	cns, err := slas.getConnections()
+	if err != nil {
+		return nil, err
+	}
+	var cnInfos []ConnectionInfo
+	var cnInfo ConnectionInfo
+	for _, cn := range cns {
+		// Check if As is initiator or acceptor
+		acceptAS := cn.getAcceptAS()
+		initAS := cn.getInitAS()
+		if initAS.Id == slas.Id {
+			neighborIA, err := addr.IAFromString(acceptAS.IA)
+			if err != nil {
+				return cnInfos, err
+			}
+			cnInfo = ConnectionInfo{
+				NeighborISD: neighborIA.I,
+				NeighborAS:  neighborIA.A,
+				NeighborIP:  cn.AcceptIP,
+				LocalIP:     cn.InitIP,
+				RemotePort:  cn.AcceptPort,
+				LocalPort:   cn.InitPort,
+				Linktype:    cn.Linktype,
+				IsVPN:       cn.IsVPN,
+				Status:      cn.InitStatus,
+			}
+		} else {
+			var linktype = cn.Linktype
+			if cn.Linktype == "PARENT" {
+				linktype = "CHILD"
+			}
+			neighborIA, err := addr.IAFromString(initAS.IA)
+			if err != nil {
+				return cnInfos, err
+			}
+			cnInfo = ConnectionInfo{
+				NeighborISD: neighborIA.I,
+				NeighborAS:  neighborIA.A,
+				NeighborIP:  cn.InitIP,
+				LocalIP:     cn.AcceptIP,
+				RemotePort:  cn.InitPort,
+				LocalPort:   cn.AcceptPort,
+				Linktype:    linktype,
+				IsVPN:       cn.IsVPN,
+				Status:      cn.AcceptStatus,
+			}
+		}
+		cnInfos = append(cnInfos, cnInfo)
+	}
+	return cnInfos, err
+}
+
+// Find SCIONLabAses by UserEmail
+func FindSCIONLabASesByUserEmail(email string) ([]SCIONLabAS, error) {
+	var v []SCIONLabAS
+	_, err := o.QueryTable(new(SCIONLabAS)).Filter("UserEmail", email).RelatedSel().All(&v)
 	return v, err
 }
 
-func FindSCIONLabVMByIPAndRemoteIA(ip, ia string) (*SCIONLabVM, error) {
-	v := new(SCIONLabVM)
-	err := o.QueryTable(v).Filter("IP", ip).Filter("RemoteIA", ia).RelatedSel().One(v)
+// Find SCIONLabAS by UserEmail and Type
+// ASSUMPTION: only one type of AS for every user
+// TODO (@philippmao, mlegner) Support multiple of same type ASes for a user
+func FindSCIONLabASByUEmailAndType(email string, Type uint8) (*SCIONLabAS, error) {
+	v := new(SCIONLabAS)
+	err := o.QueryTable(v).Filter("UserEmail", email).Filter("Type", Type).RelatedSel().One(v)
 	return v, err
 }
 
-func FindSCIONLabVMsByRemoteIA(remoteIA string) ([]SCIONLabVM, error) {
-	var v []SCIONLabVM
-	_, err := o.QueryTable(new(SCIONLabVM)).Filter("RemoteIA", remoteIA).RelatedSel().All(&v)
+// Find SCIONLabAS by the ia
+func FindSCIONLabASByIA(ia *addr.ISD_AS) (*SCIONLabAS, error) {
+	v := new(SCIONLabAS)
+	err := o.QueryTable(v).Filter("IA__startswith", strconv.Itoa(ia.I)).Filter("IA__endswith", strconv.Itoa(ia.A)).RelatedSel().One(v)
 	return v, err
 }
 
-func (svm *SCIONLabVM) Insert() error {
-	_, err := o.Insert(svm)
-	return err
-}
-
-func (svm *SCIONLabVM) Update() error {
-	_, err := o.Update(svm)
-	return err
+// Find SCIONLabAS by the Public IP
+func FindSCIONLabASesByIP(ip string) ([]SCIONLabAS, error) {
+	var v []SCIONLabAS
+	_, err := o.QueryTable(new(SCIONLabAS)).Filter("PublicIP", ip).RelatedSel().All(&v)
+	return v, err
 }

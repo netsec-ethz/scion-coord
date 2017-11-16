@@ -37,7 +37,7 @@ func init() {
 
 	// register the models
 	orm.RegisterModel(new(user), new(Account), new(As), new(JoinRequest), new(ConnRequest),
-		new(JoinReply), new(ConnReply), new(SCIONLabServer), new(SCIONLabVM))
+		new(JoinReply), new(ConnReply), new(SCIONLabServer), new(SCIONLabVM), new(AttachmentPoint), new(SCIONLabAS), new(Connection))
 
 	// print verbose logs when generating the tables
 	verbose := true
