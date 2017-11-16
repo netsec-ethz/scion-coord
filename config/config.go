@@ -29,6 +29,7 @@ var (
 	HTTP_BIND_PORT, _ = goconf.AppConf.Int("http.bind_port")
 	// address from which the service is reachable from outside
 	HTTP_HOST_ADDRESS        = goconf.AppConf.String("http.host_address")
+	HTTP_ENABLE_HTTPS, _     = goconf.AppConf.Bool("http.enable_https")
 	EMAIL_PM_SERVER_TOKEN    = goconf.AppConf.String("email.pm_server_token")
 	EMAIL_PM_ACCOUNT_TOKEN   = goconf.AppConf.String("email.pm_account_token")
 	EMAIL_FROM               = goconf.AppConf.String("email.from")
