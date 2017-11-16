@@ -14,6 +14,8 @@
 
 package models
 
+// TODO (@philippmao, mlegner) Remove this file once the SCIONLabVMController is updated
+
 type SCIONLabServer struct {
 	Id                uint64 `orm:"column(id);auto;pk"`
 	IA                string `orm:"unique"` // ISD-AS in which the server is located

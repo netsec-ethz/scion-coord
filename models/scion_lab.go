@@ -15,8 +15,9 @@
 package models
 
 import (
+	"time"
+
 	"github.com/netsec-ethz/scion/go/lib/addr"
-	"strconv"
 )
 
 type AttachmentPoint struct {
@@ -28,17 +29,22 @@ type AttachmentPoint struct {
 	Connections []*Connection `orm:"reverse(many);index"` // List of Connections
 }
 
+// TODO (@philippmao, mlegner) Add function to get BindIP from Type
 type SCIONLabAS struct {
-	Id          uint64           `orm:"column(id);auto;pk"`
-	UserEmail   string           // Email address of the Owning user
-	PublicIP    string           // IP address of the SCIONLabAS
-	BindIP      string           // Used for VPN connections specific to each type of AS
-	IA          string           // IA in the form "ISD-AS"
+	Id          uint64 `orm:"column(id);auto;pk"`
+	UserMail    string // User linked to the AS
+	PublicIP    string // IP address of the SCIONLabAS
+	BindIP      string // Used for VPN connections specific to each type of AS
+	StartPort   int
+	Isd         int
+	As          int
 	Core        bool             `orm:"default(false)"` // Is this SCIONLabAS a core AS
 	Status      uint8            `orm:"default(0)"`     // Status of the AS (i.e Active, Create, Update, Remove)
-	Type        uint8            // Type of the AS: (VM, DEDICATED, BOX, SERVER)
+	Type        uint8            `orm:"default(0)"`     // Type of the AS: (VM, DEDICATED, BOX, SERVER)
 	AP          *AttachmentPoint `orm:"null;rel(one);on_delete(set_null)"`
-	Connections []*Connection    `orm:"reverse(many)"` // List of Connections
+	Created     time.Time
+	Updated     time.Time
+	Connections []*Connection `orm:"reverse(many)"` // List of Connections
 }
 
 type Connection struct {
@@ -47,12 +53,14 @@ type Connection struct {
 	AcceptAP     *AttachmentPoint `orm:"rel(fk)"` // AS which accepted the connection
 	InitIP       string
 	AcceptIP     string
-	InitPort     int    // Port used by initiating AS
-	AcceptPort   int    // Port used by accepting AS
-	Linktype     string // PARENT -> Acceptor is Parent
+	InitBrId     int   // Id of the Initiator Border router, Port = StartPort + Id
+	AcceptBrId   int   // Id of the Acceptor Border router
+	Linktype     uint8 // PARENT -> Acceptor is Parent
 	IsVPN        bool
-	InitStatus   string // "new", "up", "delete", "deleted"
-	AcceptStatus string
+	InitStatus   uint8 // "new", "up", "delete", "deleted"
+	AcceptStatus uint8
+	Created      time.Time
+	Updated      time.Time
 }
 
 func (ap *AttachmentPoint) Insert() error {
@@ -66,21 +74,27 @@ func (ap *AttachmentPoint) Update() error {
 }
 
 func (slas *SCIONLabAS) Insert() error {
+	slas.Created = time.Now().UTC()
+	slas.Updated = time.Now().UTC()
 	_, err := o.Insert(slas)
 	return err
 }
 
 func (slas *SCIONLabAS) Update() error {
+	slas.Updated = time.Now().UTC()
 	_, err := o.Update(slas)
 	return err
 }
 
 func (cn *Connection) Insert() error {
+	cn.Created = time.Now().UTC()
+	cn.Updated = time.Now().UTC()
 	_, err := o.Insert(cn)
 	return err
 }
 
 func (cn *Connection) Update() error {
+	cn.Updated = time.Now().UTC()
 	_, err := o.Update(cn)
 	return err
 }
@@ -117,11 +131,13 @@ type ConnectionInfo struct {
 	NeighborAS  int
 	NeighborIP  string
 	LocalIP     string
+	BindIP      string
+	BrId        int
 	RemotePort  int
 	LocalPort   int
-	Linktype    string //"PARENT","CHILD"
+	Linktype    uint8 //"PARENT","CHILD"
 	IsVPN       bool
-	Status      string
+	Status      uint8
 }
 
 // Returns a list of connectionInfo
@@ -138,37 +154,39 @@ func (slas *SCIONLabAS) GetConnectionInfo() ([]ConnectionInfo, error) {
 		acceptAS := cn.getAcceptAS()
 		initAS := cn.getInitAS()
 		if initAS.Id == slas.Id {
-			neighborIA, err := addr.IAFromString(acceptAS.IA)
 			if err != nil {
 				return cnInfos, err
 			}
 			cnInfo = ConnectionInfo{
-				NeighborISD: neighborIA.I,
-				NeighborAS:  neighborIA.A,
+				NeighborISD: acceptAS.Isd,
+				NeighborAS:  acceptAS.As,
 				NeighborIP:  cn.AcceptIP,
 				LocalIP:     cn.InitIP,
-				RemotePort:  cn.AcceptPort,
-				LocalPort:   cn.InitPort,
+				BindIP:      initAS.BindIP,
+				BrId:        cn.InitBrId,
+				RemotePort:  acceptAS.StartPort + cn.AcceptBrId,
+				LocalPort:   initAS.StartPort + cn.InitBrId,
 				Linktype:    cn.Linktype,
 				IsVPN:       cn.IsVPN,
 				Status:      cn.InitStatus,
 			}
 		} else {
 			var linktype = cn.Linktype
-			if cn.Linktype == "PARENT" {
-				linktype = "CHILD"
+			if cn.Linktype == PARENT {
+				linktype = CHILD
 			}
-			neighborIA, err := addr.IAFromString(initAS.IA)
 			if err != nil {
 				return cnInfos, err
 			}
 			cnInfo = ConnectionInfo{
-				NeighborISD: neighborIA.I,
-				NeighborAS:  neighborIA.A,
+				NeighborISD: initAS.Isd,
+				NeighborAS:  initAS.As,
 				NeighborIP:  cn.InitIP,
 				LocalIP:     cn.AcceptIP,
-				RemotePort:  cn.InitPort,
-				LocalPort:   cn.AcceptPort,
+				BindIP:      acceptAS.BindIP,
+				BrId:        cn.AcceptBrId,
+				RemotePort:  initAS.StartPort + cn.InitBrId,
+				LocalPort:   acceptAS.StartPort + cn.AcceptBrId,
 				Linktype:    linktype,
 				IsVPN:       cn.IsVPN,
 				Status:      cn.AcceptStatus,
@@ -179,26 +197,43 @@ func (slas *SCIONLabAS) GetConnectionInfo() ([]ConnectionInfo, error) {
 	return cnInfos, err
 }
 
+// This Function looks for all Attachment Point ASes
+func GetAllAPs() ([]*SCIONLabAS, error) {
+	var v []AttachmentPoint
+	var w []*SCIONLabAS
+	_, err := o.QueryTable(new(AttachmentPoint)).RelatedSel().All(&v)
+	if err != nil {
+		return w, err
+	}
+	for _, ap := range v {
+		o.LoadRelated(&ap, "AS")
+		w = append(w, ap.AS)
+	}
+	return w, err
+}
+
 // Find SCIONLabAses by UserEmail
 func FindSCIONLabASesByUserEmail(email string) ([]SCIONLabAS, error) {
 	var v []SCIONLabAS
-	_, err := o.QueryTable(new(SCIONLabAS)).Filter("UserEmail", email).RelatedSel().All(&v)
+	_, err := o.QueryTable(new(SCIONLabAS)).Filter("UserMail", email).RelatedSel().All(&v)
 	return v, err
 }
 
-// Find SCIONLabAS by UserEmail and Type
-// ASSUMPTION: only one type of AS for every user
-// TODO (@philippmao, mlegner) Support multiple of same type ASes for a user
-func FindSCIONLabASByUEmailAndType(email string, Type uint8) (*SCIONLabAS, error) {
-	v := new(SCIONLabAS)
-	err := o.QueryTable(v).Filter("UserEmail", email).Filter("Type", Type).RelatedSel().One(v)
+// Find SCIONLabASes by UserEmail and Type
+func FindSCIONLabASesByUEmailAndType(email string, Type uint8) ([]SCIONLabAS, error) {
+	var v []SCIONLabAS
+	_, err := o.QueryTable(new(SCIONLabAS)).Filter("UserMail", email).Filter("Type", Type).RelatedSel().All(&v)
 	return v, err
 }
 
-// Find SCIONLabAS by the ia
-func FindSCIONLabASByIA(ia *addr.ISD_AS) (*SCIONLabAS, error) {
+// Find SCIONLabAS by the IA string
+func FindSCIONLabASByIAString(ia string) (*SCIONLabAS, error) {
 	v := new(SCIONLabAS)
-	err := o.QueryTable(v).Filter("IA__startswith", strconv.Itoa(ia.I)).Filter("IA__endswith", strconv.Itoa(ia.A)).RelatedSel().One(v)
+	IA, err1 := addr.IAFromString(ia)
+	if err1 != nil {
+		return nil, err1
+	}
+	err := o.QueryTable(v).Filter("Isd", IA.I).Filter("As", IA.A).RelatedSel().One(v)
 	return v, err
 }
 

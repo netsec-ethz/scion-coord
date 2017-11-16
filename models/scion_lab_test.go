@@ -15,57 +15,8 @@
 package models
 
 import (
-	"github.com/netsec-ethz/scion/go/lib/addr"
 	"testing"
 )
-
-const (
-	INACTIVE = iota // 0
-	ACTIVE
-	CREATE
-	UPDATE
-	REMOVE
-	BOX
-	VM
-	DEDICATED
-	SERVER
-)
-
-/*type AttachmentPoint struct {
-	Id          uint64 `orm:"column(id);auto;pk"`
-	VPNIP       string
-	StartVPNIP  string
-	EndVPNIP    string
-	AS          *SCIONLabAS   `orm:"reverse(one)"`
-	Connections []*Connection `orm:"reverse(many);index"` // List of Connections
-}
-
-type SCIONLabAS struct {
-	Id          uint64           `orm:"column(id);auto;pk"`
-	UserEmail   string           // Email address of the Owning user
-	PublicIP    string           // IP address of the SCIONLabAS
-	BindIP      string           // Used for VPN connections specific to each type of AS
-	IA          string           // IA in the form "ISD-AS"
-	Core        bool             // Is this SCIONLabAS a core AS
-	Status      uint8            `orm:"default(0)"` // Status of the AS (i.e Active, Create, Update, Remove)
-	Type        uint8            // Type of the AS: (VM, DEDICATED, BOX, SERVER)
-	AP          *AttachmentPoint `orm:"null;rel(one);on_delete(set_null)"`
-	Connections []*Connection    `orm:"reverse(many)"` // List of Connections
-}
-
-type Connection struct {
-	Id           uint64           `orm:"column(id);auto;pk"`
-	InitAS       *SCIONLabAS      `orm:"rel(fk)"` // AS which initiated the connection
-	AcceptAP     *AttachmentPoint `orm:"rel(fk)"` // AS which accepted the connection
-	InitIP       string
-	AcceptIP     string
-	InitPort     int    // Port used by initiating AS
-	AcceptPort   int    // Port used by accepting AS
-	Linktype     string // PARENT -> Acceptor is Parent
-	IsVPN        bool
-	InitStatus   string // "new", "up", "delete", "deleted"
-	AcceptStatus string
-}*/
 
 func Test(t *testing.T) {
 	// Insert Users
@@ -81,51 +32,63 @@ func Test(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	slas1 := new(SCIONLabAS)
-	slas1.IA = "1-1"
-	slas1.PublicIP = "1.2.3.4"
-	slas1.Status = ACTIVE
-	slas1.Type = BOX
-	slas1.UserEmail = u1.Email
+	slas1 := &SCIONLabAS{
+		UserMail:  u1.Email,
+		PublicIP:  "1.2.3.4",
+		BindIP:    "10.0.0.15",
+		StartPort: 50000,
+		Isd:       1,
+		As:        1,
+		Status:    ACTIVE,
+		Type:      BOX,
+	}
+	slas2 := &SCIONLabAS{
+		UserMail:  u2.Email,
+		BindIP:    "127.0.0.1",
+		StartPort: 50000,
+		Isd:       1,
+		As:        2,
+		Status:    INACTIVE,
+		Type:      VM,
+	}
+	slas3 := &SCIONLabAS{
+		UserMail:  u3.Email,
+		PublicIP:  "6.4.9.4",
+		BindIP:    "127.0.0.1",
+		StartPort: 50000,
+		Isd:       2,
+		As:        5,
+		Status:    UPDATE,
+		Type:      DEDICATED,
+		Core:      true,
+	}
 	err = slas1.Insert()
 	if err != nil {
 		t.Fatal(err)
 	}
-	slas2 := new(SCIONLabAS)
-	slas2.IA = "1-2"
-	slas2.BindIP = "127.0.0.1"
-	slas2.Status = INACTIVE
-	slas2.Type = VM
-	slas2.UserEmail = u2.Email
 	err = slas2.Insert()
 	if err != nil {
 		t.Fatal(err)
 	}
-	slas3 := new(SCIONLabAS)
-	slas3.IA = "2-5"
-	slas3.PublicIP = "6.4.9.4"
-	slas3.BindIP = "127.0.0.1"
-	slas3.Status = UPDATE
-	slas3.Type = DEDICATED
-	slas3.Core = true
-	slas3.UserEmail = u3.Email
 	err = slas3.Insert()
 	if err != nil {
 		t.Fatal(err)
 	}
 	// SLAS1 & 3 are attachment Points
-	ap1 := new(AttachmentPoint)
-	ap1.VPNIP = "10.0.0.1"
-	ap1.StartVPNIP = "10.0.0.2"
-	ap1.EndVPNIP = "10.0.0.19"
+	ap1 := &AttachmentPoint{
+		VPNIP:      "10.0.0.1",
+		StartVPNIP: "10.0.0.2",
+		EndVPNIP:   "10.0.0.19",
+	}
+	ap2 := &AttachmentPoint{
+		VPNIP:      "62.0.0.1",
+		StartVPNIP: "62.0.0.2",
+		EndVPNIP:   "62.0.0.254",
+	}
 	err = ap1.Insert()
 	if err != nil {
 		t.Fatal(err)
 	}
-	ap2 := new(AttachmentPoint)
-	ap2.VPNIP = "62.0.0.1"
-	ap2.StartVPNIP = "62.0.0.2"
-	ap2.EndVPNIP = "62.0.0.254"
 	err = ap2.Insert()
 	if err != nil {
 		t.Fatal(err)
@@ -142,79 +105,76 @@ func Test(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Insert Connections
-	// 1-1 and 1-2 are connected via VPN
-	cn1 := new(Connection)
-	cn1.InitIP = "10.0.0.3"
-	cn1.AcceptIP = slas1.AP.VPNIP
-	cn1.InitAS = slas2
-	cn1.AcceptAP = ap1
-	cn1.AcceptPort = 50004
-	cn1.InitPort = 50000
-	cn1.IsVPN = true
-	cn1.Linktype = "PARENT"
-	cn1.AcceptStatus = "Up"
-	cn1.InitStatus = "New"
+	cn1 := Connection{
+		InitIP:       "10.0.0.3",
+		AcceptIP:     slas1.AP.VPNIP,
+		InitAS:       slas2,
+		AcceptAP:     ap1,
+		InitBrId:     2,
+		AcceptBrId:   6,
+		Linktype:     PARENT,
+		IsVPN:        true,
+		InitStatus:   CREATE,
+		AcceptStatus: ACTIVE,
+	}
+	cn2 := Connection{
+		InitIP:       slas1.PublicIP,
+		AcceptIP:     slas3.PublicIP,
+		InitAS:       slas1,
+		AcceptAP:     ap2,
+		InitBrId:     2,
+		AcceptBrId:   1,
+		Linktype:     PARENT,
+		IsVPN:        false,
+		InitStatus:   REMOVE,
+		AcceptStatus: REMOVED,
+	}
+	cn3 := Connection{
+		InitIP:       "62.0.0.53",
+		AcceptIP:     slas3.AP.VPNIP,
+		InitAS:       slas2,
+		AcceptAP:     ap2,
+		InitBrId:     4,
+		AcceptBrId:   7,
+		Linktype:     PARENT,
+		IsVPN:        true,
+		InitStatus:   ACTIVE,
+		AcceptStatus: CREATE,
+	}
 	err = cn1.Insert()
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 1-1 and 1-3 are connected
-	cn2 := new(Connection)
-	cn2.InitIP = slas1.PublicIP
-	cn2.AcceptIP = slas3.PublicIP
-	cn2.InitAS = slas1
-	cn2.AcceptAP = ap2
-	cn2.AcceptPort = 50002
-	cn2.InitPort = 50001
-	cn2.IsVPN = false
-	cn2.Linktype = "PARENT"
-	cn2.AcceptStatus = "Delete"
-	cn2.InitStatus = "Delete"
 	err = cn2.Insert()
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 1-2 and 1-3 are connected via VPN
-	cn3 := new(Connection)
-	cn3.InitIP = "62.0.0.53"
-	cn3.AcceptIP = slas3.AP.VPNIP
-	cn3.InitAS = slas2
-	cn3.AcceptAP = ap2
-	cn3.AcceptPort = 50003
-	cn3.InitPort = 50001
-	cn3.IsVPN = true
-	cn3.Linktype = "PARENT"
-	cn3.AcceptStatus = "Up"
-	cn3.InitStatus = "New"
 	err = cn3.Insert()
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Test FindSCIONLabASByIA
-	ia, _ := addr.IAFromString("1-1")
-	s1, err := FindSCIONLabASByIA(ia)
+	s1, err := FindSCIONLabASByIAString("1-1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("FindSCIONLabASByIA 1-1: %v", s1)
 	t.Logf("FindSCIONLabASByIA AP 1-1: %v", s1.AP)
-	ia, _ = addr.IAFromString("2-5")
-	s3, err := FindSCIONLabASByIA(ia)
+	s3, err := FindSCIONLabASByIAString("2-5")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("FindSCIONLabASByIA 2-5: %v", s3)
 	t.Logf("FindSCIONLabASByIA AP 2-5: %v", s3.AP)
 	// Test FindSCIONLabASByTypeUserEmail
-	s2, err := FindSCIONLabASByUEmailAndType("mail2", VM)
+	list, err := FindSCIONLabASesByUEmailAndType("mail2", VM)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("FindSCIONLabASByIA mail2, VM: %v", s2)
-	s2.UserEmail = "mail1"
-	err = s2.Update()
-	if err != nil {
-		t.Fatal(err)
+	var s2 SCIONLabAS
+	for _, as := range list {
+		t.Logf("FindSCIONLabASByUmailAndType mail2, VM: %v", as)
+		s2 = as
 	}
 	// Test FindSCIONLabASesByUserEmail
 	smail1, err := FindSCIONLabASesByUserEmail("mail1")
@@ -231,6 +191,14 @@ func Test(t *testing.T) {
 	}
 	for _, sIP1 := range sIP {
 		t.Logf("FindSCIONLabAsesByIP 1.2.3.4: %v", sIP1)
+	}
+	// Test GetAllAPS
+	APList, err := GetAllAPs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ap := range APList {
+		t.Logf("GetAllAPs: %v", ap)
 	}
 	// Test GetConnectionInfo for all Ases
 	cns, err := s1.GetConnectionInfo()

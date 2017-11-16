@@ -30,14 +30,17 @@ func init() {
 	orm.RegisterDriver("mysql", orm.DRMySQL)
 	orm.RegisterDataBase("default", "mysql",
 		fmt.Sprintf("%s:%s@(%s:%d)/%s?charset=utf8&parseTime=true",
-			config.DB_USER, config.DB_PASS, config.DB_HOST, config.DB_PORT, config.DB_NAME), config.DB_MAX_CONNECTIONS, config.DB_MAX_IDLE)
+			config.DB_USER, config.DB_PASS, config.DB_HOST, config.DB_PORT, config.DB_NAME),
+		config.DB_MAX_CONNECTIONS, config.DB_MAX_IDLE)
 
 	// prints the queries
 	orm.Debug = false
 
 	// register the models
+	// TODO (@philippmao, mlegner) Remove SCIONLabServer and SCIONLabVM
 	orm.RegisterModel(new(user), new(Account), new(As), new(JoinRequest), new(ConnRequest),
-		new(JoinReply), new(ConnReply), new(SCIONLabServer), new(SCIONLabVM), new(AttachmentPoint), new(SCIONLabAS), new(Connection))
+		new(JoinReply), new(ConnReply), new(SCIONLabServer), new(SCIONLabVM),
+		new(SCIONLabAS), new(AttachmentPoint), new(Connection))
 
 	// print verbose logs when generating the tables
 	verbose := true

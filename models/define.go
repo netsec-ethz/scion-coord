@@ -1,0 +1,17 @@
+package models
+
+const (
+	INACTIVE = iota // 0
+	ACTIVE
+	CREATE
+	UPDATE
+	REMOVE
+	REMOVED
+	PARENT
+	CHILD
+	CORE
+	BOX
+	VM
+	DEDICATED
+	SERVER
+)
