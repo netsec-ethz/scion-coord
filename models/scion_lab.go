@@ -218,10 +218,18 @@ func (slas *SCIONLabAS) UpdateDBConnection(cnInfo ConnectionInfo) error {
 			respondAS := cn.getRespondAS()
 			joinAS := cn.getJoinAS()
 			if joinAS.ID == slas.ID {
+				if !cn.IsVPN {
+					cn.JoinIP = slas.PublicIP
+				}
 				cn.JoinStatus = cnInfo.Status
+				cn.JoinBrId = cnInfo.BrID
 			}
 			if respondAS.ID == slas.ID {
+				if !cn.IsVPN {
+					cn.RespondIP = slas.PublicIP
+				}
 				cn.RespondStatus = cnInfo.Status
+				cn.RespondBrId = cnInfo.BrID
 			}
 			if err := cn.Update(); err != nil {
 				return err

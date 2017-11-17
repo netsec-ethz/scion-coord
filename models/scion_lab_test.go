@@ -127,7 +127,7 @@ func Test(t *testing.T) {
 		Linktype:      PARENT,
 		IsVPN:         false,
 		JoinStatus:    REMOVE,
-		RespondStatus: REMOVED,
+		RespondStatus: DELETED,
 	}
 	cn3 := Connection{
 		JoinIP:        "62.0.0.53",
@@ -200,27 +200,84 @@ func Test(t *testing.T) {
 	for _, ap := range APList {
 		t.Logf("GetAllAPs: %v", ap)
 	}
-	// Test GetConnectionInfo for all Ases
-	cns, err := s1.GetConnectionInfo()
+	// Test FindSCIONLabAsesByIsd
+	slases, err := FindSCIONLabAsesByIsd(1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, cn := range cns {
+	for _, slas := range slases {
+		t.Logf("FindSCIONLabAsesByIsd 1: %v", slas)
+	}
+	// Test FindSCIONLabASByIAInt
+	as, err := FindSCIONLabASByIAInt(1, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("FindSCIONLabASByIAInt 1-2: %v", as)
+	// Test GetConnectionInfo for all Ases
+	cns1, err := s1.GetConnectionInfo()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, cn := range cns1 {
 		t.Log("Connection s1: %v", cn)
 	}
-	cns, err = s2.GetConnectionInfo()
+	cns2, err := s2.GetConnectionInfo()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, cn := range cns {
+	for _, cn := range cns2 {
 		t.Log("Connection s2: %v", cn)
 	}
-	cns, err = s3.GetConnectionInfo()
+	cns3, err := s3.GetConnectionInfo()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, cn := range cns {
+	for _, cn := range cns3 {
 		t.Log("Connection s3: %v", cn)
 	}
-
+	// Test UpdateDBConnection
+	s1.PublicIP = "CONNECTIONTEST"
+	cns1[0].BrID = 99999
+	cns1[0].Status = UPDATE
+	err = s1.Update()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s1.UpdateDBConnection(cns1[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	s2.PublicIP = "CONNECTIONTEST"
+	cns2[0].BrID = 99999
+	cns2[0].Status = UPDATE
+	err = s2.Update()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s2.UpdateDBConnection(cns2[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	cns1, err = s1.GetConnectionInfo()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, cn := range cns1 {
+		t.Log("Connection s1: %v", cn)
+	}
+	cns2, err = s2.GetConnectionInfo()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, cn := range cns2 {
+		t.Log("Connection s2: %v", cn)
+	}
+	cns3, err = s3.GetConnectionInfo()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, cn := range cns3 {
+		t.Log("Connection s3: %v", cn)
+	}
 }
