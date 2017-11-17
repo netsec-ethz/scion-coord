@@ -21,7 +21,7 @@ import (
 )
 
 type AttachmentPoint struct {
-	Id          uint64 `orm:"column(id);auto;pk"`
+	ID          uint64 `orm:"column(id);auto;pk"`
 	VPNIP       string
 	StartVPNIP  string
 	EndVPNIP    string
@@ -31,7 +31,7 @@ type AttachmentPoint struct {
 
 // TODO (@philippmao, mlegner) Add function to get BindIP from Type
 type SCIONLabAS struct {
-	Id          uint64 `orm:"column(id);auto;pk"`
+	ID          uint64 `orm:"column(id);auto;pk"`
 	UserMail    string // User linked to the AS
 	PublicIP    string // IP address of the SCIONLabAS
 	BindIP      string // Used for VPN connections specific to each type of AS
@@ -48,19 +48,19 @@ type SCIONLabAS struct {
 }
 
 type Connection struct {
-	Id           uint64           `orm:"column(id);auto;pk"`
-	InitAS       *SCIONLabAS      `orm:"rel(fk)"` // AS which initiated the connection
-	AcceptAP     *AttachmentPoint `orm:"rel(fk)"` // AS which accepted the connection
-	InitIP       string
-	AcceptIP     string
-	InitBrId     int   // Id of the Initiator Border router, Port = StartPort + Id
-	AcceptBrId   int   // Id of the Acceptor Border router
-	Linktype     uint8 // PARENT -> Acceptor is Parent
-	IsVPN        bool
-	InitStatus   uint8 // "new", "up", "delete", "deleted"
-	AcceptStatus uint8
-	Created      time.Time
-	Updated      time.Time
+	ID            uint64           `orm:"column(id);auto;pk"`
+	JoinAS        *SCIONLabAS      `orm:"rel(fk)"` // AS which initiated the connection
+	RespondAP     *AttachmentPoint `orm:"rel(fk)"` // AS which accepted the connection
+	JoinIP        string
+	RespondIP     string
+	JoinBrId      int   // Id of the Initiator Border router, Port = StartPort + Id
+	RespondBrId   int   // Id of the Acceptor Border router
+	Linktype      uint8 // PARENT -> Acceptor is Parent
+	IsVPN         bool
+	JoinStatus    uint8
+	RespondStatus uint8
+	Created       time.Time
+	Updated       time.Time
 }
 
 func (ap *AttachmentPoint) Insert() error {
@@ -101,11 +101,19 @@ func (cn *Connection) Update() error {
 
 func (slas *SCIONLabAS) getConnections() ([]*Connection, error) {
 	_, err := o.LoadRelated(slas, "Connections")
-	if slas.AP != nil && err == nil {
-		APCns, err := slas.AP.getConnections()
-		return append(slas.Connections, APCns...), err
+	var v []*Connection
+	if err != nil {
+		return v, err
 	}
-	return slas.Connections, err
+	v = append(v, slas.Connections...)
+	if slas.AP != nil {
+		APCns, err := slas.AP.getConnections()
+		if err != nil {
+			return v, err
+		}
+		v = append(v, APCns...)
+	}
+	return v, err
 }
 
 func (ap *AttachmentPoint) getConnections() ([]*Connection, error) {
@@ -113,26 +121,27 @@ func (ap *AttachmentPoint) getConnections() ([]*Connection, error) {
 	return ap.Connections, err
 }
 
-func (cn *Connection) getInitAS() *SCIONLabAS {
+func (cn *Connection) getJoinAS() *SCIONLabAS {
 	v := new(SCIONLabAS)
-	o.QueryTable(v).Filter("Id", cn.InitAS.Id).RelatedSel().One(v)
+	o.QueryTable(v).Filter("Id", cn.JoinAS.ID).RelatedSel().One(v)
 	return v
 }
 
-func (cn *Connection) getAcceptAS() *SCIONLabAS {
+func (cn *Connection) getRespondAS() *SCIONLabAS {
 	v := new(AttachmentPoint)
-	o.QueryTable(v).Filter("Id", cn.AcceptAP.Id).RelatedSel().One(v)
+	o.QueryTable(v).Filter("Id", cn.RespondAP.ID).RelatedSel().One(v)
 	o.LoadRelated(v, "AS")
 	return v.AS
 }
 
 type ConnectionInfo struct {
+	CnID        uint64 // Used to find the BorderRouter
 	NeighborISD int
 	NeighborAS  int
 	NeighborIP  string
 	LocalIP     string
 	BindIP      string
-	BrId        int
+	BrID        int
 	RemotePort  int
 	LocalPort   int
 	Linktype    uint8 //"PARENT","CHILD"
@@ -151,24 +160,25 @@ func (slas *SCIONLabAS) GetConnectionInfo() ([]ConnectionInfo, error) {
 	var cnInfo ConnectionInfo
 	for _, cn := range cns {
 		// Check if As is initiator or acceptor
-		acceptAS := cn.getAcceptAS()
-		initAS := cn.getInitAS()
-		if initAS.Id == slas.Id {
+		respondAS := cn.getRespondAS()
+		joinAS := cn.getJoinAS()
+		if joinAS.ID == slas.ID {
 			if err != nil {
 				return cnInfos, err
 			}
 			cnInfo = ConnectionInfo{
-				NeighborISD: acceptAS.Isd,
-				NeighborAS:  acceptAS.As,
-				NeighborIP:  cn.AcceptIP,
-				LocalIP:     cn.InitIP,
-				BindIP:      initAS.BindIP,
-				BrId:        cn.InitBrId,
-				RemotePort:  acceptAS.StartPort + cn.AcceptBrId,
-				LocalPort:   initAS.StartPort + cn.InitBrId,
+				CnID:        cn.ID,
+				NeighborISD: respondAS.Isd,
+				NeighborAS:  respondAS.As,
+				NeighborIP:  cn.RespondIP,
+				LocalIP:     cn.JoinIP,
+				BindIP:      joinAS.BindIP,
+				BrID:        cn.JoinBrId,
+				RemotePort:  respondAS.StartPort + cn.RespondBrId,
+				LocalPort:   joinAS.StartPort + cn.JoinBrId,
 				Linktype:    cn.Linktype,
 				IsVPN:       cn.IsVPN,
-				Status:      cn.InitStatus,
+				Status:      cn.JoinStatus,
 			}
 		} else {
 			var linktype = cn.Linktype
@@ -179,17 +189,17 @@ func (slas *SCIONLabAS) GetConnectionInfo() ([]ConnectionInfo, error) {
 				return cnInfos, err
 			}
 			cnInfo = ConnectionInfo{
-				NeighborISD: initAS.Isd,
-				NeighborAS:  initAS.As,
-				NeighborIP:  cn.InitIP,
-				LocalIP:     cn.AcceptIP,
-				BindIP:      acceptAS.BindIP,
-				BrId:        cn.AcceptBrId,
-				RemotePort:  initAS.StartPort + cn.InitBrId,
-				LocalPort:   acceptAS.StartPort + cn.AcceptBrId,
+				NeighborISD: joinAS.Isd,
+				NeighborAS:  joinAS.As,
+				NeighborIP:  cn.JoinIP,
+				LocalIP:     cn.RespondIP,
+				BindIP:      respondAS.BindIP,
+				BrID:        cn.RespondBrId,
+				RemotePort:  joinAS.StartPort + cn.JoinBrId,
+				LocalPort:   respondAS.StartPort + cn.RespondBrId,
 				Linktype:    linktype,
 				IsVPN:       cn.IsVPN,
-				Status:      cn.AcceptStatus,
+				Status:      cn.RespondStatus,
 			}
 		}
 		cnInfos = append(cnInfos, cnInfo)
@@ -197,7 +207,32 @@ func (slas *SCIONLabAS) GetConnectionInfo() ([]ConnectionInfo, error) {
 	return cnInfos, err
 }
 
-// This Function looks for all Attachment Point ASes
+// Update Status of a Connection using a ConnectionInfo Object
+func (slas *SCIONLabAS) UpdateDBConnection(cnInfo ConnectionInfo) error {
+	cns, err := slas.getConnections()
+	if err != nil {
+		return err
+	}
+	for _, cn := range cns {
+		if cn.ID == cnInfo.CnID {
+			respondAS := cn.getRespondAS()
+			joinAS := cn.getJoinAS()
+			if joinAS.ID == slas.ID {
+				cn.JoinStatus = cnInfo.Status
+			}
+			if respondAS.ID == slas.ID {
+				cn.RespondStatus = cnInfo.Status
+			}
+			if err := cn.Update(); err != nil {
+				return err
+			}
+			break
+		}
+	}
+	return nil
+}
+
+// Returns all Attachment Point ASes
 func GetAllAPs() ([]*SCIONLabAS, error) {
 	var v []AttachmentPoint
 	var w []*SCIONLabAS
@@ -234,6 +269,20 @@ func FindSCIONLabASByIAString(ia string) (*SCIONLabAS, error) {
 		return nil, err1
 	}
 	err := o.QueryTable(v).Filter("Isd", IA.I).Filter("As", IA.A).RelatedSel().One(v)
+	return v, err
+}
+
+// Find SCIONLabAS by the ISD AS int
+func FindSCIONLabASByIAInt(Isd int, As int) (*SCIONLabAS, error) {
+	v := new(SCIONLabAS)
+	err := o.QueryTable(v).Filter("Isd", Isd).Filter("As", As).RelatedSel().One(v)
+	return v, err
+}
+
+// Find SCIONLabASes by ISD
+func FindSCIONLabAsesByIsd(isd int) ([]SCIONLabAS, error) {
+	var v []SCIONLabAS
+	_, err := o.QueryTable(new(SCIONLabAS)).Filter("Isd", isd).RelatedSel().All(&v)
 	return v, err
 }
 
