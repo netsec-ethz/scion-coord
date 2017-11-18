@@ -209,33 +209,36 @@ func (slas *SCIONLabAS) GetConnectionInfo() ([]ConnectionInfo, error) {
 
 // Update Status of a Connection using a ConnectionInfo Object
 func (slas *SCIONLabAS) UpdateDBConnection(cnInfo ConnectionInfo) error {
-	cns, err := slas.getConnections()
+	cn := new(Connection)
+	err := o.QueryTable(cn).Filter("ID", cnInfo.CnID).RelatedSel().One(cn)
 	if err != nil {
 		return err
 	}
-	for _, cn := range cns {
-		if cn.ID == cnInfo.CnID {
-			respondAS := cn.getRespondAS()
-			joinAS := cn.getJoinAS()
-			if joinAS.ID == slas.ID {
-				if !cn.IsVPN {
-					cn.JoinIP = slas.PublicIP
-				}
-				cn.JoinStatus = cnInfo.Status
-				cn.JoinBrId = cnInfo.BrID
-			}
-			if respondAS.ID == slas.ID {
-				if !cn.IsVPN {
-					cn.RespondIP = slas.PublicIP
-				}
-				cn.RespondStatus = cnInfo.Status
-				cn.RespondBrId = cnInfo.BrID
-			}
-			if err := cn.Update(); err != nil {
-				return err
-			}
-			break
+	respondAS := cn.getRespondAS()
+	joinAS := cn.getJoinAS()
+	if joinAS.ID == slas.ID {
+		if !cn.IsVPN {
+			cn.JoinIP = slas.PublicIP
 		}
+		cn.JoinStatus = cnInfo.Status
+		// If the Connection is removed status REMOVE has to be set for both parties
+		if cnInfo.Status == REMOVE {
+			cn.RespondStatus = cnInfo.Status
+		}
+		cn.JoinBrId = cnInfo.BrID
+	}
+	if respondAS.ID == slas.ID {
+		if !cn.IsVPN {
+			cn.RespondIP = slas.PublicIP
+		}
+		cn.RespondStatus = cnInfo.Status
+		if cnInfo.Status == REMOVE {
+			cn.JoinStatus = cnInfo.Status
+		}
+		cn.RespondBrId = cnInfo.BrID
+	}
+	if err := cn.Update(); err != nil {
+		return err
 	}
 	return nil
 }
