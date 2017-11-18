@@ -290,7 +290,7 @@ func FindSCIONLabASByIAInt(Isd int, As int) (*SCIONLabAS, error) {
 	return v, err
 }
 
-// Find SCIONLabASes by ISD
+// Find SCIONLabASes by ISD int
 func FindSCIONLabAsesByIsd(isd int) ([]SCIONLabAS, error) {
 	var v []SCIONLabAS
 	_, err := o.QueryTable(new(SCIONLabAS)).Filter("Isd", isd).RelatedSel().All(&v)
