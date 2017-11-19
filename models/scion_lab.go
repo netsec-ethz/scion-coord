@@ -163,9 +163,6 @@ func (slas *SCIONLabAS) GetConnectionInfo() ([]ConnectionInfo, error) {
 		respondAS := cn.getRespondAS()
 		joinAS := cn.getJoinAS()
 		if joinAS.ID == slas.ID {
-			if err != nil {
-				return cnInfos, err
-			}
 			// If the connection has been removed continue
 			if cn.JoinStatus == REMOVED {
 				continue
@@ -188,9 +185,6 @@ func (slas *SCIONLabAS) GetConnectionInfo() ([]ConnectionInfo, error) {
 			var linktype = cn.Linktype
 			if cn.Linktype == PARENT {
 				linktype = CHILD
-			}
-			if err != nil {
-				return cnInfos, err
 			}
 			if cn.RespondStatus == REMOVED {
 				continue
@@ -294,13 +288,6 @@ func FindSCIONLabASByIAString(ia string) (*SCIONLabAS, error) {
 func FindSCIONLabASByIAInt(Isd int, As int) (*SCIONLabAS, error) {
 	v := new(SCIONLabAS)
 	err := o.QueryTable(v).Filter("Isd", Isd).Filter("As", As).RelatedSel().One(v)
-	return v, err
-}
-
-// Find SCIONLabASes by ISD int
-func FindSCIONLabAsesByIsd(isd int) ([]SCIONLabAS, error) {
-	var v []SCIONLabAS
-	_, err := o.QueryTable(new(SCIONLabAS)).Filter("Isd", isd).RelatedSel().All(&v)
 	return v, err
 }
 
