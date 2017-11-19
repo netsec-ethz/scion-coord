@@ -166,6 +166,10 @@ func (slas *SCIONLabAS) GetConnectionInfo() ([]ConnectionInfo, error) {
 			if err != nil {
 				return cnInfos, err
 			}
+			// If the connection has been removed continue
+			if cn.JoinStatus == REMOVED {
+				continue
+			}
 			cnInfo = ConnectionInfo{
 				CnID:        cn.ID,
 				NeighborISD: respondAS.Isd,
@@ -187,6 +191,9 @@ func (slas *SCIONLabAS) GetConnectionInfo() ([]ConnectionInfo, error) {
 			}
 			if err != nil {
 				return cnInfos, err
+			}
+			if cn.RespondStatus == REMOVED {
+				continue
 			}
 			cnInfo = ConnectionInfo{
 				NeighborISD: joinAS.Isd,
