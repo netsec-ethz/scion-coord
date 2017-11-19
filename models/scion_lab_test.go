@@ -127,7 +127,7 @@ func Test(t *testing.T) {
 		Linktype:      PARENT,
 		IsVPN:         false,
 		JoinStatus:    REMOVE,
-		RespondStatus: DELETED,
+		RespondStatus: REMOVED,
 	}
 	cn3 := Connection{
 		JoinIP:        "62.0.0.53",
@@ -199,14 +199,6 @@ func Test(t *testing.T) {
 	}
 	for _, ap := range APList {
 		t.Logf("GetAllAPs: %v", ap)
-	}
-	// Test FindSCIONLabAsesByIsd
-	slases, err := FindSCIONLabAsesByIsd(1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, slas := range slases {
-		t.Logf("FindSCIONLabAsesByIsd 1: %v", slas)
 	}
 	// Test FindSCIONLabASByIAInt
 	as, err := FindSCIONLabASByIAInt(1, 2)
