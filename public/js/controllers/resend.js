@@ -14,6 +14,7 @@ scionApp
                     $scope.message = "";
                     $scope.error = response.data;
                 });
+                $scope.email = "";
         };
 
 }]);
