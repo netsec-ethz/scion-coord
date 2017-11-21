@@ -190,6 +190,7 @@ func (slas *SCIONLabAS) GetConnectionInfo() ([]ConnectionInfo, error) {
 				continue
 			}
 			cnInfo = ConnectionInfo{
+				CnID:        cn.ID,
 				NeighborISD: joinAS.Isd,
 				NeighborAS:  joinAS.As,
 				NeighborIP:  cn.JoinIP,
