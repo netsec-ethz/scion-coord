@@ -222,8 +222,8 @@ func (slas *SCIONLabAS) UpdateDBConnection(cnInfo ConnectionInfo) error {
 			cn.JoinIP = slas.PublicIP
 		}
 		cn.JoinStatus = cnInfo.Status
-		// If the Connection is removed status REMOVE has to be set for both parties
-		if cnInfo.Status == REMOVE {
+		// If the Connection updated or going to be removed both parties need this status
+		if cnInfo.Status == REMOVE || cnInfo.Status == UPDATE {
 			cn.RespondStatus = cnInfo.Status
 		}
 		cn.JoinBrId = cnInfo.BrID
@@ -233,7 +233,7 @@ func (slas *SCIONLabAS) UpdateDBConnection(cnInfo ConnectionInfo) error {
 			cn.RespondIP = slas.PublicIP
 		}
 		cn.RespondStatus = cnInfo.Status
-		if cnInfo.Status == REMOVE {
+		if cnInfo.Status == REMOVE || cnInfo.Status == UPDATE {
 			cn.JoinStatus = cnInfo.Status
 		}
 		cn.RespondBrId = cnInfo.BrID
