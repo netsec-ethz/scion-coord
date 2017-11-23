@@ -37,8 +37,8 @@ func Test(t *testing.T) {
 		PublicIP:  "1.2.3.4",
 		BindIP:    "10.0.0.15",
 		StartPort: 50000,
-		Isd:       1,
-		As:        1,
+		ISD:       1,
+		AS:        1,
 		Status:    ACTIVE,
 		Type:      BOX,
 	}
@@ -46,8 +46,8 @@ func Test(t *testing.T) {
 		UserMail:  u2.Email,
 		BindIP:    "127.0.0.1",
 		StartPort: 50000,
-		Isd:       1,
-		As:        2,
+		ISD:       1,
+		AS:        2,
 		Status:    INACTIVE,
 		Type:      VM,
 	}
@@ -56,8 +56,8 @@ func Test(t *testing.T) {
 		PublicIP:  "6.4.9.4",
 		BindIP:    "127.0.0.1",
 		StartPort: 50000,
-		Isd:       2,
-		As:        5,
+		ISD:       2,
+		AS:        5,
 		Status:    UPDATE,
 		Type:      DEDICATED,
 		Core:      true,
@@ -110,8 +110,8 @@ func Test(t *testing.T) {
 		RespondIP:     slas1.AP.VPNIP,
 		JoinAS:        slas2,
 		RespondAP:     ap1,
-		JoinBrId:      2,
-		RespondBrId:   6,
+		JoinBRID:      2,
+		RespondBRID:   6,
 		Linktype:      PARENT,
 		IsVPN:         true,
 		JoinStatus:    CREATE,
@@ -122,8 +122,8 @@ func Test(t *testing.T) {
 		RespondIP:     slas3.PublicIP,
 		JoinAS:        slas1,
 		RespondAP:     ap2,
-		JoinBrId:      2,
-		RespondBrId:   1,
+		JoinBRID:      2,
+		RespondBRID:   1,
 		Linktype:      PARENT,
 		IsVPN:         false,
 		JoinStatus:    REMOVE,
@@ -134,8 +134,8 @@ func Test(t *testing.T) {
 		RespondIP:     slas3.AP.VPNIP,
 		JoinAS:        slas2,
 		RespondAP:     ap2,
-		JoinBrId:      4,
-		RespondBrId:   7,
+		JoinBRID:      4,
+		RespondBRID:   7,
 		Linktype:      PARENT,
 		IsVPN:         true,
 		JoinStatus:    ACTIVE,
@@ -230,7 +230,7 @@ func Test(t *testing.T) {
 	}
 	// Test UpdateDBConnection
 	s1.PublicIP = "CONNECTIONTEST"
-	cns1[0].BrID = 99999
+	cns1[0].BRID = 99999
 	cns1[0].Status = UPDATE
 	err = s1.Update()
 	if err != nil {
@@ -241,7 +241,7 @@ func Test(t *testing.T) {
 		t.Fatal(err)
 	}
 	s2.PublicIP = "CONNECTIONTEST"
-	cns2[0].BrID = 99999
+	cns2[0].BRID = 99999
 	cns2[0].Status = UPDATE
 	err = s2.Update()
 	if err != nil {
