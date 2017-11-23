@@ -221,7 +221,7 @@ func (slas *SCIONLabAS) GetConnectionInfo() ([]ConnectionInfo, error) {
 	return cnInfos, err
 }
 
-// Update Status of a Connection using a ConnectionInfo Object
+// Update the Status of a Connection using a ConnectionInfo Object
 func (slas *SCIONLabAS) UpdateDBConnection(cnInfo ConnectionInfo) error {
 	cn := new(Connection)
 	err := o.QueryTable(cn).Filter("ID", cnInfo.CNID).RelatedSel().One(cn)
