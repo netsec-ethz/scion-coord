@@ -14,7 +14,7 @@
 
 package models
 
-// States in which a scionlabAs or connection can be in.
+// States in which a scionlabAs or connection can be.
 const (
 	INACTIVE = iota // 0
 	ACTIVE
