@@ -423,7 +423,7 @@ func (c *ASController) UploadConnReply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Add / Substract the credits for the request depending on the ConnReply.Status
+	// Add / subtract the credits for the request depending on the ConnReply.Status
 	// APPROVED = add credits to the receiver
 	// DENIED = give credits back to the initiator
 	if err := c.checkAndUpdateCreditsAtResponse(w, r, cr, reply); err != nil {

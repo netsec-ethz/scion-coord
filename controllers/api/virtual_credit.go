@@ -127,7 +127,7 @@ func (c *ASController) checkAndUpdateCredits(w http.ResponseWriter, r *http.Requ
 
 	// Subtracting credits from AS
 	if err := as.UpdateCurrency(-1 * creditsNeeded); err != nil {
-		log.Printf("Error: Substracting credits! AS: %v, Request: %v, Error: %v", as, r.Body, err)
+		log.Printf("Error: Subtracting credits! AS: %v, Request: %v, Error: %v", as, r.Body, err)
 		c.Error500(err, w, r)
 		return err
 	}
