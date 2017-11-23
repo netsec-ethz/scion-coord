@@ -30,14 +30,15 @@ type AttachmentPoint struct {
 }
 
 // TODO (@philippmao, mlegner) Add function to get BindIP from Type
+// TODO (@philippmao, mlegner) Link ScionLabAs to user model
 type SCIONLabAS struct {
 	ID          uint64 `orm:"column(id);auto;pk"`
 	UserMail    string // User linked to the AS
 	PublicIP    string // IP address of the SCIONLabAS
 	BindIP      string // Used for VPN connections specific to each type of AS
 	StartPort   int
-	Isd         int
-	As          int
+	ISD         int
+	AS          int
 	Core        bool             `orm:"default(false)"` // Is this SCIONLabAS a core AS
 	Status      uint8            `orm:"default(0)"`     // Status of the AS (i.e Active, Create, Update, Remove)
 	Type        uint8            `orm:"default(0)"`     // Type of the AS: (VM, DEDICATED, BOX, SERVER)
@@ -53,8 +54,8 @@ type Connection struct {
 	RespondAP     *AttachmentPoint `orm:"rel(fk)"` // AS which accepted the connection
 	JoinIP        string
 	RespondIP     string
-	JoinBrId      int   // Id of the Initiator Border router, Port = StartPort + Id
-	RespondBrId   int   // Id of the Acceptor Border router
+	JoinBRID      int   // Id of the Initiator Border router, Port = StartPort + Id
+	RespondBRID   int   // Id of the Acceptor Border router
 	Linktype      uint8 // PARENT -> Acceptor is Parent
 	IsVPN         bool
 	JoinStatus    uint8
@@ -123,25 +124,25 @@ func (ap *AttachmentPoint) getConnections() ([]*Connection, error) {
 
 func (cn *Connection) getJoinAS() *SCIONLabAS {
 	v := new(SCIONLabAS)
-	o.QueryTable(v).Filter("Id", cn.JoinAS.ID).RelatedSel().One(v)
+	o.QueryTable(v).Filter("ID", cn.JoinAS.ID).RelatedSel().One(v)
 	return v
 }
 
 func (cn *Connection) getRespondAS() *SCIONLabAS {
 	v := new(AttachmentPoint)
-	o.QueryTable(v).Filter("Id", cn.RespondAP.ID).RelatedSel().One(v)
+	o.QueryTable(v).Filter("ID", cn.RespondAP.ID).RelatedSel().One(v)
 	o.LoadRelated(v, "AS")
 	return v.AS
 }
 
 type ConnectionInfo struct {
-	CnID        uint64 // Used to find the BorderRouter
+	CNID        uint64 // Used to find the BorderRouter
 	NeighborISD int
 	NeighborAS  int
 	NeighborIP  string
 	LocalIP     string
 	BindIP      string
-	BrID        int
+	BRID        int
 	RemotePort  int
 	LocalPort   int
 	Linktype    uint8 //"PARENT","CHILD"
@@ -158,6 +159,7 @@ func (slas *SCIONLabAS) GetConnectionInfo() ([]ConnectionInfo, error) {
 	}
 	var cnInfos []ConnectionInfo
 	var cnInfo ConnectionInfo
+	var bindIP string
 	for _, cn := range cns {
 		// Check if As is initiator or acceptor
 		respondAS := cn.getRespondAS()
@@ -167,16 +169,21 @@ func (slas *SCIONLabAS) GetConnectionInfo() ([]ConnectionInfo, error) {
 			if cn.JoinStatus == REMOVED {
 				continue
 			}
+			if cn.IsVPN {
+				bindIP = joinAS.BindIP
+			} else {
+				bindIP = cn.JoinIP
+			}
 			cnInfo = ConnectionInfo{
-				CnID:        cn.ID,
-				NeighborISD: respondAS.Isd,
-				NeighborAS:  respondAS.As,
+				CNID:        cn.ID,
+				NeighborISD: respondAS.ISD,
+				NeighborAS:  respondAS.AS,
 				NeighborIP:  cn.RespondIP,
 				LocalIP:     cn.JoinIP,
-				BindIP:      joinAS.BindIP,
-				BrID:        cn.JoinBrId,
-				RemotePort:  respondAS.StartPort + cn.RespondBrId - 1,
-				LocalPort:   joinAS.StartPort + cn.JoinBrId - 1,
+				BindIP:      bindIP,
+				BRID:        cn.JoinBRID,
+				RemotePort:  respondAS.StartPort + cn.RespondBRID - 1,
+				LocalPort:   joinAS.StartPort + cn.JoinBRID - 1,
 				Linktype:    cn.Linktype,
 				IsVPN:       cn.IsVPN,
 				Status:      cn.JoinStatus,
@@ -189,16 +196,21 @@ func (slas *SCIONLabAS) GetConnectionInfo() ([]ConnectionInfo, error) {
 			if cn.RespondStatus == REMOVED {
 				continue
 			}
+			if cn.IsVPN {
+				bindIP = respondAS.BindIP
+			} else {
+				bindIP = cn.RespondIP
+			}
 			cnInfo = ConnectionInfo{
-				CnID:        cn.ID,
-				NeighborISD: joinAS.Isd,
-				NeighborAS:  joinAS.As,
+				CNID:        cn.ID,
+				NeighborISD: joinAS.ISD,
+				NeighborAS:  joinAS.AS,
 				NeighborIP:  cn.JoinIP,
 				LocalIP:     cn.RespondIP,
-				BindIP:      respondAS.BindIP,
-				BrID:        cn.RespondBrId,
-				RemotePort:  joinAS.StartPort + cn.JoinBrId - 1,
-				LocalPort:   respondAS.StartPort + cn.RespondBrId - 1,
+				BindIP:      bindIP,
+				BRID:        cn.RespondBRID,
+				RemotePort:  joinAS.StartPort + cn.JoinBRID - 1,
+				LocalPort:   respondAS.StartPort + cn.RespondBRID - 1,
 				Linktype:    linktype,
 				IsVPN:       cn.IsVPN,
 				Status:      cn.RespondStatus,
@@ -212,7 +224,7 @@ func (slas *SCIONLabAS) GetConnectionInfo() ([]ConnectionInfo, error) {
 // Update Status of a Connection using a ConnectionInfo Object
 func (slas *SCIONLabAS) UpdateDBConnection(cnInfo ConnectionInfo) error {
 	cn := new(Connection)
-	err := o.QueryTable(cn).Filter("ID", cnInfo.CnID).RelatedSel().One(cn)
+	err := o.QueryTable(cn).Filter("ID", cnInfo.CNID).RelatedSel().One(cn)
 	if err != nil {
 		return err
 	}
@@ -227,7 +239,7 @@ func (slas *SCIONLabAS) UpdateDBConnection(cnInfo ConnectionInfo) error {
 		if cnInfo.Status == REMOVE || cnInfo.Status == UPDATE {
 			cn.RespondStatus = cnInfo.Status
 		}
-		cn.JoinBrId = cnInfo.BrID
+		cn.JoinBRID = cnInfo.BRID
 	}
 	if respondAS.ID == slas.ID {
 		if !cn.IsVPN {
@@ -237,7 +249,7 @@ func (slas *SCIONLabAS) UpdateDBConnection(cnInfo ConnectionInfo) error {
 		if cnInfo.Status == REMOVE || cnInfo.Status == UPDATE {
 			cn.JoinStatus = cnInfo.Status
 		}
-		cn.RespondBrId = cnInfo.BrID
+		cn.RespondBRID = cnInfo.BRID
 	}
 	if err := cn.Update(); err != nil {
 		return err
@@ -281,14 +293,14 @@ func FindSCIONLabASByIAString(ia string) (*SCIONLabAS, error) {
 	if err1 != nil {
 		return nil, err1
 	}
-	err := o.QueryTable(v).Filter("Isd", IA.I).Filter("As", IA.A).RelatedSel().One(v)
+	err := o.QueryTable(v).Filter("ISD", IA.I).Filter("AS", IA.A).RelatedSel().One(v)
 	return v, err
 }
 
 // Find SCIONLabAS by the ISD AS int
-func FindSCIONLabASByIAInt(Isd int, As int) (*SCIONLabAS, error) {
+func FindSCIONLabASByIAInt(isd int, as int) (*SCIONLabAS, error) {
 	v := new(SCIONLabAS)
-	err := o.QueryTable(v).Filter("Isd", Isd).Filter("As", As).RelatedSel().One(v)
+	err := o.QueryTable(v).Filter("ISD", isd).Filter("AS", as).RelatedSel().One(v)
 	return v, err
 }
 
