@@ -16,8 +16,6 @@ package api
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"log"
 	"net/http"
 
@@ -54,7 +52,7 @@ func (c *LoginController) Logout(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil || userSession == nil {
 		log.Println(err)
-		c.Forbidden(err, w, r)
+		c.Forbidden(w, err, "Error getting user session")
 		return
 	}
 
@@ -62,7 +60,7 @@ func (c *LoginController) Logout(w http.ResponseWriter, r *http.Request) {
 	session.Options.MaxAge = -1
 
 	if err := session.Save(r, w); err != nil {
-		c.Error500(err, w, r)
+		c.Error500(w, err, "Error: Session expired")
 		return
 	}
 
@@ -77,7 +75,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Println(err)
-		c.Forbidden(err, w, r)
+		c.Forbidden(w, err, "Error getting user session")
 		return
 	}
 
@@ -95,7 +93,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 
 		// check if the parsing succeeded
 		if err := decoder.Decode(&user); err != nil {
-			c.Forbidden(fmt.Errorf("Decoding JSON failed: %v", err), w, r)
+			c.Forbidden(w, err, "Error decoding JSON")
 			return
 		}
 
@@ -105,7 +103,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 
 		// make sure they are not empty
 		if email == "" || password == "" {
-			c.Forbidden(errors.New("email or password empty"), w, r)
+			c.Forbidden(w, nil, "Email or password empty")
 			return
 		}
 
@@ -116,21 +114,21 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 	// otherwise redirect to the home page
 	dbUser, err := models.FindUserByEmail(email)
 	if err != nil || dbUser == nil {
-		c.BadRequest(err, w, r)
+		c.BadRequest(w, err, "Error: User not found")
 		return
 	}
 
 	// if stored password is invalid due to reset or pre-approved registration
 	if dbUser.PasswordInvalid {
 		log.Printf("Password is not set for user %v.", dbUser.Email)
-		c.Forbidden(err, w, r)
+		c.Forbidden(w, err, "Password is not set for user %v", dbUser.Email)
 		return
 	}
 
 	// if the authentication fails
 	if err := dbUser.Authenticate(password); err != nil {
 		log.Printf("Authentication failed for user %v: %v", dbUser.Email, err)
-		c.Forbidden(err, w, r)
+		c.Forbidden(w, err, "Authentication failed for user %v", dbUser.Email)
 		return
 	}
 
@@ -159,7 +157,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 	// save the session status
 	if err := session.Save(r, w); err != nil {
 		log.Println("Error while saving the session", err)
-		c.Error500(err, w, r)
+		c.Error500(w, err, "Error while saving the session")
 		return
 	}
 
@@ -170,7 +168,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 
 	} else {
 		log.Println("Auth error")
-		c.Forbidden(err, w, r)
+		c.Forbidden(w, nil, "Auth error")
 		return
 	}
 

@@ -17,9 +17,12 @@ package controllers
 
 import (
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
+
+	"github.com/netsec-ethz/scion-coord/config"
 )
 
 type output interface {
@@ -28,13 +31,13 @@ type output interface {
 	// returns plain text data
 	Plain(data string, w http.ResponseWriter, r *http.Request)
 	// Response with a 500 and an error
-	Error500(err error, w http.ResponseWriter, r *http.Request)
+	Error500(w http.ResponseWriter, err error, desc string, a ...interface{})
 
-	BadRequest(err error, w http.ResponseWriter, r *http.Request)
+	BadRequest(w http.ResponseWriter, err error, desc string, a ...interface{})
 
-	NotFound(err error, w http.ResponseWriter, r *http.Request)
+	NotFound(w http.ResponseWriter, err error, desc string, a ...interface{})
 
-	Forbidden(err error, w http.ResponseWriter, r *http.Request)
+	Forbidden(w http.ResponseWriter, err error, desc string, a ...interface{})
 
 	Render(tpl *template.Template, data interface{}, w http.ResponseWriter, r *http.Request)
 
@@ -43,6 +46,25 @@ type output interface {
 
 type HTTPController struct {
 	output
+}
+
+// Verbosity returns an error string containing sensitive information when
+// debug mode is activated or a more generic error message otherwise
+var Verbosity func(err error, format string, a ...interface{}) string
+
+func init() {
+	if config.LOG_DEBUG_MODE {
+		Verbosity = func(err error, format string, a ...interface{}) string {
+			if err != nil {
+				return fmt.Sprintf(format+": %v", append(a, err)...)
+			}
+			return fmt.Sprintf(format, a...)
+		}
+	} else {
+		Verbosity = func(err error, format string, a ...interface{}) string {
+			return fmt.Sprintf(format, a...)
+		}
+	}
 }
 
 func (c HTTPController) JSON(data interface{}, w http.ResponseWriter, r *http.Request) {
@@ -59,14 +81,14 @@ func (c HTTPController) JSON(data interface{}, w http.ResponseWriter, r *http.Re
 	// in case of marshalling error
 	// return 500
 	if err != nil {
-		c.Error500(err, w, r)
+		c.Error500(w, err, "Error creating response")
 		return
 	}
 
 	// write the content to socket
 	if _, err := w.Write(content); err != nil {
 		log.Printf("Error writing data to socket: %v", err)
-		c.Error500(err, w, r)
+		c.Error500(w, err, "Error creating response")
 	}
 
 }
@@ -78,28 +100,31 @@ func (c HTTPController) Plain(data string, w http.ResponseWriter, r *http.Reques
 	// write the content to socket
 	if _, err := w.Write([]byte(data)); err != nil {
 		log.Printf("Error writing data to socket: %v", err)
-		c.Error500(err, w, r)
+		c.Error500(w, err, "Error creating response")
 	}
 }
 
-func (c HTTPController) Error500(err error, w http.ResponseWriter, r *http.Request) {
+func (c HTTPController) Error500(w http.ResponseWriter, err error, desc string, a ...interface{}) {
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
-	http.Error(w, err.Error(), http.StatusInternalServerError)
+	http.Error(w, Verbosity(err, desc, a...), http.StatusInternalServerError)
 }
 
-func (c HTTPController) BadRequest(err error, w http.ResponseWriter, r *http.Request) {
+func (c HTTPController) BadRequest(w http.ResponseWriter, err error, desc string, a ...interface{}) {
+
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
-	http.Error(w, err.Error(), http.StatusBadRequest)
+	http.Error(w, Verbosity(err, desc, a...), http.StatusBadRequest)
 }
 
-func (c HTTPController) NotFound(err error, w http.ResponseWriter, r *http.Request) {
+func (c HTTPController) NotFound(w http.ResponseWriter, err error, desc string, a ...interface{}) {
+
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
-	http.Error(w, err.Error(), http.StatusNotFound)
+	http.Error(w, Verbosity(err, desc, a...), http.StatusNotFound)
 }
 
-func (c HTTPController) Forbidden(err error, w http.ResponseWriter, r *http.Request) {
+func (c HTTPController) Forbidden(w http.ResponseWriter, err error, desc string, a ...interface{}) {
+
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
-	http.Error(w, err.Error(), http.StatusForbidden)
+	http.Error(w, Verbosity(err, desc, a...), http.StatusForbidden)
 }
 
 func (C HTTPController) Render(tpl *template.Template, data interface{}, w http.ResponseWriter, r *http.Request) {
