@@ -26,6 +26,7 @@ type Session struct {
 	Organisation string
 	XSRFToken    string
 	HasLoggedIn  bool
+	IsAdmin      bool
 	Error        string // errors to display while rendering the template
 }
 

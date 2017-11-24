@@ -1,46 +1,65 @@
 <div class="register-box">
-<div class="register-logo">
-    <a href="#/register"><b>Register</b></a>
+  <div class="register-logo">
+    <b>Register</b>
   </div>
   <div class="register-box-body">
     <p class="login-box-msg">Register a new membership</p>
 
 
-      <div ng-show="error" ng-model="error" class="alert alert-danger alert-dismissible">
-        {{error}}
-      </div>
-      <div ng-if="message" class="alert alert-success alert-dismissible">
-        {{message}}
-      </div>
+    <div ng-show="error" class="alert alert-danger alert-dismissible">
+      {{error}}
+    </div>
+    <div ng-show="message" class="alert alert-success alert-dismissible">
+      {{message}}
+    </div>
 
 
     <form name="registration" ng-submit="register(user)">
       <div class="form-group has-feedback">
-        <input type="text" class="form-control" ng-model="user.first" name="first" placeholder="First name" ng-required="true">
+        <input type="text" class="form-control" ng-model="user.first" name="first"
+               placeholder="First name"
+               ng-required="true">
         <span class="glyphicon glyphicon-user form-control-feedback"></span>
       </div>
       <div class="form-group has-feedback">
-        <input type="text" class="form-control" ng-model="user.last" name="last" placeholder="Last name" ng-required="true">
+        <input type="text" class="form-control" ng-model="user.last" name="last"
+               placeholder="Last name"
+               ng-required="true">
         <span class="glyphicon glyphicon-user form-control-feedback"></span>
       </div>
       <div class="form-group has-feedback">
-        <input type="text" class="form-control" ng-model="user.organisation" name="organisation" placeholder="Organisation" ng-required="false">
+        <input type="text" class="form-control" ng-model="user.organisation" name="organisation"
+               placeholder="Organisation" ng-required="false">
         <span class="glyphicon glyphicon-briefcase form-control-feedback"></span>
       </div>
       <div class="form-group has-feedback">
-        <input type="email" class="form-control" ng-model="user.email" name="email" placeholder="Email" ng-required="true" ng-blur="email_entered=true">
+        <input type="email" class="form-control" ng-model="user.email" name="email"
+               placeholder="Email address"
+               ng-required="true" ng-blur="email_entered=true">
         <span class="glyphicon glyphicon-envelope form-control-feedback"></span>
-        <span class="error" ng-if="registration.email.$error.email && email_entered">Please enter a valid email address.</span>
+        <span class="error"
+              ng-if="registration.email.$error.email && email_entered">
+          Please enter a valid email address.
+        </span>
       </div>
       <div class="form-group has-feedback">
-        <input type="password" class="form-control" ng-model="user.password" name="password" placeholder="Password" ng-required="true" ng-minlength="8" ng-blur="password_entered=true">
+        <input type="password" class="form-control" ng-model="user.password" name="password"
+               placeholder="Password"
+               ng-required="true" ng-minlength="8" ng-blur="password_entered=true">
         <span class="glyphicon glyphicon-lock form-control-feedback"></span>
-        <span class="error" ng-if="registration.password.$error.minlength && password_entered">Please use at least 8 characters.</span>
+        <span class="error" ng-if="registration.password.$error.minlength && password_entered">
+          Please use at least 8 characters.</span>
       </div>
       <div class="form-group has-feedback">
-        <input type="password" class="form-control" ng-model="user.password_confirmation" check-match="user.password" name="password_confirmation" placeholder="Retype password" ng-required="true" ng-blur="password_confirmation_entered=true">
+        <input type="password" class="form-control" ng-model="user.password_confirmation"
+               check-match="user.password"
+               name="password_confirmation" placeholder="Retype password" ng-required="true"
+               ng-blur="password_confirmation_entered=true">
         <span class="glyphicon glyphicon-log-in form-control-feedback"></span>
-        <span class="error" ng-if="registration.password_confirmation.$error.match && password_confirmation_entered">Please enter matching passwords.</span>
+        <span class="error"
+              ng-if="registration.password_confirmation.$error.match && password_confirmation_entered">
+          Please enter matching passwords.
+        </span>
       </div>
       <div class="row">
         <!-- /.col -->
@@ -53,15 +72,7 @@
       </div>
     </form>
 
-    <!-- <div class="social-auth-links text-center">
-      <p>- OR -</p>
-      <a href="#" class="btn btn-block btn-social btn-facebook btn-flat"><i class="fa fa-facebook"></i> Sign up using
-        Facebook</a>
-      <a href="#" class="btn btn-block btn-social btn-google btn-flat"><i class="fa fa-google-plus"></i> Sign up using
-        Google+</a>
-    </div>
-    -->
     <br>
-    <a href="#/login" class="text-center">I am already registered.</a>
+    <a href="#/login" class="text-center">I am already registered</a>
   </div>
 </div>

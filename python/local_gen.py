@@ -21,14 +21,11 @@
 # Standard library
 import argparse
 import base64
-import configparser
 import json
 import os
-from shutil import rmtree
 
 # External packages
 from Crypto import Random
-from nacl.signing import SigningKey
 
 # SCION
 from lib.crypto.asymcrypto import (
@@ -37,7 +34,6 @@ from lib.crypto.asymcrypto import (
 )
 from lib.crypto.certificate import Certificate
 from lib.crypto.certificate_chain import CertificateChain
-from lib.defines import GEN_PATH
 from lib.packet.scion_addr import ISD_AS
 from lib.util import read_file
 from topology.generator import INITIAL_CERT_VERSION, INITIAL_TRC_VERSION
@@ -47,10 +43,11 @@ from ad_manager.util.local_config_util import (
     ASCredential,
     generate_zk_config,
     get_elem_dir,
-    prep_dispatcher_supervisord_conf,
+    prep_supervisord_conf,
     write_as_conf_and_path_policy,
     write_certs_trc_keys,
     write_dispatcher_config,
+    write_endhost_config,
     write_supervisord_config,
     write_topology_file,
     write_zlog_file,
@@ -58,12 +55,14 @@ from ad_manager.util.local_config_util import (
     TYPES_TO_KEYS,
 )
 
+
 # Directory structure and credential files
 SCION_COORD_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 DEFAULT_PACKAGE_PATH = os.path.expanduser("~/scionLabConfigs")
 DEFAULT_CORE_CERT_FILE = os.path.join(SCION_COORD_PATH, "credentials", "ISD1-AS1-V0.crt")
 DEFAULT_CORE_SIG_KEY = os.path.join(SCION_COORD_PATH, "credentials", "as-sig.key")
 DEFAULT_TRC_FILE = os.path.join(SCION_COORD_PATH, "credentials", "ISD1-V0.trc")
+
 
 def create_scionlab_vm_local_gen(args, tp):
     """
@@ -75,8 +74,6 @@ def create_scionlab_vm_local_gen(args, tp):
     new_ia = ISD_AS(args.joining_ia)
     core_ia = ISD_AS(args.core_ia)
     local_gen_path = os.path.join(args.package_path, args.user_id, 'gen')
-    # XXX (ercanucan): we remove user's past configs when he re-requests!
-    rmtree(local_gen_path, ignore_errors=True)
     as_obj = generate_certificate(
         new_ia, core_ia, args.core_sign_priv_key_file, args.core_cert_file, args.trc_file)
     write_dispatcher_config(local_gen_path)
@@ -93,7 +90,27 @@ def create_scionlab_vm_local_gen(args, tp):
             write_supervisord_config(config, instance_path)
             write_topology_file(tp, type_key, instance_path)
             write_zlog_file(service_type, instance_name, instance_path)
+    write_endhost_config(tp, new_ia, as_obj, local_gen_path)
     generate_zk_config(tp, new_ia, local_gen_path, simple_conf_mode=True)
+    generate_sciond_config(tp, new_ia, local_gen_path, as_obj)
+
+
+def generate_sciond_config(tp, ia, local_gen_path, as_obj):
+    executable_name = "sciond"
+    instance_name = "sd%s" % str(ia)
+    service_type = "sciond"
+    processes = []
+    for svc_type in ["BorderRouters", "BeaconService", "CertificateService",
+                     "HiddenPathService", "PathService"]:
+        if svc_type not in tp:
+            continue
+        for elem_id, elem in tp[svc_type].items():
+            processes.append(elem_id)
+    processes.append(instance_name)
+    config = prep_supervisord_conf(None, executable_name, service_type, instance_name, ia)
+    config['group:'  "as%s" % str(ia)] = {'programs': ",".join(processes)}
+    sciond_conf_path = get_elem_dir(local_gen_path, ia, "")
+    write_supervisord_config(config, sciond_conf_path)
 
 
 def generate_certificate(joining_ia, core_ia, core_sign_priv_key_file, core_cert_file, trc_file):
@@ -106,8 +123,7 @@ def generate_certificate(joining_ia, core_ia, core_sign_priv_key_file, core_cert
     public_key_encr, private_key_encr = generate_enc_keypair()
     cert = Certificate.from_values(
         str(joining_ia), str(core_ia), INITIAL_TRC_VERSION, INITIAL_CERT_VERSION, comment,
-        False, validity, public_key_encr, public_key_sign, SigningKey(core_ia_sig_priv_key)
-    )
+        False, validity, public_key_encr, public_key_sign, core_ia_sig_priv_key)
     core_ia_chain = CertificateChain.from_raw(read_file(core_cert_file))
     sig_priv_key = base64.b64encode(private_key_sign).decode()
     enc_priv_key = base64.b64encode(private_key_encr).decode()
@@ -116,44 +132,6 @@ def generate_certificate(joining_ia, core_ia, core_sign_priv_key_file, core_cert
     master_as_key = base64.b64encode(Random.new().read(16)).decode('utf-8')
     as_obj = ASCredential(sig_priv_key, enc_priv_key, joining_ia_chain, trc, master_as_key)
     return as_obj
-
-
-def prep_supervisord_conf(instance_dict, executable_name, service_type, instance_name, isd_as):
-    """
-    Prepares the supervisord configuration for the infrastructure elements
-    and returns it as a ConfigParser object.
-    :param dict instance_dict: topology information of the given instance.
-    :param str executable_name: the name of the executable.
-    :param str service_type: the type of the service (e.g. beacon_server).
-    :param str instance_name: the instance of the service (e.g. br1-8-1).
-    :param ISD_AS isd_as: the ISD-AS the service belongs to.
-    :returns: supervisord configuration as a ConfigParser object
-    :rtype: ConfigParser
-    """
-    config = configparser.ConfigParser()
-    env_tmpl = 'PYTHONPATH=python:.,ZLOG_CFG="%s/%s.zlog.conf"'
-    if service_type == 'router':  # go router
-        env_tmpl += ',GODEBUG="cgocheck=0"'
-        cmd = ('bash -c \'exec bin/%s -id "%s" -confd "%s" &>logs/%s.OUT\'') % (
-            executable_name, instance_name, get_elem_dir(GEN_PATH, isd_as, instance_name),
-            instance_name)
-    else:  # other infrastructure elements
-        cmd = ('bash -c \'exec bin/%s "%s" "%s" &>logs/%s.OUT\'') % (
-            executable_name, instance_name, get_elem_dir(GEN_PATH, isd_as, instance_name),
-            instance_name)
-    env = env_tmpl % (get_elem_dir(GEN_PATH, isd_as, instance_name), instance_name)
-    config['program:' + instance_name] = {
-        'autostart': 'false',
-        'autorestart': 'false',
-        'environment': env,
-        'stdout_logfile': 'NONE',
-        'stderr_logfile': 'NONE',
-        'startretries': '0',
-        'startsecs': '5',
-        'priority': '100',
-        'command':  cmd
-    }
-    return config
 
 
 def main():

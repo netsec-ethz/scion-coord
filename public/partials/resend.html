@@ -1,0 +1,34 @@
+<div class="login-box">
+  <div class="login-logo">
+    <b>Complete your registration</b>
+  </div>
+  <!-- /.login-logo -->
+  <div class="login-box-body">
+    <p class="login-box-msg">Resend the verification email</p>
+
+    <div ng-show="error" class="alert alert-danger alert-dismissible" >
+      {{error}}
+    </div>
+    <div ng-show="message" class="alert alert-success alert-dismissible" >
+      {{message}}
+    </div>
+
+    <form name="loginForm" ng-submit="resendEmail(email)">
+      <div class="form-group has-feedback">
+        <input type="email" class="form-control" ng-model="email" name="email" placeholder="Email" ng-required="true">
+        <span class="glyphicon glyphicon-envelope form-control-feedback"></span>
+      </div>
+      <div class="row">
+        <div class="col-xs-12">
+          <button type="submit" class="btn btn-primary btn-block">Resend</button>
+        </div>
+        <!-- /.col -->
+      </div>
+    </form>
+
+    <br>
+    <a href="#/login" class="text-center">I am already verfied</a>
+
+  </div>
+  <!-- /.login-box-body -->
+</div>

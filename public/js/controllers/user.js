@@ -1,18 +1,19 @@
 scionApp
-    .controller('userCtrl', ['$scope', 'userService', '$location', '$window', '$http',
-        function ($scope, userService, $location, $window, $http) {
+    .controller('userCtrl', ['$scope', '$rootScope', 'userService', '$location', '$window', '$http',
+        function ($scope, $rootScope, userService, $location, $window, $http) {
 
             $scope.error = "";
             $scope.message = "";
 
-            $scope.me = function () {
+            $scope.userPageData = function () {
 
-                userService.me().then(
+                userService.userPageData().then(
                     function (data) {
                         console.log(data);
-                        $scope.user = data["User"];
+                        $rootScope.user = data["User"];
                         $scope.vmInfo = data["VMInfo"];
-                        $scope.buttonConfig = data["UIButtons"]
+                        $scope.buttonConfig = data["UIButtons"];
+                        $scope.user.isNotVPN = false;
                     },
                     function (response) {
                         console.log(response);
@@ -25,8 +26,10 @@ scionApp
             $scope.submitForm = function (action, user) {
                 switch (action) {
                     case "update":
-                        $scope.scionLabVMForm.scionLabVMIP.$setValidity("required", user.scionLabVMIP != null);
-                        if (!$scope.scionLabVMForm.scionLabVMIP.$valid) {
+                        if (user.isNotVPN) {
+                            $scope.scionLabVMForm.scionLabVMIP.$setValidity("required", user.scionLabVMIP != null);
+                        }
+                        if (user.isNotVPN && !$scope.scionLabVMForm.scionLabVMIP.$valid) {
                             $scope.error = "Please enter a correct public IP address.";
                         } else {
                             $scope.generateSCIONLabVM(user);
@@ -41,8 +44,8 @@ scionApp
                 }
             };
 
-            let downloadlink = function (user) {
-                return ('/api/as/downloads?filename=' + user["Email"] + '.tar.gz');
+            let downloadlink = function () {
+                return ('/api/as/downloadTarball');
             };
 
             $scope.generateSCIONLabVM = function (user) {
@@ -52,9 +55,9 @@ scionApp
                 userService.generateSCIONLabVM(user).then(
                     function (data) {
                         console.log(data);
-                        window.location.assign(downloadlink(user));
+                        window.location.assign(downloadlink());
                         $scope.message = data;
-                        $scope.me();
+                        $scope.userPageData();
                     },
                     function (response) {
                         console.log(response);
@@ -66,7 +69,7 @@ scionApp
                 $scope.error = "";
                 $scope.message = "";
 
-                window.location.assign(downloadlink(user));
+                window.location.assign(downloadlink());
             };
 
             $scope.removeSCIONLabVM = function (user) {
@@ -77,7 +80,7 @@ scionApp
                     function (data) {
                         console.log(data);
                         $scope.message = data;
-                        $scope.me();
+                        $scope.userPageData();
                     },
                     function (response) {
                         console.log(response);
@@ -107,6 +110,6 @@ scionApp
             });
 
             // refresh the data when the controller is loaded
-            $scope.me();
+            $scope.userPageData();
         }
     ]);

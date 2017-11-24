@@ -1,14 +1,17 @@
 <div class="login-box">
   <div class="login-logo">
-    <a href="#"><b>Login</b></a>
+    <b>Login</b>
   </div>
   <!-- /.login-logo -->
   <div class="login-box-body">
     <p class="login-box-msg">Sign in to start your session</p>
 
-    <div ng-show="error" ng-model="error" class="alert alert-danger alert-dismissible">
-        {{error}}
-      </div>
+    <div ng-show="error" class="alert alert-danger alert-dismissible" >
+      {{error}}
+    </div>
+    <div ng-show="message" class="alert alert-success alert-dismissible" >
+      {{message}}
+    </div>
 
     <form name="loginForm" ng-submit="login(user)">
       <div class="form-group has-feedback">
@@ -37,9 +40,27 @@
     <!-- /.social-auth-links -->
 
     <!-- <a href="#">I forgot my password</a><br> -->
-    <br />
-    <a href="#/register" class="text-center">Register a new account</a>
 
+      <br>
+      <div class="row">
+          <div class="col-xs-6"><a href="#/register" class="text-center">Register a new account</a></div>
+          <div class="col-xs-6"><a href="#/resend" class="text-center" style="float: right">
+            Resend account verification email
+          </a></div>
+      </div>
+      <br>
+ 
   </div>
+
+  <div class=hotspot-wrapper>
+    <a href="/public/img/topology_no_labels.gv.png" data-lightbox="scionlab-topology" 
+      alt="SCIONLab Topology" data-title="SCIONLab Topology">
+      <img src="/public/img/topology_no_labels.gv.png" class="center-block img-responsive">
+      <div class="hotspot-text">
+        SCIONLab Topology
+      </div>
+   </a>
+  </div>
+
   <!-- /.login-box-body -->
 </div>
