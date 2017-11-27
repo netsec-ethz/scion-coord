@@ -16,6 +16,9 @@
 # If uncommented and non-empty it switches logging from console to a file
 #log.file = ""
 
+# If enabled, forwards (possibly sensitive) error messages to the web interface
+log.debug_mode = 0
+
 # If uncommented and non-empty, this directory is used to store generated
 # VM configurations instead of "~/scionLabConfigs"
 #directory.package_directory = ""

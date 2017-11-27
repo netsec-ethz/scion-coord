@@ -152,7 +152,7 @@ func (c *ASController) UploadJoinRequest(w http.ResponseWriter, r *http.Request)
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&request); err != nil {
 		log.Printf("Error decoding JSON: %v, %v", r.Body, err)
-		c.BadRequest(w, err, "Error decoding Json")
+		c.BadRequest(w, err, "Error decoding JSON")
 		return
 	}
 	// find the account belonging to the request
@@ -314,7 +314,7 @@ func (c *ASController) PollJoinReply(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Error marshaling JSON for account: %v request: %v new AS: %v, %v",
 			account, request.RequestId, joinReply.JoiningIA, err)
-		c.Error500(w, err, "Error marshaling JSON")
+		c.Error500(w, err, "Error during JSON marshaling")
 		return
 	}
 	fmt.Fprintln(w, string(b))
@@ -557,9 +557,9 @@ func (c *ASController) PollEvents(w http.ResponseWriter, r *http.Request) {
 
 	b, err := json.Marshal(resp)
 	if err != nil {
-		log.Printf("Error during JSON Marshaling. Account: %v, ISD-AS: %v, %v", account, isdas,
+		log.Printf("Error during JSON marshaling. Account: %v, ISD-AS: %v, %v", account, isdas,
 			err)
-		c.Error500(w, err, "Error during JSON Marshaling")
+		c.Error500(w, err, "Error during JSON marshaling")
 		return
 	}
 	fmt.Fprintln(w, string(b))
@@ -610,9 +610,9 @@ func (c *ASController) ListASes(w http.ResponseWriter, r *http.Request) {
 	resp := c.prepASListResponse(ases)
 	b, err := json.Marshal(resp)
 	if err != nil {
-		log.Printf("Error during JSON Marshaling. Account: %v, ISD-AS: %v, %v", account, req.IsdAs,
+		log.Printf("Error during JSON marshaling. Account: %v, ISD-AS: %v, %v", account, req.IsdAs,
 			err)
-		c.Error500(w, err, "Error during JSON Marshaling")
+		c.Error500(w, err, "Error during JSON marshaling")
 		return
 	}
 	fmt.Fprintln(w, string(b))

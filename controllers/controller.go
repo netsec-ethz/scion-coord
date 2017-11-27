@@ -104,6 +104,17 @@ func (c HTTPController) Plain(data string, w http.ResponseWriter, r *http.Reques
 	}
 }
 
+func (c HTTPController) Error(w http.ResponseWriter, err error, errorCode int, description string, a ...interface{}) {
+
+	// Log the error
+	log.Println(fmt.Sprintf(description+": %v", append(a, err)...))
+
+	// Forward the error to the web interface
+	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
+	http.Error(w, Verbosity(err, description, a...), errorCode)
+
+}
+
 func (c HTTPController) Error500(w http.ResponseWriter, err error, desc string, a ...interface{}) {
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
 	http.Error(w, Verbosity(err, desc, a...), http.StatusInternalServerError)

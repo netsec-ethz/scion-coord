@@ -167,8 +167,8 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 		c.JSON(&user, w, r)
 
 	} else {
-		log.Println("Auth error")
-		c.Forbidden(w, nil, "Auth error")
+		log.Println("Authentication error")
+		c.Forbidden(w, nil, "Authentication error")
 		return
 	}
 
