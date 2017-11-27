@@ -54,6 +54,11 @@ var (
 	SERVER_VPN_IP         = goconf.AppConf.String("server.vpn.ip")
 	SERVER_VPN_START_IP   = goconf.AppConf.String("server.vpn.start_ip")
 	SERVER_VPN_END_IP     = goconf.AppConf.String("server.vpn.end_ip")
+
+	// Virtual Credit system
+	VIRTUAL_CREDIT_ENABLE, _        = goconf.AppConf.Bool("virtualCredit.enable")
+	VIRTUAL_CREDIT_START_CREDITS, _ = goconf.AppConf.Int64("virtualCredit.startCredits")
+
 	// Local IP address in VM; this is a default set by
 	// vagrant and may have to be adjusted if vagrant configuration is changed
 	VM_LOCAL_IP = "10.0.2.15"
