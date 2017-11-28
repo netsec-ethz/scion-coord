@@ -20,11 +20,12 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"errors"
+	"log"
+	"net/http"
+
 	"github.com/gorilla/sessions"
 	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/models"
-	"log"
-	"net/http"
 )
 
 var (

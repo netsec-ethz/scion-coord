@@ -15,10 +15,11 @@
 package middleware
 
 import (
-	"github.com/gorilla/handlers"
-	"github.com/netsec-ethz/scion-coord/config"
 	"net/http"
 	"os"
+
+	"github.com/gorilla/handlers"
+	"github.com/netsec-ethz/scion-coord/config"
 )
 
 func LoggingHandler(next http.Handler) http.Handler {

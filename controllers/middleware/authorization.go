@@ -15,10 +15,10 @@
 package middleware
 
 import (
-	//"log"
+	"net/http"
+
 	"github.com/gorilla/mux"
 	"github.com/netsec-ethz/scion-coord/models"
-	"net/http"
 )
 
 type CheckFunction func(r *http.Request) bool
