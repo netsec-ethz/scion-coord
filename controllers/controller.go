@@ -30,6 +30,9 @@ type output interface {
 	JSON(data interface{}, w http.ResponseWriter, r *http.Request)
 	// returns plain text data
 	Plain(data string, w http.ResponseWriter, r *http.Request)
+
+	Error(w http.ResponseWriter, err error, errorCode int, description string, a ...interface{})
+
 	// Response with a 500 and an error
 	Error500(w http.ResponseWriter, err error, desc string, a ...interface{})
 
@@ -104,6 +107,8 @@ func (c HTTPController) Plain(data string, w http.ResponseWriter, r *http.Reques
 	}
 }
 
+//TODO (chaehni): Replace calls to error functions with this generic function.
+//if used throughout, it makes the dedicated error functions obsolete.
 func (c HTTPController) Error(w http.ResponseWriter, err error, errorCode int, description string, a ...interface{}) {
 
 	// Log the error
