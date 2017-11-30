@@ -4,48 +4,12 @@ Vagrant.require_version ">= 1.9.7"
 
 Vagrant.configure(2) do |config|
   $setup_scion = <<-SCRIPT
-    sudo apt-get -y update
-    echo 'export GOPATH="$HOME/go"' >> ~/.profile
-    echo 'export PATH="$HOME/.local/bin:$GOPATH/bin:/usr/local/go/bin:$PATH"' >> ~/.profile
-    echo 'export SC="$GOPATH/src/github.com/netsec-ethz/scion"' >> ~/.profile
-    echo 'export PYTHONPATH="$SC/python:$SC"' >> ~/.profile
-    source ~/.profile
-    mkdir -p "$GOPATH"
-    mkdir -p "$GOPATH/src/github.com/netsec-ethz"
-    cd "$GOPATH/src/github.com/netsec-ethz"
-    git config --global url.https://github.com/.insteadOf git@github.com:
-    git clone --recursive -b scionlab git@github.com:netsec-ethz/scion
-    cd scion
-    bash -c 'yes | GO_INSTALL=true ./env/deps'
-    cp -r /vagrant/gen .
-    cd sub
-    git clone git@github.com:netsec-ethz/scion-viz
-    cd scion-viz/python/web
-    pip3 install --user --require-hashes -r requirements.txt
-    python3 ./manage.py migrate
-    echo "alias cdscion='cd /home/ubuntu/go/src/github.com/netsec-ethz/scion'" >> ~/.bash_aliases
-    echo "alias checkbeacons='tail -f /home/ubuntu/go/src/github.com/netsec-ethz/scion/logs/bs*.DEBUG'" >> ~/.bash_aliases
-  SCRIPT
-  $setup_openvpn = <<-SCRIPT
-    if [ -e /vagrant/client.conf ] # do OpenVPN setup only if config file is present
-    then
-        echo "Setting up OpenVPN."
-        apt-get -y install openvpn
-        cp /vagrant/client.conf /etc/openvpn
-        chmod 600 /etc/openvpn/client.conf
-        systemctl start openvpn@client
-        systemctl enable openvpn@client
-    else
-        echo "No OpenVPN configuration present; keeping standard setup."
-    fi
-  SCRIPT
-  $setup_systemd_service = <<-SCRIPT
-    cp /vagrant/scion.service /vagrant/scion-viz.service /etc/systemd/system/
-    echo "RemoveIPC=no" >> /etc/systemd/logind.conf
-    systemctl enable scion.service
-    systemctl start scion.service
-    systemctl enable scion-viz.service
-    systemctl start scion-viz.service
+    echo "Downloading install script..."
+    wget https://gist.githubusercontent.com/xabarass/7aa560a2ba9010d8dbb6f08029509ae5/raw/41adcb49dff860fa704fb03aa52e0f0cd1b88bca/scion_install_script.sh
+    chmod +x scion_install_script.sh
+    echo "Install script downloaded, running it"
+
+    ./scion_install_script.sh -g /vagrant/gen/ -v /vagrant/client.conf -s /vagrant/scion.service -z /vagrant/scion-viz.service
   SCRIPT
   config.vm.box = "scion/ubuntu-16.04-64-scion"
   # Port forwarding not necessary for OpenVPN setup...
@@ -56,6 +20,4 @@ Vagrant.configure(2) do |config|
     vb.name = "SCIONLabVM"
   end
   config.vm.provision "shell", privileged: false, inline: $setup_scion
-  config.vm.provision "shell", privileged: true, inline: $setup_openvpn
-  config.vm.provision "shell", privileged: true, inline: $setup_systemd_service
 end
