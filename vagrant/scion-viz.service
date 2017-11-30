@@ -4,10 +4,10 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-User=ubuntu
-WorkingDirectory=/home/ubuntu/go/src/github.com/netsec-ethz/scion/sub/scion-viz/python/web
-Environment="PYTHONPATH=/home/ubuntu/go/src/github.com/netsec-ethz/scion/python:/home/ubuntu/go/src/github.com/netsec-ethz/scion"
-ExecStart=/usr/bin/python3 /home/ubuntu/go/src/github.com/netsec-ethz/scion/sub/scion-viz/python/web/manage.py runserver 10.0.2.15:8000
+User=_USER_
+WorkingDirectory=/home/_USER_/go/src/github.com/netsec-ethz/scion/sub/scion-viz/python/web
+Environment="PYTHONPATH=/home/_USER_/go/src/github.com/netsec-ethz/scion/python:/home/_USER_/go/src/github.com/netsec-ethz/scion"
+ExecStart=/usr/bin/python3 /home/_USER_/go/src/github.com/netsec-ethz/scion/sub/scion-viz/python/web/manage.py runserver 10.0.2.15:8000
 
 [Install]
 WantedBy=multi-user.target

@@ -6,11 +6,11 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-User=ubuntu
-WorkingDirectory=/home/ubuntu/go/src/github.com/netsec-ethz/scion
-Environment="PATH=/home/ubuntu/.local/bin:/home/ubuntu/go/bin:/usr/local/go/bin:/home/ubuntu/bin:/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin" "GOPATH=/home/ubuntu/go"
-ExecStart=/home/ubuntu/go/src/github.com/netsec-ethz/scion/scion.sh run
-ExecStop=/home/ubuntu/go/src/github.com/netsec-ethz/scion/scion.sh stop
+User=_USER_
+WorkingDirectory=/home/_USER_/go/src/github.com/netsec-ethz/scion
+Environment="PATH=/home/_USER_/.local/bin:/home/_USER_/go/bin:/usr/local/go/bin:/home/_USER_/bin:/home/_USER_/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin" "GOPATH=/home/_USER_/go"
+ExecStart=/home/_USER_/go/src/github.com/netsec-ethz/scion/scion.sh run
+ExecStop=/home/_USER_/go/src/github.com/netsec-ethz/scion/scion.sh stop
 
 [Install]
 WantedBy=multi-user.target
