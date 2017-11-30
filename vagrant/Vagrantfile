@@ -5,7 +5,7 @@ Vagrant.require_version ">= 1.9.7"
 Vagrant.configure(2) do |config|
   $setup_scion = <<-SCRIPT
     echo "Downloading install script..."
-    wget https://gist.githubusercontent.com/xabarass/7aa560a2ba9010d8dbb6f08029509ae5/raw/41adcb49dff860fa704fb03aa52e0f0cd1b88bca/scion_install_script.sh
+    wget https://raw.githubusercontent.com/netsec-ethz/scion-coord/master/scion_install_script.sh
     chmod +x scion_install_script.sh
     echo "Install script downloaded, running it"
 
