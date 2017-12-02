@@ -66,7 +66,7 @@ git clone --recursive -b scionlab git@github.com:netsec-ethz/scion
 cd scion
 
 # Check if there is a patch directory
-if  [[ !(-z "$patch_dir") && (-d "$patch_dir")]]
+if  [[ ( ! -z ${patch_dir+x} ) && -d ${patch_dir} ]]
 then
     echo "Applying patches:"
 
@@ -95,16 +95,18 @@ fi
 
 bash -c 'yes | GO_INSTALL=true ./env/deps'
 
+sudo cp docker/zoo.cfg /etc/zookeeper/conf/zoo.cfg
+
 # Check if gen directory exists
-if  [[ !(-z "$gen_dir") && (-d "$gen_dir")]]
-then
-    echo "Gen directory is NOT specified! Generating local topology!"
-    
-    ./scion.sh topology
-else
+if  [[ ( ! -z ${gen_dir+x} ) && -d ${gen_dir} ]]
+then  
     echo "Gen directory is specified! Using content from there!"
     
     cp -r "$gen_dir" .
+else
+    echo "Gen directory is NOT specified! Generating local topology!"
+    
+    ./scion.sh topology
 fi
 
 cd sub
@@ -116,7 +118,7 @@ python3 ./manage.py migrate
 echo "alias cdscion='cd $SC'" >> ~/.bash_aliases
 echo "alias checkbeacons='tail -f $SC/logs/bs*.DEBUG'" >> ~/.bash_aliases
 
-if  [[ !(-z "$vpn_config_file") && (-r "$vpn_config_file")]]
+if  [[ ( ! -z ${vpn_config_file+x} ) && -r ${vpn_config_file} ]]
 then
     echo "VPN configuration specified! Configuring it!"
 
@@ -128,10 +130,8 @@ then
     sudo systemctl enable openvpn@client
 fi
 
-if  [[ !(-z "$scion_service_path") && (-r "$scion_service_path")]]
+if  [[ ( ! -z ${scion_service_path+x} ) && -r ${scion_service_path} ]]
 then
-    echo "SCION systemd service file not specified! SCION won't run automatically on startup."
-else
     echo "Registring SCION as startup service"
 
     cp "$scion_service_path" tmp.service
@@ -143,12 +143,12 @@ else
     sudo systemctl start scion.service
 
     rm tmp.service
+else
+    echo "SCION systemd service file not specified! SCION won't run automatically on startup."
 fi
 
-if  [[ !(-z "$scion_viz_service") && (-r "$scion_viz_service")]]
+if  [[ ( ! -z ${scion_viz_service+x} ) && -r ${scion_viz_service} ]]
 then
-    echo "SCION viz systemd service file not specified! SCION won't run automatically on startup."
-else
     echo "Registring SCION viz as startup service"
 
     cp "$scion_viz_service" tmp.service
@@ -158,4 +158,6 @@ else
 
     sudo systemctl enable scion-viz.service
     sudo systemctl start scion-viz.service
+else
+    echo "SCION viz systemd service file not specified! SCION won't run automatically on startup."
 fi
