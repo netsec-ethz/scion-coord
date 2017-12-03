@@ -104,9 +104,9 @@ then
     
     cp -r "$gen_dir" .
 else
-    echo "Gen directory is NOT specified! Generating local topology!"
+    echo "Gen directory is NOT specified! Generating local (Tiny) topology!"
     
-    ./scion.sh topology
+    ./scion.sh topology -c topology/Tiny.topo
 fi
 
 cd sub
