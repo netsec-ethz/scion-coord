@@ -7,9 +7,9 @@ Vagrant.configure(2) do |config|
     echo "Downloading install script..."
     wget https://raw.githubusercontent.com/netsec-ethz/scion-coord/master/scion_install_script.sh
     chmod +x scion_install_script.sh
-    echo "Install script downloaded, running it"
-
-    ./scion_install_script.sh -g /vagrant/gen/ -v /vagrant/client.conf -s /vagrant/scion.service -z /vagrant/scion-viz.service
+    echo "Install script downloaded, running it..."
+    ./scion_install_script.sh -g /vagrant/gen/ -v /vagrant/client.conf -s /vagrant/scion.service \
+    -z /vagrant/scion-viz.service -a ~/.bash_aliases -c
   SCRIPT
   config.vm.box = "scion/ubuntu-16.04-64-scion"
   # Port forwarding not necessary for OpenVPN setup...

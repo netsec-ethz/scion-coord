@@ -2,16 +2,19 @@
 
 shopt -s nullglob
 
-usage="$(basename "$0") [-p PATCH_DIR] [-g GEN_DIR] [-v VPN_CONF_PATH] [-s SCION_SERVICE] [-z SCION_VI_SERVICE]
+usage="$(basename "$0") [-p PATCH_DIR] [-g GEN_DIR] [-v VPN_CONF_PATH] \
+[-s SCION_SERVICE] [-z SCION_VI_SERVICE] [-a ALIASES_FILE] [-c]
 
 where:
     -p PATCH_DIR        apply patches from PATCH_DIR on cloned repo
     -g GEN_DIR          path to gen directory to be used
     -v VPN_CONF_PATH    path to OpenVPN configuration file
     -s SCION_SERVICE    path to SCION service file
-    -z SCION_VI_SERVICE path to SCION viz service file"
+    -z SCION_VI_SERVICE path to SCION-viz service file
+    -a ALIASES_FILE     adds useful command aliases in specified file
+    -c                  do not destroy user context on logout"
 
-while getopts ":p:g:v:s:z:h" opt; do
+while getopts ":p:g:v:s:z:ha:c" opt; do
   case $opt in
     p)
       patch_dir=$OPTARG
@@ -33,6 +36,12 @@ while getopts ":p:g:v:s:z:h" opt; do
       echo "$usage" >&2
       exit 1
       ;;
+    a)
+      aliases_file=$OPTARG
+      ;;
+    c)
+      keep_user_context=true
+      ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
       echo "$usage" >&2
@@ -47,6 +56,22 @@ while getopts ":p:g:v:s:z:h" opt; do
 done
 
 echo "Starting SCION installation..."
+
+# Check if we are running on correct Ubuntu system
+if [ -f /etc/os-release ]
+then
+    . /etc/os-release
+
+    if [[ $NAME == "Ubuntu" && $VERSION_ID == 16.04* ]] ; then
+      echo "We are running on $NAME version $VERSION_ID seems okay"
+    else
+      echo "ERROR! We are not running on Ubuntu 16.04 system, shutting down!" >&2
+      exit 1
+    fi
+else
+    echo "ERROR! This script can only be run on Ubuntu 16.04" >&2
+    exit 1
+fi
 
 sudo apt-get -y update
 sudo apt-get -y install git
@@ -78,7 +103,7 @@ then
         git apply "$f"
     done
 
-    git_username=$(git config user.names)
+    git_username=$(git config user.name)
 
     # We need to have git user in order to commit
     if [ -z "$git_username" ]
@@ -88,7 +113,7 @@ then
         git config --global user.email "scion@scion-architecture.net"
     fi
 
-    git commit -am "Modified to compile on ARM systems"
+    git commit -am "Applied platform dependent patches"
 
     echo "Finished applying patches"
 fi
@@ -99,13 +124,11 @@ sudo cp docker/zoo.cfg /etc/zookeeper/conf/zoo.cfg
 
 # Check if gen directory exists
 if  [[ ( ! -z ${gen_dir+x} ) && -d ${gen_dir} ]]
-then  
+then
     echo "Gen directory is specified! Using content from there!"
-    
     cp -r "$gen_dir" .
 else
     echo "Gen directory is NOT specified! Generating local (Tiny) topology!"
-    
     ./scion.sh topology -c topology/Tiny.topo
 fi
 
@@ -115,8 +138,14 @@ cd scion-viz/python/web
 pip3 install --user --require-hashes -r requirements.txt
 python3 ./manage.py migrate
 
-echo "alias cdscion='cd $SC'" >> ~/.bash_aliases
-echo "alias checkbeacons='tail -f $SC/logs/bs*.DEBUG'" >> ~/.bash_aliases
+# Should we add aliases
+if [[ (! -z ${aliases_file} ) ]]
+then
+  echo "Adding aliases to $aliases_file"
+
+  echo "alias cdscion='cd $SC'" >> "$aliases_file"
+  echo "alias checkbeacons='tail -f $SC/logs/bs*.DEBUG'" >> "$aliases_file"
+fi
 
 if  [[ ( ! -z ${vpn_config_file+x} ) && -r ${vpn_config_file} ]]
 then
@@ -132,11 +161,11 @@ fi
 
 if  [[ ( ! -z ${scion_service_path+x} ) && -r ${scion_service_path} ]]
 then
-    echo "Registring SCION as startup service"
+    echo "Registering SCION as startup service"
 
     cp "$scion_service_path" tmp.service
-    # We need to replace ubuntu user with current username
-    sed -i "s/ubuntu/$USER/g" tmp.service
+    # We need to replace template user with current username
+    sed -i "s/_USER_/$USER/g" tmp.service
     sudo cp tmp.service /etc/systemd/system/scion.service
 
     sudo systemctl enable scion.service
@@ -149,15 +178,22 @@ fi
 
 if  [[ ( ! -z ${scion_viz_service+x} ) && -r ${scion_viz_service} ]]
 then
-    echo "Registring SCION viz as startup service"
+    echo "Registering SCION-viz as startup service"
 
     cp "$scion_viz_service" tmp.service
-    # We need to replace ubuntu user with current username
-    sed -i "s/ubuntu/$USER/g" tmp.service
+    # We need to replace template user with current username
+    sed -i "s/_USER_/$USER/g" tmp.service
     sudo cp tmp.service /etc/systemd/system/scion-viz.service
 
     sudo systemctl enable scion-viz.service
     sudo systemctl start scion-viz.service
+
+    rm tmp.service
 else
-    echo "SCION viz systemd service file not specified! SCION won't run automatically on startup."
+    echo "SCION viz systemd service file not specified! SCION-viz won't run automatically on startup."
+fi
+
+if [[ $keep_user_context = true ]]
+then
+  sudo sh -c 'echo \"RemoveIPC=no\" >> /etc/systemd/logind.conf'
 fi
