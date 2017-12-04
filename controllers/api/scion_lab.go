@@ -25,7 +25,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"text/template"
 	"time"
@@ -40,40 +39,19 @@ import (
 	"github.com/netsec-ethz/scion/go/lib/addr"
 )
 
-var (
-	_, b, _, _      = runtime.Caller(0)
-	currentPath     = filepath.Dir(b)
-	scionCoordPath  = filepath.Dir(filepath.Dir(currentPath))
-	localGenPath    = filepath.Join(scionCoordPath, "python", "local_gen.py")
-	TempPath        = filepath.Join(scionCoordPath, "temp")
-	scionPath       = filepath.Join(filepath.Dir(scionCoordPath), "scion")
-	scionWebPath    = filepath.Join(scionPath, "sub", "web")
-	pythonPath      = filepath.Join(scionPath, "python")
-	vagrantPath     = filepath.Join(scionCoordPath, "vagrant")
-	PackagePath     = config.PACKAGE_DIRECTORY
-	credentialsPath = filepath.Join(scionCoordPath, "credentials")
-	CoreCertFile    = filepath.Join(credentialsPath, "ISD1-AS1-V0.crt")
-	CoreSigKey      = filepath.Join(credentialsPath, "as-sig.key")
-	TrcFile         = filepath.Join(credentialsPath, "ISD1-V0.trc")
-	EasyRSAPath     = filepath.Join(PackagePath, "easy-rsa")
-	RSAKeyPath      = filepath.Join(EasyRSAPath, "keys")
-	CACertPath      = filepath.Join(RSAKeyPath, "ca.crt")
+// Acknowledgments for the performed operations by a SCIONLab AS.
+const (
+	CREATED = "Created"
+	UPDATED = "Updated"
+	REMOVED = "Removed"
 )
 
-// The states in which a user's SCIONLab VM can be in.
 const (
 	INACTIVE = iota // 0
 	ACTIVE
 	CREATE
 	UPDATE
 	REMOVE
-)
-
-// Acknowledgments for the performed operations by a SCIONLab AS.
-const (
-	CREATED = "Created"
-	UPDATED = "Updated"
-	REMOVED = "Removed"
 )
 
 func UserPackagePath(email string) string {

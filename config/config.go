@@ -61,5 +61,6 @@ var (
 
 	// Local IP address in VM; this is a default set by
 	// vagrant and may have to be adjusted if vagrant configuration is changed
-	VM_LOCAL_IP = "10.0.2.15"
+	VM_LOCAL_IP  = "10.0.2.15"
+	HB_PERIOD, _ = goconf.AppConf.Int("heartbeat.period")
 )

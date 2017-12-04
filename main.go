@@ -115,6 +115,7 @@ func main() {
 	adminController := api.AdminController{}
 	asController := api.ASController{}
 	scionLabVMController := api.SCIONLabVMController{}
+	scionBoxController := api.SCIONBoxController{}
 
 	// rate limitation
 	resendLimit := tollbooth.NewLimiter(1, time.Minute*10,
@@ -197,6 +198,11 @@ func main() {
 		apiChain.ThenFunc(scionLabVMController.GetSCIONLabVMASes))
 	router.Handle("/api/as/confirmSCIONLabVMASes/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabVMController.ConfirmSCIONLabVMASes))
+
+	//SCIONBox API
+	router.Handle("/api/as/initBox", loggingChain.ThenFunc(scionBoxController.InitializeBox))
+	router.Handle("/api/as/connectBox/{account_id}/{secret}", apiChain.ThenFunc(scionBoxController.ConnectNewBox))
+	router.Handle("/api/as/heartbeat/{account_id}/{secret}", apiChain.ThenFunc(scionBoxController.HeartBeatFunction))
 
 	// ==========================================================
 	// SCION Web API
