@@ -31,7 +31,7 @@ var (
 	HeartBeatLimit  = time.Duration(config.HB_LIMIT)
 )
 
-const(
+const (
 	BR_START_PORT = 31046
-	MTU = 1472
+	MTU           = 1472
 )

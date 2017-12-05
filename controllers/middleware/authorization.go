@@ -29,13 +29,15 @@ var (
 	AdminHandler = constructHandler(checkAdmin)
 )
 
+// TODO(mlegner): We need an additional authorization handler that checks if the account is an admin
 func checkAccountSecret(r *http.Request) bool {
 	vars := mux.Vars(r)
 	account_id := vars["account_id"]
 	secret := vars["secret"]
 	// In this case we are receiving a request with account_id and secret params
 	if account_id != "" && secret != "" {
-		if account, err := models.FindUserByAccountIdSecret(account_id, secret); err == nil && account != nil {
+		if account, err := models.FindAccountByAccountIDAndSecret(account_id, secret); err == nil &&
+			account != nil {
 			// proceed with the next handler
 			return true
 		}
@@ -47,7 +49,8 @@ func checkAccountSecret(r *http.Request) bool {
 	secret = r.URL.Query().Get("secret")
 
 	if account_id != "" && secret != "" {
-		if account, err := models.FindUserByAccountIdSecret(account_id, secret); err == nil && account != nil {
+		if account, err := models.FindAccountByAccountIDAndSecret(account_id, secret); err == nil &&
+			account != nil {
 			// proceed with the next handler
 			return true
 		}

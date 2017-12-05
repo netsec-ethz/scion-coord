@@ -141,17 +141,17 @@
 			"revisionTime": "2017-09-27T15:21:54Z"
 		},
 		{
-                        "checksumSHA1": "um5Gw7FZwz/GoxIXVIlSL1NigXk=",
-                        "path": "github.com/oschwald/geoip2-golang",
-                        "revision": "5b1dc16861f81d05d9836bb21c2d0d65282fc0b8",
-                        "revisionTime": "2017-04-23T21:58:58Z"
-                },
+			"checksumSHA1": "um5Gw7FZwz/GoxIXVIlSL1NigXk=",
+			"path": "github.com/oschwald/geoip2-golang",
+			"revision": "5b1dc16861f81d05d9836bb21c2d0d65282fc0b8",
+			"revisionTime": "2017-04-23T21:58:58Z"
+		},
 		{
-                        "checksumSHA1": "N6I3i0LIjQckurgTeH3b2A5YTec=",
-                        "path": "github.com/oschwald/maxminddb-golang",
-                        "revision": "26fe5ace1c706491c2936119e1dc69c1a9c04d7f",
-                        "revisionTime": "2017-09-01T13:40:56Z"
-                },
+			"checksumSHA1": "N6I3i0LIjQckurgTeH3b2A5YTec=",
+			"path": "github.com/oschwald/maxminddb-golang",
+			"revision": "26fe5ace1c706491c2936119e1dc69c1a9c04d7f",
+			"revisionTime": "2017-09-01T13:40:56Z"
+		},
 		{
 			"checksumSHA1": "JVGDxPn66bpe6xEiexs1r+y6jF0=",
 			"path": "github.com/patrickmn/go-cache",
@@ -219,7 +219,7 @@
 			"revisionTime": "2017-09-18T06:10:02Z"
 		},
 		{
-			"checksumSHA1": "e/1sucokv1jK2HvWMMQMZd1QEeU=",
+			"checksumSHA1": "AIIn8HsmPeOuNDpemoEWwlt/w5c=",
 			"path": "golang.org/x/sys/unix",
 			"revision": "47bdb838cce8879fca08207206a5dfde2f2538bc",
 			"revisionTime": "2017-08-08T10:31:41Z"

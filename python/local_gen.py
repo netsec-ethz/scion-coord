@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-:mod:`local_gen` --- Local config generation tool for a SCIONLab VM
+:mod:`local_gen` --- Local config generation tool for a SCIONLab AS
 ===================================================================
 
 """
@@ -64,7 +64,7 @@ DEFAULT_CORE_SIG_KEY = os.path.join(SCION_COORD_PATH, "credentials", "as-sig.key
 DEFAULT_TRC_FILE = os.path.join(SCION_COORD_PATH, "credentials", "ISD1-V0.trc")
 
 
-def create_scionlab_vm_local_gen(args, tp):
+def create_scionlab_as_local_gen(args, tp):
     """
     Creates the usual gen folder structure for an ISD/AS under web_scion/gen,
     ready for Ansible deployment
@@ -84,7 +84,7 @@ def create_scionlab_vm_local_gen(args, tp):
             config = prep_supervisord_conf(tp[type_key][instance_name], executable_name,
                                            service_type, instance_name, new_ia)
             instance_path = get_elem_dir(local_gen_path, new_ia, instance_name)
-            # TODO (ercanucan): pass the TRC file as a parameter
+            # TODO(ercanucan): pass the TRC file as a parameter
             write_certs_trc_keys(new_ia, as_obj, instance_path)
             write_as_conf_and_path_policy(new_ia, as_obj, instance_path)
             write_supervisord_config(config, instance_path)
@@ -156,7 +156,7 @@ def main():
     parser.add_argument("--topo_file",
                         help='Topology file to be used for config generation.')
     parser.add_argument("--package_path",
-                        help='Path to generate and store VM configurations.',
+                        help='Path to generate and store AS configurations.',
                         default=DEFAULT_PACKAGE_PATH)
     parser.add_argument("--user_id",
                         help='User Identifier (email)')
@@ -164,7 +164,7 @@ def main():
 
     with open(args.topo_file) as json_data:
         topo_dict = json.load(json_data)
-    create_scionlab_vm_local_gen(args, topo_dict)
+    create_scionlab_as_local_gen(args, topo_dict)
 
 
 if __name__ == '__main__':

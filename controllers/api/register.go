@@ -265,7 +265,7 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 	}
 
 	// Send email address confirmation link
-	if err := sendVerificationEmail(user.Id); err != nil {
+	if err := sendVerificationEmail(user.ID); err != nil {
 		log.Printf("Error sending verification email: %v", err)
 		c.Error500(w, err, "Error sending verification email")
 	}
@@ -289,7 +289,7 @@ func (c *RegistrationController) ResendActivationLink(w http.ResponseWriter, r *
 		return
 	}
 
-	if err := sendVerificationEmail(user.Id); err != nil {
+	if err := sendVerificationEmail(user.ID); err != nil {
 		log.Printf("Error sending verification email: %v", err)
 		c.Error500(w, err, "Error sending verification email")
 		return
@@ -302,7 +302,7 @@ func (c *RegistrationController) ResendActivationLink(w http.ResponseWriter, r *
 // Function which sends verification emails to newly registered users
 func sendVerificationEmail(userID uint64) error {
 
-	user, err := models.FindUserById(fmt.Sprintf("%v", userID))
+	user, err := models.FindUserByID(fmt.Sprintf("%v", userID))
 	if err != nil {
 		return err
 	}

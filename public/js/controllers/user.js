@@ -11,7 +11,7 @@ scionApp
                     function (data) {
                         console.log(data);
                         $rootScope.user = data["User"];
-                        $scope.vmInfo = data["VMInfo"];
+                        $scope.asInfo = data["ASInfo"];
                         $scope.buttonConfig = data["UIButtons"];
                         $scope.user.isNotVPN = false;
                     },
@@ -27,19 +27,19 @@ scionApp
                 switch (action) {
                     case "update":
                         if (user.isNotVPN) {
-                            $scope.scionLabVMForm.scionLabVMIP.$setValidity("required", user.scionLabVMIP != null);
+                            $scope.scionLabASForm.scionLabASIP.$setValidity("required", user.scionLabASIP != null);
                         }
-                        if (user.isNotVPN && !$scope.scionLabVMForm.scionLabVMIP.$valid) {
+                        if (user.isNotVPN && !$scope.scionLabASForm.scionLabASIP.$valid) {
                             $scope.error = "Please enter a correct public IP address.";
                         } else {
-                            $scope.generateSCIONLabVM(user);
+                            $scope.generateSCIONLabAS(user);
                         }
                         break;
                     case "download":
-                        $scope.downloadSCIONLabVM(user);
+                        $scope.downloadSCIONLabAS(user);
                         break;
                     case "remove":
-                        $scope.removeSCIONLabVM(user);
+                        $scope.removeSCIONLabAS(user);
                         break;
                 }
             };
@@ -48,11 +48,11 @@ scionApp
                 return ('/api/as/downloadTarball');
             };
 
-            $scope.generateSCIONLabVM = function (user) {
+            $scope.generateSCIONLabAS = function (user) {
                 $scope.error = "";
                 $scope.message = "";
 
-                userService.generateSCIONLabVM(user).then(
+                userService.generateSCIONLabAS(user).then(
                     function (data) {
                         console.log(data);
                         window.location.assign(downloadlink());
@@ -65,18 +65,18 @@ scionApp
                     });
             };
 
-            $scope.downloadSCIONLabVM = function (user) {
+            $scope.downloadSCIONLabAS = function (user) {
                 $scope.error = "";
                 $scope.message = "";
 
                 window.location.assign(downloadlink());
             };
 
-            $scope.removeSCIONLabVM = function (user) {
+            $scope.removeSCIONLabAS = function (user) {
                 $scope.error = "";
                 $scope.message = "";
 
-                userService.removeSCIONLabVM(user).then(
+                userService.removeSCIONLabAS(user).then(
                     function (data) {
                         console.log(data);
                         $scope.message = data;

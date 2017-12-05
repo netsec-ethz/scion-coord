@@ -45,9 +45,9 @@ func FindSCIONBoxByEMail(userEmail string) (*SCIONBox, error) {
 	return v, err
 }
 
-func FindSCIONBoxByIAint(Isd int, As int) (*SCIONBox, error) {
+func FindSCIONBoxByIAint(isd int, As int) (*SCIONBox, error) {
 	v := new(SCIONBox)
-	err := o.QueryTable(v).Filter("ISD", Isd).Filter("AS", As).RelatedSel().One(v)
+	err := o.QueryTable(v).Filter("ISD", isd).Filter("AS", As).RelatedSel().One(v)
 	return v, err
 }
 
@@ -69,37 +69,37 @@ func (sb *SCIONBox) Remove() error {
 	return err
 }
 
-type IsdLocation struct {
+type ISDLocation struct {
 	Id        uint64 `orm:"column(id);auto;pk"`
 	ISD       int
 	Country   string
 	Continent string
 }
 
-func (il *IsdLocation) Insert() error {
+func (il *ISDLocation) Insert() error {
 	_, err := o.Insert(il)
 	return err
 }
 
-func (il *IsdLocation) Update() error {
+func (il *ISDLocation) Update() error {
 	_, err := o.Update(il)
 	return err
 }
 
-func FindISDbyID(id int) (*IsdLocation, error) {
-	v := new(IsdLocation)
+func FindISDbyID(id int) (*ISDLocation, error) {
+	v := new(ISDLocation)
 	err := o.QueryTable(v).Filter("ISD", id).RelatedSel().One(v)
 	return v, err
 }
 
-func FindISDbyCountry(country string) (*IsdLocation, error) {
-	v := new(IsdLocation)
+func FindISDbyCountry(country string) (*ISDLocation, error) {
+	v := new(ISDLocation)
 	err := o.QueryTable(v).Filter("Country", country).RelatedSel().One(v)
 	return v, err
 }
 
-func FindISDbyContinent(continent string) (*IsdLocation, error) {
-	v := new(IsdLocation)
+func FindISDbyContinent(continent string) (*ISDLocation, error) {
+	v := new(ISDLocation)
 	err := o.QueryTable(v).Filter("Continent", continent).RelatedSel().One(v)
 	return v, err
 }
@@ -107,12 +107,12 @@ func FindISDbyContinent(continent string) (*IsdLocation, error) {
 // Find Potential Neighbors for the Box
 func FindPotentialNeighbors(isd int) ([]SCIONLabAS, error) {
 	var v []SCIONLabAS
-	v, err := GetAllAPsByIsd(isd)
+	v, err := GetAllAPsByISD(isd)
 	return v, err
 }
 
 // Find All Active Attachment Points in an ISD
-func GetAllAPsByIsd(isd int) ([]SCIONLabAS, error) {
+func GetAllAPsByISD(isd int) ([]SCIONLabAS, error) {
 	var v []SCIONLabAS
 	w, err := GetAllAPs()
 	if err != nil {
