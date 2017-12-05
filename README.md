@@ -79,7 +79,7 @@ credentials/ISD1-V0.trc
 
 #### Certificate authority setup
 
-In order to use OpenVPN inside the generated SCIONLab VMs, it is necessary to set up a certificate 
+In order to use OpenVPN inside the generated SCIONLab ASes, it is necessary to set up a certificate 
 authority. We use the tool `easy-rsa` for this.
 
 Install `easy-rsa` (version 2.x) using your package manager or download it from the 

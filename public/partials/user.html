@@ -4,14 +4,14 @@
   <h3>Welcome to SCIONLab!</h3>
 
   <div class="alert alert-info">
-    <p>{{vmInfo.VMText}}
-      <span ng-if="vmInfo.IA">
+    <p>{{asInfo.ASText}}
+      <span ng-if="asInfo.IA">
         You have been assigned the AS number <strong>{{vmInfo.IA}}</strong>.
       </span>
-      <span ng-if="vmInfo.ShowIP">
+      <span ng-if="asInfo.ShowIP">
         Your registered IP address is <strong>{{vmInfo.VMIP}}</strong>.
       </span>
-      <span ng-if="vmInfo.ShowVPN">You have chosen a <strong>VPN-based</strong> setup.</span>
+      <span ng-if="asInfo.ShowVPN">You have chosen a <strong>VPN-based</strong> setup.</span>
     </p>
   </div>
   <div>
@@ -29,7 +29,7 @@
   </div>
   <br/>
 
-  <form name="scionLabVMForm">
+  <form name="scionLabASForm">
     <div class="form-group has-feedback">
       <label class="btn btn-block btn-primary" ng-disabled="buttonConfig.Update.Disable"
              data-toggle="tooltip"
@@ -40,7 +40,7 @@
                ng-disabled="buttonConfig.Update.Disable">
         My host has a static public IP address and can receive traffic at port 50000.</label>
 
-      <input type="text" class="form-control" ng-model="user.scionLabVMIP" name="scionLabVMIP"
+      <input type="text" class="form-control" ng-model="user.scionLabASIP" name="scionLabASIP"
              placeholder="My host's public IP address" ng-if="user.isNotVPN"
              ng-pattern="/^(?!.*\.$)((1?\d?\d|25[0-5]|2[0-4]\d)(\.|$)){4}$/">
       <span class="form-control-feedback"></span>

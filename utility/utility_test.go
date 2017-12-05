@@ -33,6 +33,12 @@ type ipIncrementTest struct {
 	inc int32
 }
 
+type brTest struct {
+	name  string
+	error bool
+	id    int
+}
+
 func TestIPFunctions(t *testing.T) {
 	ipComparisonTests := []ipComparisonTest{
 		ipComparisonTest{"0.0.0.0", "0.0.0.1", -1},
@@ -74,4 +80,19 @@ func TestIPFunctions(t *testing.T) {
 		}
 	}
 
+}
+
+func TestBRIDFromString(t *testing.T) {
+	brTests := []brTest{
+		brTest{"br1-2-1", false, 1},
+		brTest{"br123", true, 0}, // conversion should fail and return 0
+		brTest{"br3-4-0", false, 0},
+	}
+
+	for _, brT := range brTests {
+		id, err := BRIDFromString(brT.name)
+		if id != brT.id || (brT.error == (err == nil)) {
+			t.Errorf("Conversion of BR string failed for %v", brT.name)
+		}
+	}
 }

@@ -49,12 +49,9 @@ var (
 	DB_PASS               = goconf.AppConf.String("db.pass")
 	DB_MAX_CONNECTIONS, _ = goconf.AppConf.Int("db.max_connections")
 	DB_MAX_IDLE, _        = goconf.AppConf.Int("db.max_idle")
-	SERVER_IA             = goconf.AppConf.String("server.ia")
-	SERVER_IP             = goconf.AppConf.String("server.ip")
-	SERVER_START_PORT, _  = goconf.AppConf.Int("server.start_port")
-	SERVER_VPN_IP         = goconf.AppConf.String("server.vpn.ip")
-	SERVER_VPN_START_IP   = goconf.AppConf.String("server.vpn.start_ip")
-	SERVER_VPN_END_IP     = goconf.AppConf.String("server.vpn.end_ip")
+	BASE_AS_ID, _         = goconf.AppConf.Int("base_as_id")
+	AP_IA                 = goconf.AppConf.String("ap_ia")
+	START_PORT, _         = goconf.AppConf.Int("start_port")
 
 	// Virtual Credit system
 	VIRTUAL_CREDIT_ENABLE, _        = goconf.AppConf.Bool("virtualCredit.enable")

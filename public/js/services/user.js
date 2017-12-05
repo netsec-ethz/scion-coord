@@ -8,21 +8,19 @@ scionApp
                 return response.data;
             });
         },
-        // Create SCIONLab VM
-        generateSCIONLabVM: function (user) {
+        // Create SCIONLab AS
+        generateSCIONLabAS: function (user) {
             // TODO(ercanucan): compose the URL in a cleaner fashion
-            let url = '/api/as/generateVM?isVPN=' + (!user.isNotVPN) + '&scionLabVMIP='
-                + user.scionLabVMIP;
+            let url = '/api/as/generateAS?isVPN=' + (!user.isNotVPN) + '&scionLabASIP='
+                + user.scionLabASIP;
             return $http.post(url).then(function (response) {
                 console.log(response);
                 return response.data;
             });
         },
-        // Remove SCIONLab VM
-        removeSCIONLabVM: function (user) {
-            console.log("Inside remove VM");
-            return $http.post('/api/as/removeVM').then(function (response) {
-                // The then function here is an opportunity to modify the response
+        // Remove SCIONLab AS
+        removeSCIONLabAS: function (user) {
+            return $http.post('/api/as/removeAS').then(function (response) {
                 console.log(response);
                 return response.data;
             });

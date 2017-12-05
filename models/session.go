@@ -19,7 +19,7 @@ import (
 )
 
 type Session struct {
-	UserId       uint64
+	UserID       uint64
 	Email        string
 	First        string
 	Last         string

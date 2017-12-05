@@ -37,11 +37,8 @@ func init() {
 	orm.Debug = false
 
 	// register the models
-	// TODO (@philippmao, mlegner) Remove SCIONLabServer and SCIONLabVM
-	// TODO (@philippmao, mlegner) Remove As models
-	orm.RegisterModel(new(user), new(Account), new(As), new(JoinRequest), new(ConnRequest),
-		new(JoinReply), new(ConnReply), new(SCIONLabServer), new(SCIONLabVM),
-		new(SCIONLabAS), new(AttachmentPoint), new(Connection))
+	orm.RegisterModel(new(user), new(Account), new(JoinRequest), new(ConnRequest),
+		new(JoinReply), new(ConnReply), new(SCIONLabAS), new(AttachmentPoint), new(Connection))
 
 	// print verbose logs when generating the tables
 	verbose := true

@@ -58,7 +58,7 @@ angular.module('scionApp')
             };
 
             $scope.sendInvitations = function (invitations) {
-                // TODO (mlegner): Maybe check for duplicates before api call.
+                // TODO(mlegner): Maybe check for duplicates before api call.
                 adminService.sendInvitations(invitations).then(
                     function (data) {
                         if (data["emails"].length === 0) {

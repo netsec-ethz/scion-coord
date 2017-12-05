@@ -16,8 +16,6 @@ package api
 
 import (
 	"bytes"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -34,7 +32,6 @@ import (
 	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
-	"github.com/netsec-ethz/scion-coord/email"
 	"github.com/netsec-ethz/scion-coord/models"
 	"github.com/netsec-ethz/scion-coord/utility"
 	"github.com/netsec-ethz/scion/go/lib/addr"
@@ -60,49 +57,35 @@ var (
 	CACertPath      = filepath.Join(RSAKeyPath, "ca.crt")
 )
 
-// The states in which a user's SCIONLab VM can be in.
-const (
-	INACTIVE = iota // 0
-	ACTIVE
-	CREATE
-	UPDATE
-	REMOVE
-)
-
-// Acknowledgments for the performed operations by a SCIONLab AS.
-const (
-	CREATED = "Created"
-	UPDATED = "Updated"
-	REMOVED = "Removed"
-)
-
 func UserPackagePath(email string) string {
 	return filepath.Join(PackagePath, email)
 }
 
-type SCIONLabVMController struct {
+type SCIONLabASController struct {
 	controllers.HTTPController
 }
 
-type SCIONLabVMInfo struct {
-	IsNewUser  bool               // denotes whether this is a new user.
-	UserEmail  string             // the email address of the user.
-	IsVPN      bool               // denotes whether this is a VPN setup
-	VPNIP      string             // IP of the VPN server
-	ISD_ID     int                // ISD
-	AS_ID      int                // asID of the SCIONLab VM
-	IP         string             // the public IP address of the SCIONLab VM
-	RemoteIA   string             // the SCIONLab AS the VM connects to
-	RemoteIP   string             // the IP address of the SCIONLab AS it connects to
-	RemotePort int                // port number of the remote SCIONLab AS being connected to
-	SVM        *models.SCIONLabVM // if exists, the DB object that belongs to this VM
+type SCIONLabASInfo struct {
+	IsNewUser   bool               // denotes whether this is a new user.
+	UserEmail   string             // the email address of the user.
+	IsVPN       bool               // denotes whether this is a VPN setup
+	VPNServerIP string             // IP of the VPN server
+	ISD         int                // ISD
+	ASID        int                // asID of the SCIONLab AS
+	IP          string             // the public IP address of the SCIONLab AS
+	RemoteIA    string             // the SCIONLab AP the AS connects to
+	RemoteIP    string             // the IP address of the SCIONLab AP it connects to
+	RemoteBRID  int                // ID of the border router in the SCIONLab AP
+	RemotePort  int                // Port of the BR in the SCIONLab AP
+	SLAS        *models.SCIONLabAS // if exists, the DB object that belongs to this AS
+	RemoteAS    *models.SCIONLabAS // the AP this AS connects to
 }
 
-// The main handler function to generates a SCIONLab VM for the given user.
+// The main handler function to generates a SCIONLab AS for the given user.
 // If successful, the front-end will initiate the downloading of the tarball.
-func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http.Request) {
+func (s *SCIONLabASController) GenerateSCIONLabAS(w http.ResponseWriter, r *http.Request) {
 	// Parse the arguments
-	isVPN, scionLabVMIP, userEmail, err := s.parseURLParameters(r)
+	isVPN, scionLabASIP, userEmail, err := s.parseURLParameters(r)
 	if err != nil {
 		log.Printf("Error parsing the parameters: %v", err)
 		s.BadRequest(w, err, "Error parsing the parameters")
@@ -111,7 +94,7 @@ func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http
 	// check if there is already a create or update in progress
 	canCreateOrUpdate, err := s.canCreateOrUpdate(userEmail)
 	if err != nil {
-		log.Printf("Error checking pending create or update. User: %v, %v", userEmail, err)
+		log.Printf("Error checking pending create or update for user %v: %v", userEmail, err)
 		s.Error500(w, err, "Error checking pending create or update")
 		return
 	}
@@ -120,56 +103,56 @@ func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http
 		return
 	}
 	// Target SCIONLab ISD and AS to connect to is determined by config file
-	svmInfo, err := s.getSCIONLabVMInfo(scionLabVMIP, userEmail, config.SERVER_IA, isVPN)
+	asInfo, err := s.getSCIONLabASInfo(scionLabASIP, userEmail, config.AP_IA, isVPN)
 	if err != nil {
-		log.Printf("Error getting SCIONLabVMInfo: %v", err)
-		s.Error500(w, err, "Error getting SCIONLabVMInfo")
+		log.Printf("Error getting SCIONLabASInfo: %v", err)
+		s.Error500(w, err, "Error getting SCIONLabASInfo")
 		return
 	}
 	// Remove all existing files from UserPackagePath
-	// TODO (mlegner): May want to archive somewhere?
-	os.RemoveAll(UserPackagePath(svmInfo.UserEmail) + "/")
+	// TODO(mlegner): May want to archive somewhere?
+	os.RemoveAll(UserPackagePath(asInfo.UserEmail) + "/")
 	// Generate topology file
-	if err = s.generateTopologyFile(svmInfo); err != nil {
+	if err = s.generateTopologyFile(asInfo); err != nil {
 		log.Printf("Error generating topology file: %v", err)
 		s.Error500(w, err, "Error generating topology file")
 		return
 	}
 	// Generate local gen
-	if err = s.generateLocalGen(svmInfo); err != nil {
+	if err = s.generateLocalGen(asInfo); err != nil {
 		log.Printf("Error generating local config: %v", err)
 		s.Error500(w, err, "Error generating local config")
 		return
 	}
 	// Generate VPN config if this is a VPN setup
-	if svmInfo.IsVPN {
-		if err = s.generateVPNConfig(svmInfo); err != nil {
+	if asInfo.IsVPN {
+		if err = s.generateVPNConfig(asInfo); err != nil {
 			log.Printf("Error generating VPN config: %v", err)
 			s.Error500(w, err, "Error generating VPN config")
 			return
 		}
 	}
-	// Package the VM
-	if err = s.packageSCIONLabVM(svmInfo.UserEmail); err != nil {
-		log.Printf("Error packaging SCIONLabVM: %v", err)
-		s.Error500(w, err, "Error packaging SCIONLabVM")
+	// Package the SCIONLab AS configuration
+	if err = s.packageConfiguration(asInfo.UserEmail); err != nil {
+		log.Printf("Error packaging SCIONLabAS configuration: %v", err)
+		s.Error500(w, err, "Error packaging SCIONLabAS configuration")
 		return
 	}
 	// Persist the relevant data into the DB
-	if err = s.updateDB(svmInfo); err != nil {
+	if err = s.updateDB(asInfo); err != nil {
 		log.Printf("Error updating DB tables: %v", err)
 		s.Error500(w, err, "Error updating DB tables")
 		return
 	}
 
-	message := "Your VM will be activated within a few minutes. " +
+	message := "Your SCIONLab AS will be activated within a few minutes. " +
 		"You will receive an email confirmation as soon as the process is complete."
 	fmt.Fprintln(w, message)
 }
 
 // Parses the necessary parameters from the URL: whether or not this is a VPN setup,
 // the user's email address, and the public IP of the user's machine.
-func (s *SCIONLabVMController) parseURLParameters(r *http.Request) (bool,
+func (s *SCIONLabASController) parseURLParameters(r *http.Request) (bool,
 	string, string, error) {
 	_, userSession, err := middleware.GetUserSession(r)
 	if err != nil {
@@ -179,18 +162,18 @@ func (s *SCIONLabVMController) parseURLParameters(r *http.Request) (bool,
 	if err := r.ParseForm(); err != nil {
 		return false, "", "", fmt.Errorf("Error parsing the form: %v", err)
 	}
-	scionLabVMIP := r.Form["scionLabVMIP"][0]
+	slasIP := r.Form["scionLabASIP"][0]
 	isVPN, _ := strconv.ParseBool(r.Form["isVPN"][0])
-	if !isVPN && scionLabVMIP == "undefined" {
+	if !isVPN && slasIP == "undefined" {
 		return false, "", "", fmt.Errorf(
 			"IP address cannot be empty for non-VPN setup. User: %v", userEmail)
 	}
-	return isVPN, scionLabVMIP, userEmail, nil
+	return isVPN, slasIP, userEmail, nil
 }
 
-// Check if the user's VM is already in the process of being created or updated.
-func (s *SCIONLabVMController) canCreateOrUpdate(userEmail string) (bool, error) {
-	svm, err := models.FindSCIONLabVMByUserEmail(userEmail)
+// Check if the user's AS is already in the process of being created or updated.
+func (s *SCIONLabASController) canCreateOrUpdate(userEmail string) (bool, error) {
+	slas, err := models.FindOneSCIONLabASByUserEmail(userEmail)
 	if err != nil {
 		if err == orm.ErrNoRows {
 			return true, nil
@@ -198,221 +181,226 @@ func (s *SCIONLabVMController) canCreateOrUpdate(userEmail string) (bool, error)
 			return false, err
 		}
 	}
-	if (svm.Status == ACTIVE) || (svm.Status == INACTIVE) {
+	if (slas.Status == models.ACTIVE) || (slas.Status == models.INACTIVE) {
 		return true, nil
 	}
 	return false, nil
 }
 
-// Next unassigned VPN IP
-func getNextVPNIP(lastAssignedIP string) (string, error) {
-	if utility.IPCompare(lastAssignedIP, config.SERVER_VPN_END_IP) == -1 {
-		return utility.IPIncrement(lastAssignedIP, 1), nil
-	} else {
-		return "", errors.New("No new VPN IP address available")
-	}
-}
-
-// Populates and returns a SCIONLabVMInfo struct, which contains the necessary information
-// to create the SCIONLab VM configuration.
-func (s *SCIONLabVMController) getSCIONLabVMInfo(scionLabVMIP, userEmail, targetIA string,
-	isVPN bool) (*SCIONLabVMInfo, error) {
+// Populates and returns a SCIONLabASInfo struct, which contains the necessary information
+// to create the SCIONLab AS configuration.
+func (s *SCIONLabASController) getSCIONLabASInfo(scionLabASIP, userEmail, targetIA string,
+	isVPN bool) (*SCIONLabASInfo, error) {
 	var newUser bool
-	var asID int
+	var asID, brID int
 	var ip, remoteIP, vpnIP string
-	remotePort := -1
-	// See if this user already has a VM
-	svm, err := models.FindSCIONLabVMByUserEmail(userEmail)
+	var cn models.ConnectionInfo
+	// See if this user already has an AS
+	slas, err := models.FindOneSCIONLabASByUserEmail(userEmail)
 	if err != nil {
 		if err == orm.ErrNoRows {
 			newUser = true
-			asID, _ = s.getNewSCIONLabVMASID()
+			asID, _ = s.getNewSCIONLabASID()
+			brID = -1
 		} else {
-			return nil, fmt.Errorf("Error looking up SCIONLab VM from DB %v: %v", userEmail, err)
+			return nil, fmt.Errorf("Error looking up SCIONLab AS for user %v: %v", userEmail, err)
 		}
 	} else {
+		cn, err = slas.GetJoinConnectionInfoToAS(config.AP_IA)
+		if err != nil {
+			return nil, fmt.Errorf("Error looking up connections of SCIONLab AS for user %v: %v",
+				userEmail, err)
+		}
 		newUser = false
-		asID = svm.IA.As
-		remotePort = svm.RemoteIAPort
+		asID = slas.ASID
+		brID = cn.BRID
 	}
-	log.Printf("AS ID given of the user %v: %v", userEmail, asID)
+	log.Printf("AS ID given to the user %v: %v", userEmail, asID)
 
 	ia, err := addr.IAFromString(targetIA)
 	if err != nil {
 		return nil, err
 	}
 
-	scionLabServer, err := models.FindSCIONLabServer(targetIA)
+	remoteAS, err := models.FindSCIONLabASByIAString(targetIA)
 	if err != nil {
-		return nil, fmt.Errorf("Error while retrieving scionLabServer for %v: %v", targetIA, err)
+		return nil, fmt.Errorf("Error while retrieving AttachmentPoint %v: %v", targetIA, err)
 	}
 
 	// Different settings depending on whether it is a VPN or standard setup
 	if isVPN {
-		ip, err = getNextVPNIP(scionLabServer.VPNLastAssignedIP)
+		if !newUser && cn.IsVPN {
+			ip = cn.LocalIP
+		} else {
+			ip, err = remoteAS.GetFreeVPNIP()
+			if err != nil {
+				return nil, err
+			}
+			log.Printf("New VPN IP to be assigned to user %v: %v", userEmail, ip)
+		}
+		remoteIP = remoteAS.AP.VPNIP
+		vpnIP = remoteAS.PublicIP
+	} else {
+		ip = scionLabASIP
+		remoteIP = remoteAS.PublicIP
+		log.Printf("IP address of AttachementPoint = %v", remoteIP)
+	}
+
+	if brID < 0 {
+		brID, err = remoteAS.GetFreeBRID()
 		if err != nil {
 			return nil, err
 		}
-		scionLabServer.VPNLastAssignedIP = ip
-		remoteIP = scionLabServer.VPNIP
-		log.Printf("new VPN IP to be assigned to user %v: %v", userEmail, ip)
-		vpnIP = scionLabServer.IP
-	} else {
-		ip = scionLabVMIP
-		log.Printf("scionLabServerIP = %v", scionLabServer.IP)
-		remoteIP = scionLabServer.IP
+		log.Printf("New BR ID to be assigned to user %v: %v", userEmail, brID)
 	}
 
-	if newUser {
-		remotePort = scionLabServer.LastAssignedPort + 1
-		log.Printf("new port to be assigned to user %v: %v", userEmail, remotePort)
-		scionLabServer.LastAssignedPort = remotePort
-	}
-	if newUser || isVPN {
-		if err := scionLabServer.Update(); err != nil {
-			return nil, fmt.Errorf("Error Updating SCIONLabServerTable for SCIONLab AS %v: %v",
-				targetIA, err)
-		}
-	}
-
-	return &SCIONLabVMInfo{
-		IsNewUser:  newUser,
-		UserEmail:  userEmail,
-		IsVPN:      isVPN,
-		ISD_ID:     ia.I,
-		AS_ID:      asID,
-		RemoteIA:   targetIA,
-		IP:         ip,
-		RemoteIP:   remoteIP,
-		RemotePort: remotePort,
-		VPNIP:      vpnIP,
-		SVM:        svm,
+	return &SCIONLabASInfo{
+		IsNewUser:   newUser,
+		UserEmail:   userEmail,
+		IsVPN:       isVPN,
+		ISD:         ia.I,
+		ASID:        asID,
+		RemoteIA:    targetIA,
+		IP:          ip,
+		RemoteIP:    remoteIP,
+		RemoteBRID:  brID,
+		RemotePort:  remoteAS.GetPortNumberFromBRID(brID),
+		VPNServerIP: vpnIP,
+		SLAS:        slas,
+		RemoteAS:    remoteAS,
 	}, nil
 }
 
-// Updates the relevant database tables related to SCIONLab VM creation.
-func (s *SCIONLabVMController) updateDB(svmInfo *SCIONLabVMInfo) error {
-	if svmInfo.IsNewUser {
-		// update the AS table
-		user, err := models.FindUserByEmail(svmInfo.UserEmail)
-		if err != nil {
-			return fmt.Errorf("Error finding the user by email %v: %v", svmInfo.UserEmail, err)
+// Updates the relevant database tables related to SCIONLab AS creation.
+func (s *SCIONLabASController) updateDB(asInfo *SCIONLabASInfo) error {
+	if asInfo.IsNewUser {
+		// update the SCIONLabAS table
+		newAS := models.SCIONLabAS{
+			UserEmail: asInfo.UserEmail,
+			StartPort: config.START_PORT,
+			ISD:       asInfo.ISD,
+			ASID:      asInfo.ASID,
+			Status:    models.CREATE,
+			Type:      models.VM,
 		}
-		newAs := &models.As{
-			Isd:     svmInfo.ISD_ID,
-			As:      svmInfo.AS_ID,
-			Core:    false,
-			Account: user.Account,
-			Created: time.Now().UTC(),
+		if !asInfo.IsVPN {
+			newAS.PublicIP = asInfo.IP
 		}
-		if err = newAs.Insert(); err != nil {
-			return fmt.Errorf("Error inserting new AS: %v User: %v, %v", newAs.String(), user,
-				err)
+		if err := newAS.Insert(); err != nil {
+			return fmt.Errorf("Error inserting new SCIONLabAS %v for user %v: %v",
+				newAS.String(), asInfo.UserEmail, err)
 		}
-		log.Printf("New SCIONLab VM AS successfully created. User: %v new AS: %v", user,
-			newAs.String())
-		newSvm := models.SCIONLabVM{
-			UserEmail:    svmInfo.UserEmail,
-			IP:           svmInfo.IP,
-			IA:           newAs,
-			IsVPN:        svmInfo.IsVPN,
-			RemoteIAPort: svmInfo.RemotePort,
-			Status:       CREATE,
-			RemoteIA:     svmInfo.RemoteIA,
+		log.Printf("New SCIONLab AS AS successfully created. User: %v new AS: %v", asInfo.UserEmail,
+			newAS.String())
+		// update the Connections table
+		newCn := models.Connection{
+			JoinIP:        asInfo.IP,
+			RespondIP:     asInfo.RemoteIP,
+			JoinAS:        &newAS,
+			RespondAP:     asInfo.RemoteAS.AP,
+			JoinBRID:      1,
+			RespondBRID:   asInfo.RemoteBRID,
+			Linktype:      models.PARENT,
+			IsVPN:         asInfo.IsVPN,
+			JoinStatus:    models.ACTIVE,
+			RespondStatus: models.CREATE,
 		}
-		if err = newSvm.Insert(); err != nil {
-			return fmt.Errorf("Error inserting new SCIONLabVM. User: %v, %v", user, err)
+		if err := newCn.Insert(); err != nil {
+			return fmt.Errorf("Error inserting new Connection for user %v: %v",
+				asInfo.UserEmail, err)
 		}
 	} else {
-		// Update the SCIONLabVM Table
-		svmInfo.SVM.IP = svmInfo.IP
-		svmInfo.SVM.IsVPN = svmInfo.IsVPN
-		if svmInfo.SVM.Status == INACTIVE {
-			svmInfo.SVM.Status = CREATE
-		} else {
-			svmInfo.SVM.Status = UPDATE
+		// Update the Connections Table
+		cn, err := asInfo.SLAS.GetJoinConnectionInfoToAS(asInfo.RemoteIA)
+		if err != nil {
+			return fmt.Errorf("Error finding existing connection of user %v: %v",
+				asInfo.UserEmail, err)
+
 		}
-		if err := svmInfo.SVM.Update(); err != nil {
-			return fmt.Errorf("Error updating SCIONLabVM Table. User: %v, %v", svmInfo.UserEmail,
-				err)
+		cn.IsVPN = asInfo.IsVPN
+		if cn.Status == models.INACTIVE {
+			asInfo.SLAS.Status = models.CREATE
+		} else {
+			asInfo.SLAS.Status = models.UPDATE
+		}
+		cn.NeighborStatus = asInfo.SLAS.Status
+		cn.Status = models.ACTIVE
+		if err := asInfo.SLAS.UpdateASAndConnection(&cn); err != nil {
+			return fmt.Errorf("Error updating database tables for user %v: %v",
+				asInfo.UserEmail, err)
 		}
 	}
 	return nil
 }
 
-// Provides a new AS ID for the newly created SCIONLab VM AS.
-func (s *SCIONLabVMController) getNewSCIONLabVMASID() (int, error) {
-	ases, err := models.FindAllASes()
+// Provides a new AS ID for the newly created SCIONLab AS AS.
+// TODO(mlegner): Should we maybe use the lowest unused ID instead?
+func (s *SCIONLabASController) getNewSCIONLabASID() (int, error) {
+	ases, err := models.FindAllASInfos()
 	if err != nil {
 		return -1, err
 	}
-	// Base AS ID for SCIONLab starts from 1000
-	asID := 1000
+	// Base AS ID for SCIONLab is set in config file
+	asID := config.BASE_AS_ID
 	for _, as := range ases {
-		if as.As > asID {
-			asID = as.As
+		if as.ASID > asID {
+			asID = as.ASID
 		}
 	}
 	return asID + 1, nil
 }
 
 // Generates the path to the temporary topology file
-func (svmInfo *SCIONLabVMInfo) topologyFile() string {
-	return filepath.Join(TempPath, svmInfo.UserEmail+"_topology.json")
+func (asInfo *SCIONLabASInfo) topologyFile() string {
+	return filepath.Join(TempPath, asInfo.UserEmail+"_topology.json")
 }
 
-// Generates the topology file for the SCIONLab VM AS. It uses the template file
+// Generates the topology file for the SCIONLab AS AS. It uses the template file
 // simple_config_topo.tmpl under templates folder in order to populate and generate the
 // JSON file.
-func (s *SCIONLabVMController) generateTopologyFile(svmInfo *SCIONLabVMInfo) error {
-	log.Printf("Generating topology file for SCIONLab VM")
+func (s *SCIONLabASController) generateTopologyFile(asInfo *SCIONLabASInfo) error {
+	log.Printf("Generating topology file for SCIONLab AS")
 	t, err := template.ParseFiles("templates/simple_config_topo.tmpl")
 	if err != nil {
-		return fmt.Errorf("Error parsing topology template config. User: %v, %v",
-			svmInfo.UserEmail, err)
+		return fmt.Errorf("Error parsing topology template config for user %v: %v",
+			asInfo.UserEmail, err)
 	}
-	f, err := os.Create(svmInfo.topologyFile())
+	f, err := os.Create(asInfo.topologyFile())
 	if err != nil {
-		return fmt.Errorf("Error creating topology file config. User: %v, %v", svmInfo.UserEmail,
+		return fmt.Errorf("Error creating topology file config for user %v: %v", asInfo.UserEmail,
 			err)
-	}
-	var bindIP string
-	if svmInfo.IsVPN {
-		bindIP = svmInfo.IP
-	} else {
-		bindIP = config.VM_LOCAL_IP
 	}
 
 	// Topo file parameters
 	data := map[string]string{
-		"IP":           svmInfo.IP,
-		"BIND_IP":      bindIP,
-		"ISD_ID":       strconv.Itoa(svmInfo.ISD_ID),
-		"AS_ID":        strconv.Itoa(svmInfo.AS_ID),
-		"TARGET_ISDAS": svmInfo.RemoteIA,
-		"REMOTE_ADDR":  svmInfo.RemoteIP,
-		"REMOTE_PORT":  strconv.Itoa(svmInfo.RemotePort),
+		"IP":           asInfo.IP,
+		"BIND_IP":      asInfo.SLAS.BindIP(asInfo.IsVPN, asInfo.IP),
+		"ISD_ID":       strconv.Itoa(asInfo.ISD),
+		"AS_ID":        strconv.Itoa(asInfo.ASID),
+		"TARGET_ISDAS": asInfo.RemoteIA,
+		"REMOTE_ADDR":  asInfo.RemoteIP,
+		"REMOTE_PORT":  strconv.Itoa(asInfo.RemotePort),
 	}
 	if err = t.Execute(f, data); err != nil {
-		return fmt.Errorf("Error executing topology template file. User: %v, %v",
-			svmInfo.UserEmail, err)
+		return fmt.Errorf("Error executing topology template file for user %v: %v",
+			asInfo.UserEmail, err)
 	}
 	f.Close()
 	return nil
 }
 
-// Creates the local gen folder of the SCIONLab VM AS. It calls a Python wrapper script
+// Creates the local gen folder of the SCIONLab AS AS. It calls a Python wrapper script
 // located under the python directory. The script uses SCION's and SCION-WEB's library
 // functions in order to generate the certificate, AS keys etc.
-func (s *SCIONLabVMController) generateLocalGen(svmInfo *SCIONLabVMInfo) error {
-	log.Printf("Creating gen folder for SCIONLab VM")
-	asID := strconv.Itoa(svmInfo.AS_ID)
-	isdID := strconv.Itoa(svmInfo.ISD_ID)
-	userEmail := svmInfo.UserEmail
+func (s *SCIONLabASController) generateLocalGen(asInfo *SCIONLabASInfo) error {
+	log.Printf("Creating gen folder for SCIONLab AS")
+	asID := strconv.Itoa(asInfo.ASID)
+	isdID := strconv.Itoa(asInfo.ISD)
+	userEmail := asInfo.UserEmail
 	log.Printf("Calling create local gen. ISD-ID: %v, AS-ID: %v, UserEmail: %v", isdID, asID,
 		userEmail)
 	cmd := exec.Command("python3", localGenPath,
-		"--topo_file="+svmInfo.topologyFile(), "--user_id="+userEmail,
+		"--topo_file="+asInfo.topologyFile(), "--user_id="+userEmail,
 		"--joining_ia="+isdID+"-"+asID,
 		"--core_sign_priv_key_file="+CoreSigKey,
 		"--core_cert_file="+CoreCertFile,
@@ -423,8 +411,8 @@ func (s *SCIONLabVMController) generateLocalGen(svmInfo *SCIONLabVMInfo) error {
 	cmdOut, _ := cmd.StdoutPipe()
 	cmdErr, _ := cmd.StderrPipe()
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("Generate local gen command could not start. User: %v, %v",
-			svmInfo.UserEmail, err)
+		return fmt.Errorf("Generate local gen command could not start for user %v: %v",
+			asInfo.UserEmail, err)
 	}
 	// read stdout and stderr
 	stdOutput, _ := ioutil.ReadAll(cmdOut)
@@ -434,10 +422,10 @@ func (s *SCIONLabVMController) generateLocalGen(svmInfo *SCIONLabVMInfo) error {
 	return nil
 }
 
-// Packages the SCIONLab VM configuration as a tarball and returns the name of the
+// Packages the SCIONLab AS configuration as a tarball and returns the name of the
 // generated file.
-func (s *SCIONLabVMController) packageSCIONLabVM(userEmail string) error {
-	log.Printf("Packaging SCIONLab VM")
+func (s *SCIONLabASController) packageConfiguration(userEmail string) error {
+	log.Printf("Packaging SCIONLab AS")
 	userPackagePath := UserPackagePath(userEmail)
 	vagrantDir, err := os.Open(vagrantPath)
 	if err != nil {
@@ -452,7 +440,7 @@ func (s *SCIONLabVMController) packageSCIONLabVM(userEmail string) error {
 		dst := filepath.Join(userPackagePath, obj.Name())
 		if !obj.IsDir() {
 			if err = utility.CopyFile(src, dst); err != nil {
-				return fmt.Errorf("Failed to copy files. User: %v, src: %v, dst: %v, %v",
+				return fmt.Errorf("Failed to copy files for user %v: src: %v, dst: %v, %v",
 					userEmail, src, dst, err)
 			}
 		}
@@ -460,210 +448,21 @@ func (s *SCIONLabVMController) packageSCIONLabVM(userEmail string) error {
 	cmd := exec.Command("tar", "zcvf", userEmail+".tar.gz", userEmail)
 	cmd.Dir = PackagePath
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("Failed to create SCIONLabVM tarball. User: %v, %v", userEmail, err)
+		return fmt.Errorf("Failed to create SCIONLabAS tarball for user %v: %v", userEmail, err)
 	}
 	return nil
 }
 
-// The struct used for API calls between scion-coord and SCIONLab ASes
-type SCIONLabVM struct {
-	ASID         string // ISD-AS of the VM
-	IsVPN        bool
-	RemoteIAPort int    // port number of the remote SCIONLab AS being connected to
-	UserEmail    string // The email address of the user owning this SCIONLab VM AS
-	VMIP         string // IP address of the SCIONLab VM
-	RemoteBR     string // The name of the remote border router
-}
-
-// API end-point for the designated SCIONLab ASes to query actions to be done for users'
-// SCIONLab VM ASes.
-// An example response to this API may look like the following:
-// {"1-7":
-//        {"Create":[],
-//         "Remove":[],
-//         "Update":[{"ASID":"1-1020",
-//                    "IsVPN":true,
-//                    "RemoteIAPort":50053,
-//                    "UserEmail":"user@example.com",
-//                    "VMIP":"10.0.8.42",
-//                    "RemoteBR":"br1-5-5"}]
-//        }
-// }
-func (s *SCIONLabVMController) GetSCIONLabVMASes(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Inside GetSCIONLabVMASes = %v", r.URL.Query())
-	scionLabAS := r.URL.Query().Get("scionLabAS")
-	if len(scionLabAS) == 0 {
-		s.BadRequest(w, nil, "scionLabAS parameter missing")
-		return
-	}
-	vms, err := models.FindSCIONLabVMsByRemoteIA(scionLabAS)
-	if err != nil {
-		log.Printf("Error looking up SCIONLab VMs from DB. SCIONLabAS %v: %v", scionLabAS, err)
-		s.Error500(w, err, "Error looking up SCIONLab VMs from DB")
-		return
-	}
-	vmsCreateResp := []SCIONLabVM{}
-	vmsUpdateResp := []SCIONLabVM{}
-	vmsRemoveResp := []SCIONLabVM{}
-	for _, v := range vms {
-		vmResp := SCIONLabVM{
-			ASID:         strconv.Itoa(v.IA.Isd) + "-" + strconv.Itoa(v.IA.As),
-			IsVPN:        v.IsVPN,
-			VMIP:         v.IP,
-			RemoteIAPort: v.RemoteIAPort,
-			UserEmail:    v.UserEmail,
-			RemoteBR:     v.RemoteBR,
-		}
-		switch v.Status {
-		case CREATE:
-			vmsCreateResp = append(vmsCreateResp, vmResp)
-		case UPDATE:
-			vmsUpdateResp = append(vmsUpdateResp, vmResp)
-		case REMOVE:
-			vmsRemoveResp = append(vmsRemoveResp, vmResp)
-		}
-	}
-	resp := map[string]map[string][]SCIONLabVM{
-		scionLabAS: {
-			"Create": vmsCreateResp,
-			"Update": vmsUpdateResp,
-			"Remove": vmsRemoveResp,
-		},
-	}
-	b, err := json.Marshal(resp)
-	if err != nil {
-		log.Printf("Error during JSON Marshaling: %v", err)
-		s.Error500(w, err, "Error during JSON Marshaling")
-		return
-	}
-	fmt.Fprintln(w, string(b))
-}
-
-// API end-point to mark the provided SCIONLabVMs as Created, Updated or Removed
-// An example request to this API may look like the following:
-// {"1-7":
-//        {"Created":[],
-//         "Removed":[],
-//         "Updated":[{"ASID":"1-1020",
-//                     "RemoteIAPort":50053,
-//                     "VMIP":"203.0.113.0",
-//                     "RemoteBR":"br1-5-5"}]
-//        }
-// }
-// If sucessful, the API will return an empty JSON response with HTTP code 200.
-func (s *SCIONLabVMController) ConfirmSCIONLabVMASes(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Inside ConfirmSCIONLabVMASes..")
-	var ASIDs2VMs map[string]map[string][]SCIONLabVM
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&ASIDs2VMs); err != nil {
-		log.Printf("Error decoding JSON: %v, %v", r.Body, err)
-		s.BadRequest(w, err, "Error decoding JSON")
-		return
-	}
-	failedConfirmations := []string{}
-	for ia, event := range ASIDs2VMs {
-		for action, vms := range event {
-			failedConfirmations = append(failedConfirmations, s.processConfirmedSCIONLabVMASes(
-				ia, action, vms)...)
-		}
-	}
-	if len(failedConfirmations) > 0 {
-		s.Error500(w, nil, "Error processing confirmations for the following VMs: %v",
-			failedConfirmations)
-		return
-	}
-	fmt.Fprintln(w, "{}")
-}
-
-// Updates the relevant DB tables based on the received confirmations from
-// SCIONLab AS and send out confirmation emails.
-func (s *SCIONLabVMController) processConfirmedSCIONLabVMASes(ia, action string,
-	vms []SCIONLabVM) []string {
-	log.Printf("action = %v, vms = %v", action, vms)
-	failedConfirmations := []string{}
-	for _, vm := range vms {
-		// find the SCIONLabVM
-		vm_db, err := models.FindSCIONLabVMByIPAndRemoteIA(vm.VMIP, ia)
-		if err != nil {
-			log.Printf("Error finding the SCIONLabVM with IP %v: %v",
-				vm.VMIP, err)
-			failedConfirmations = append(failedConfirmations, vm.VMIP)
-			continue
-		}
-		switch action {
-		case CREATED, UPDATED:
-			vm_db.Status = ACTIVE
-			vm_db.RemoteBR = vm.RemoteBR
-		case REMOVED:
-			vm_db.Status = INACTIVE
-			vm_db.RemoteBR = ""
-		default:
-			log.Printf("Unsupported VM action for: %v. User %v", vm.VMIP, vm_db.UserEmail)
-			failedConfirmations = append(failedConfirmations, vm.VMIP)
-			continue
-		}
-		if err = vm_db.Update(); err != nil {
-			log.Printf("Error updating SCIONLabVM Table. VM IP: %v, %v", vm.VMIP, err)
-			failedConfirmations = append(failedConfirmations, vm.VMIP)
-		} else {
-			if err := sendConfirmationEmail(vm_db.UserEmail, action); err != nil {
-				log.Printf("Error sending email confirmation to user %v: %v", vm_db.UserEmail, err)
-			}
-		}
-	}
-	return failedConfirmations
-}
-
-// Function which sends confirmation emails to users
-func sendConfirmationEmail(userEmail, action string) error {
-	user, err := models.FindUserByEmail(userEmail)
-	if err != nil {
-		return err
-	}
-
-	var message string
-	subject := "[SCIONLab] "
-	switch action {
-	case CREATED:
-		message = "The infrastructure for your SCIONLab VM has been created. " +
-			"You are now able to use the SCION network through your VM."
-		subject += "VM creation request completed"
-	case UPDATED:
-		message = "The settings for your SCIONLab VM have been updated."
-		subject += "VM update request completed"
-	case REMOVED:
-		message = "Your removal request has been processed. " +
-			"All infrastructure for your SCIONLab VM has been removed."
-		subject += "VM removal request completed"
-	}
-
-	data := struct {
-		FirstName   string
-		LastName    string
-		Protocol    string
-		HostAddress string
-		Message     string
-	}{user.FirstName, user.LastName, config.HTTP_PROTOCOL, config.HTTP_HOST_ADDRESS, message}
-
-	log.Printf("Sending confirmation email to user %v.", userEmail)
-	if err := email.ConstructAndSend("vm_status.html", subject, data, "vm-update",
-		userEmail); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// API end-point to serve the generated SCIONLab VM configuration tarball.
-func (s *SCIONLabVMController) ReturnTarball(w http.ResponseWriter, r *http.Request) {
+// API end-point to serve the generated SCIONLab AS configuration tarball.
+func (s *SCIONLabASController) ReturnTarball(w http.ResponseWriter, r *http.Request) {
 	_, userSession, err := middleware.GetUserSession(r)
 	if err != nil {
 		log.Printf("Error getting the user session: %v", err)
 		s.Forbidden(w, err, "Error getting the user session")
 		return
 	}
-	vm, err := models.FindSCIONLabVMByUserEmail(userSession.Email)
-	if err != nil || vm.Status == INACTIVE || vm.Status == REMOVE {
+	slas, err := models.FindOneSCIONLabASByUserEmail(userSession.Email)
+	if err != nil || slas.Status == models.INACTIVE || slas.Status == models.REMOVE {
 		log.Printf("No active configuration found for user %v\n", userSession.Email)
 		s.BadRequest(w, nil, "No active configuration found for user %v",
 			userSession.Email)
@@ -684,9 +483,9 @@ func (s *SCIONLabVMController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 	http.ServeContent(w, r, fileName, time.Now(), bytes.NewReader(data))
 }
 
-// The handler function to remove a SCIONLab VM for the given user.
+// The handler function to remove a SCIONLab AS for the given user.
 // If successful, it will return a 200 status with an empty response.
-func (s *SCIONLabVMController) RemoveSCIONLabVM(w http.ResponseWriter, r *http.Request) {
+func (s *SCIONLabASController) RemoveSCIONLabAS(w http.ResponseWriter, r *http.Request) {
 	_, userSession, err := middleware.GetUserSession(r)
 	if err != nil {
 		log.Printf("Error getting the user session: %v", err)
@@ -694,40 +493,49 @@ func (s *SCIONLabVMController) RemoveSCIONLabVM(w http.ResponseWriter, r *http.R
 	}
 	userEmail := userSession.Email
 
-	// check if there is an active VM which can be removed
-	canRemove, svm, err := s.canRemove(userEmail)
+	// check if there is an active AS which can be removed
+	canRemove, slas, cn, err := s.canRemove(userEmail)
 	if err != nil {
-		log.Printf("Error checking if VM can be removed. User: %v, %v", userEmail, err)
-		s.Error500(w, err, "Error checking if VM can be removed")
+		log.Printf("Error checking if your AS can be removed for user %v: %v", userEmail, err)
+		s.Error500(w, err, "Error checking if AS can be removed")
 		return
 	}
 	if !canRemove {
-		s.BadRequest(w, nil, "You currently do not have an active SCIONLab VM.")
+		s.BadRequest(w, nil, "You currently do not have an active SCIONLab AS.")
 		return
 	}
-	svm.Status = REMOVE
-	if err := svm.Update(); err != nil {
-		s.Error500(w, err, "Error removing entry from SCIONLabVM Table")
+	slas.Status = models.REMOVE
+	cn.NeighborStatus = models.REMOVE
+	cn.Status = models.INACTIVE
+	if err := slas.UpdateASAndConnection(cn); err != nil {
+		log.Printf("Error marking AS and Connection as removed for user %v: %v",
+			userEmail, err)
+		s.Error500(w, err, "Error marking AS and Connection as removed")
 		return
 	}
-	log.Printf("Marked removal of SCIONLabVM of user %v.", userEmail)
-	fmt.Fprintln(w, "Your VM will be removed within the next few minutes. "+
+	log.Printf("Marked removal of SCIONLabAS of user %v.", userEmail)
+	fmt.Fprintln(w, "Your AS will be removed within the next few minutes. "+
 		"You will receive a confirmation email as soon as the removal is complete.")
 }
 
-// Check if the user's VM is already removed or in the process of being removed.
-// Can remove a VM only if it is in the ACTIVE state.
-func (s *SCIONLabVMController) canRemove(userEmail string) (bool, *models.SCIONLabVM, error) {
-	svm, err := models.FindSCIONLabVMByUserEmail(userEmail)
+// Check if the user's AS is already removed or in the process of being removed.
+// Can remove a AS only if it is in the ACTIVE state.
+func (s *SCIONLabASController) canRemove(userEmail string) (bool, *models.SCIONLabAS,
+	*models.ConnectionInfo, error) {
+	slas, err := models.FindOneSCIONLabASByUserEmail(userEmail)
 	if err != nil {
 		if err == orm.ErrNoRows {
-			return false, nil, nil
+			return false, nil, nil, nil
 		} else {
-			return false, nil, err
+			return false, nil, nil, err
 		}
 	}
-	if svm.Status == ACTIVE {
-		return true, svm, nil
+	if slas.Status == models.ACTIVE {
+		cn, err := slas.GetJoinConnectionInfoToAS(config.AP_IA)
+		if err != nil {
+			return false, nil, nil, err
+		}
+		return true, slas, &cn, nil
 	}
-	return false, nil, nil
+	return false, nil, nil, nil
 }
