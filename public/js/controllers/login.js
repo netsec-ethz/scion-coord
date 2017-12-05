@@ -16,7 +16,7 @@ scionApp
                             $location.path('/resend');
                         } else{
                             $scope.error = "Failed to log you in: Make sure your email address \
-                                and password are correct and your email address is verified."
+                                and password are correct and your email address is verified.";
                             $scope.message = "";
                         }
                     });

@@ -21,7 +21,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/astaxie/beego/orm"
 	"github.com/didip/tollbooth"
 	"github.com/didip/tollbooth/limiter"
 	"github.com/gorilla/handlers"
@@ -30,55 +29,8 @@ import (
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/controllers/api"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
-	"github.com/netsec-ethz/scion-coord/models"
-	"github.com/netsec-ethz/scion-coord/utility"
 	"golang.org/x/crypto/acme/autocert"
 )
-
-// make sure that data about SCIONLab ASes in database is correct
-// TODO (mlegner): remove deprecated servers?
-func initializeSLS() error {
-	sls, err := models.FindSCIONLabServer(config.SERVER_IA)
-	vpnLastAssignedIPStart := utility.IPIncrement(config.SERVER_VPN_START_IP, -1)
-	lastAssignedPortStart := config.SERVER_START_PORT - 1
-
-	if err != nil {
-		if err == orm.ErrNoRows { // Server does not exist
-			newSLS := models.SCIONLabServer{
-				IA:                config.SERVER_IA,
-				IP:                config.SERVER_IP,
-				LastAssignedPort:  lastAssignedPortStart,
-				VPNIP:             config.SERVER_VPN_IP,
-				VPNLastAssignedIP: vpnLastAssignedIPStart,
-			}
-			fmt.Println("Inserting SCIONLab AS configuration into database.")
-			if err := newSLS.Insert(); err != nil {
-				return fmt.Errorf("ERROR: Cannot insert SCIONLab AS configuration into database:"+
-					" %v", err)
-			}
-		} else {
-			return fmt.Errorf("ERROR: Cannot get SCIONLab AS configuration from database: %v", err)
-		}
-	} else { // Server exists and needs to be updated
-		sls.IP = config.SERVER_IP
-		sls.VPNIP = config.SERVER_VPN_IP
-		if sls.LastAssignedPort < lastAssignedPortStart {
-			sls.LastAssignedPort = lastAssignedPortStart - 1
-		}
-		if sls.VPNLastAssignedIP == "" || utility.IPCompare(sls.VPNLastAssignedIP,
-			vpnLastAssignedIPStart) == -1 {
-			sls.VPNLastAssignedIP = vpnLastAssignedIPStart
-		}
-
-		fmt.Printf("Updating SCIONLab AS configuration in database: %v\n", sls)
-		if err := sls.Update(); err != nil {
-			return fmt.Errorf("ERROR: Cannot update SCIONLab AS configuration in database: %v",
-				err)
-		}
-	}
-
-	return nil
-}
 
 // check if credential files exist and create necessary directories
 func checkCredentials() bool {
@@ -99,12 +51,6 @@ func checkCredentials() bool {
 }
 
 func main() {
-	// update database of SCIONLab ASes
-	if err := initializeSLS(); err != nil {
-		fmt.Printf("There was an error updating the server database: %v", err)
-		return
-	}
-
 	if !checkCredentials() {
 		return
 	}
@@ -113,8 +59,8 @@ func main() {
 	registrationController := api.RegistrationController{}
 	loginController := api.LoginController{}
 	adminController := api.AdminController{}
-	asController := api.ASController{}
-	scionLabVMController := api.SCIONLabVMController{}
+	asController := api.ASInfoController{}
+	scionLabASController := api.SCIONLabASController{}
 
 	// rate limitation
 	resendLimit := tollbooth.NewLimiter(1, time.Minute*10,
@@ -186,17 +132,17 @@ func main() {
 	router.Handle("/api/sendInvitations", adminChain.ThenFunc(
 		adminController.SendInvitationEmails)).Methods(http.MethodPost)
 
-	// generates a SCIONLab VM
+	// generates a SCIONLab AS
 	// TODO(ercanucan): fix the authentication
-	router.Handle("/api/as/generateVM", userChain.ThenFunc(
-		scionLabVMController.GenerateSCIONLabVM))
-	router.Handle("/api/as/removeVM", userChain.ThenFunc(scionLabVMController.RemoveSCIONLabVM))
+	router.Handle("/api/as/generateAS", userChain.ThenFunc(
+		scionLabASController.GenerateSCIONLabAS))
+	router.Handle("/api/as/removeAS", userChain.ThenFunc(scionLabASController.RemoveSCIONLabAS))
 	router.Handle("/api/as/downloadTarball", userChain.ThenFunc(
-		scionLabVMController.ReturnTarball))
+		scionLabASController.ReturnTarball))
 	router.Handle("/api/as/getSCIONLabVMASes/{account_id}/{secret}",
-		apiChain.ThenFunc(scionLabVMController.GetSCIONLabVMASes))
+		apiChain.ThenFunc(scionLabASController.GetUpdatesForAP))
 	router.Handle("/api/as/confirmSCIONLabVMASes/{account_id}/{secret}",
-		apiChain.ThenFunc(scionLabVMController.ConfirmSCIONLabVMASes))
+		apiChain.ThenFunc(scionLabASController.ConfirmUpdatesFromAP))
 
 	// ==========================================================
 	// SCION Web API
@@ -229,7 +175,7 @@ func main() {
 	// ==========================================================
 	// Virtual currency API
 
-	router.Handle("/api/listASConnections/{account_id}/{secret}/{isdas}",
+	router.Handle("/api/listASConnections/{account_id}/{secret}/{ia}",
 		apiChain.ThenFunc(asController.ListASesConnectionsWithCredits))
 
 	// serve static files

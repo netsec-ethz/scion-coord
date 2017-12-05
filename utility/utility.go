@@ -20,6 +20,9 @@ import (
 	"io"
 	"net"
 	"os"
+	"sort"
+	"strconv"
+	"strings"
 )
 
 // Simple utility function to copy a file.
@@ -37,7 +40,7 @@ func CopyFile(source string, dest string) (err error) {
 	_, err = io.Copy(destfile, sourcefile)
 	if err == nil {
 		sourceinfo, _ := os.Stat(source)
-		// TODO (jonghoonkwon): do proper error logging!
+		// TODO(jonghoonkwon): do proper error logging!
 		err = os.Chmod(dest, sourceinfo.Mode())
 	}
 	return
@@ -63,7 +66,7 @@ func IPIncrement(ip string, diff int32) string {
 	return IntToIP(temp)
 }
 
-// returns -1, if ip1 < ip2, 0, if ip1 == ip2, +1, if ip1 > ip2
+// Returns -1, if ip1 < ip2, 0, if ip1 == ip2, +1, if ip1 > ip2
 func IPCompare(ip1, ip2 string) int8 {
 	if diff := int(IPToInt(ip1)) - int(IPToInt(ip2)); diff > 0 {
 		return 1
@@ -72,4 +75,43 @@ func IPCompare(ip1, ip2 string) int8 {
 	} else {
 		return -1
 	}
+}
+
+// Create IA string from ISD and AS IDs
+func IAString(isd, as int) string {
+	return fmt.Sprintf("%v-%v", isd, as)
+}
+
+// Parses a BR name and returns the BRID
+func BRIDFromString(s string) (int, error) {
+	parts := strings.Split(s, "-")
+	if len(parts) != 3 {
+		return 0, fmt.Errorf("Invalid BR name structure: %v", s)
+	}
+	id, err := strconv.Atoi(parts[2])
+	if err != nil {
+		return 0, fmt.Errorf("Unable to parse BRID: %v", err)
+	}
+	return id, nil
+}
+
+// Creates BR name from IA string and BRID
+func BRString(ia string, id int) string {
+	return fmt.Sprintf("br%v-%v", ia, id)
+}
+
+// Returns the smallest integer >= min that is not present in the given ids
+func GetFreeID(ids []int, min int) int {
+	res := min
+	sort.Ints(ids)
+	for _, i := range ids {
+		if i < res {
+			continue
+		}
+		if i == res {
+			res++
+		}
+		break
+	}
+	return res
 }

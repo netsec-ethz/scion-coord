@@ -8,13 +8,13 @@
   <p><strong>AccountId:</strong> {{user.AccountID}}</p>
   <p><strong>Secret:</strong> {{user.Secret}}</p>
   <div class="alert alert-info">
-    <p>{{vmInfo.VMText}} <span
-        ng-if="vmInfo.ShowIP">Your registered IP address is <strong>{{vmInfo.VMIP}}</strong>.</span>
-      <span ng-if="vmInfo.ShowVPN">You have chosen a <strong>VPN-based</strong> setup.</span>
+    <p>{{asInfo.ASText}} <span
+        ng-if="asInfo.ShowIP">Your registered IP address is <strong>{{asInfo.ASIP}}</strong>.</span>
+      <span ng-if="asInfo.ShowVPN">You have chosen a <strong>VPN-based</strong> setup.</span>
     </p>
   </div>
   <div style="color:red">
-    <p>When you fill out and submit the form below, your SCIONLab VM configuration
+    <p>When you fill out and submit the form below, your SCIONLab AS configuration
       for connecting to the designated SCIONLab AS will be packaged and downloaded.
       Please extract the downloaded tarball in a desired location and refer to the
       README file inside for instructions.</p>
@@ -24,7 +24,7 @@
   </div>
   <br/>
 
-  <form name="scionLabVMForm">
+  <form name="scionLabASForm">
     <div class="form-group has-feedback">
       <label class="btn btn-block btn-primary" ng-disabled="buttonConfig.Update.Disable"
              data-toggle="tooltip"
@@ -35,7 +35,7 @@
                ng-disabled="buttonConfig.Update.Disable">
         My host has a static public IP address and can receive traffic at port 50000.</label>
 
-      <input type="text" class="form-control" ng-model="user.scionLabVMIP" name="scionLabVMIP"
+      <input type="text" class="form-control" ng-model="user.scionLabASIP" name="scionLabASIP"
              placeholder="My host's public IP address" ng-if="user.isNotVPN"
              ng-pattern="/^(?!.*\.$)((1?\d?\d|25[0-5]|2[0-4]\d)(\.|$)){4}$/">
       <span class="form-control-feedback"></span>

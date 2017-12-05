@@ -15,9 +15,7 @@
 package models
 
 import (
-	"fmt"
-
-	"github.com/astaxie/beego/orm"
+	"github.com/netsec-ethz/scion-coord/utility"
 	"github.com/netsec-ethz/scion/go/lib/addr"
 )
 
@@ -37,18 +35,19 @@ type ConnectionWithCredits struct {
 	AS            int    // the other AS
 	CreditBalance int64  // How much credits the connection costs / yields
 	Bandwidth     uint64 // The bandwidth in kb/s
-	IsOutgoing    bool   // false = the other AS has to pay for, true = the other AS gets credits for
+	IsOutgoing    bool   // false = the other AS has to pay, true = the other AS gets credits
 	Timestamp     string // The creation time of the connection
 }
 
 // Look for all connection to and from this AS and calculates the necessary credits for it
-func (as *As) ListConnections() ([]ConnectionWithCredits, error) {
+func (as *ASInfo) ListConnections() ([]ConnectionWithCredits, error) {
 	var connections []ConnectionWithCredits
-	isdas := fmt.Sprintf("%v-%v", as.Isd, as.As)
+	isdas := utility.IAString(as.ISD, as.ASID)
 
 	// Outgoing ones (this AS pays for)
 	var outGoings []ConnRequest
-	_, err := o.QueryTable("conn_request").Filter("status", APPROVED).Filter("request_i_a", isdas).All(&outGoings)
+	_, err := o.QueryTable(new(ConnRequest)).Filter("Status", APPROVED).Filter("RequestIA",
+		isdas).All(&outGoings)
 	if err != nil {
 		return connections, err
 	}
@@ -66,7 +65,8 @@ func (as *As) ListConnections() ([]ConnectionWithCredits, error) {
 
 	// Incoming ones (this AS gets Credits for)
 	var inComings []ConnRequest
-	_, err = o.QueryTable("conn_request").Filter("status", APPROVED).Filter("respond_i_a", isdas).All(&inComings)
+	_, err = o.QueryTable(new(ConnRequest)).Filter("Status", APPROVED).Filter("RespondIA",
+		isdas).All(&inComings)
 	if err != nil {
 		return connections, err
 	}
@@ -85,13 +85,13 @@ func (as *As) ListConnections() ([]ConnectionWithCredits, error) {
 	return connections, err
 }
 
-// Changes the Credits the AS has. CreditsDiff can be negative to substract and be positive to add Credits
-func (as *As) UpdateCurrency(CreditsDiff int64) error {
-	as.Credits += CreditsDiff
-	// Can't use update because of missing pk error (but pk is set, beego have some serious problems)
-	_, err := o.QueryTable(as).Filter("Isd", as.Isd).Filter("As", as.As).Update(orm.Params{
-		"credits": as.Credits,
-	})
-
-	return err
+// Changes the Credits the AS has. CreditsDiff can be negative to subtract and be positive to add
+// Credits
+func (as *ASInfo) UpdateCurrency(CreditsDiff int64) error {
+	slas, err := FindSCIONLabASByASInfo(*as)
+	if err != nil {
+		return err
+	}
+	slas.Credits += CreditsDiff
+	return slas.Update()
 }

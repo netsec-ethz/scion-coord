@@ -23,10 +23,10 @@ import (
 	"github.com/netsec-ethz/scion-coord/models"
 )
 
-type vmInfo struct {
-	VMStatus uint8
-	VMText   string
-	VMIP     string
+type asInfo struct {
+	ASStatus uint8
+	ASText   string
+	ASIP     string
 	ShowIP   bool
 	ShowVPN  bool
 }
@@ -41,79 +41,81 @@ type buttonConfiguration struct {
 }
 
 type uiButtons struct {
-	Update   buttonConfiguration // Button to create or update VM
-	Download buttonConfiguration // Button to re-download VM
-	Remove   buttonConfiguration // Button to remove VM
+	Update   buttonConfiguration // Button to create or update AS
+	Download buttonConfiguration // Button to re-download AS
+	Remove   buttonConfiguration // Button to remove AS
 }
 
 type userPageData struct {
 	User      user
-	VMInfo    vmInfo
+	ASInfo    asInfo
 	UIButtons uiButtons
 }
 
-// generates the structs containing information about the user's VM and the
+// generates the structs containing information about the user's AS and the
 // configuration of UI buttons
-func populateVMStatusButtons(userEmail string) (vmInfo, uiButtons, error) {
-	vmInfo := vmInfo{}
+func populateASStatusButtons(userEmail string) (asInfo, uiButtons, error) {
+	asInfo := asInfo{}
 	buttons := uiButtons{
 		Update: buttonConfiguration{
-			Text:            "Update and Download SCIONLab VM Configuration",
+			Text:            "Update and Download SCIONLab AS Configuration",
 			Action:          "update",
 			TooltipDisabled: "Updates are disabled as you have a pending request.",
 			Disable:         true,
 		},
 		Download: buttonConfiguration{
-			Text:            "Re-download my SCIONLab VM Configuration",
+			Text:            "Re-download my SCIONLab AS Configuration",
 			Action:          "download",
-			TooltipDisabled: "You currently do not have an active VM configuration.",
+			TooltipDisabled: "You currently do not have an active AS configuration.",
 		},
 		Remove: buttonConfiguration{
-			Text:            "Remove my SCIONLab VM Configuration",
+			Text:            "Remove my SCIONLab AS Configuration",
 			Class:           "btn-danger",
 			Action:          "remove",
-			TooltipDisabled: "You currently do not have an active VM configuration.",
+			TooltipDisabled: "You currently do not have an active AS configuration.",
 			Disable:         true,
 		},
 	}
 
-	vm, err := models.FindSCIONLabVMByUserEmail(userEmail)
+	as, err := models.FindOneSCIONLabASByUserEmail(userEmail)
 	if err != nil {
 		if err != orm.ErrNoRows {
-			return vmInfo, buttons, err
+			return asInfo, buttons, err
 		}
 	} else {
-		vmInfo.VMIP = vm.IP
-		vmInfo.VMStatus = vm.Status
+		asInfo.ASIP = as.PublicIP
+		asInfo.ASStatus = as.Status
 	}
-	switch vmInfo.VMStatus {
-	case INACTIVE:
-		vmInfo.VMText = "You currently do not have an active SCIONLab VM."
-		buttons.Update.Text = "Create and Download SCIONLab VM Configuration"
+	switch asInfo.ASStatus {
+	case models.INACTIVE:
+		asInfo.ASText = "You currently do not have an active SCIONLab AS."
+		buttons.Update.Text = "Create and Download SCIONLab AS Configuration"
 		buttons.Update.Disable = false
 		buttons.Download.Hide = true
 		buttons.Remove.Hide = true
-	case ACTIVE:
-		vmInfo.VMText = "You currently have an active SCIONLab VM."
+	case models.ACTIVE:
+		asInfo.ASText = "You currently have an active SCIONLab AS."
 		buttons.Update.Disable = false
 		buttons.Remove.Disable = false
-	case CREATE:
-		vmInfo.VMText = "You have a pending creation request for your SCIONLab VM."
-	case UPDATE:
-		vmInfo.VMText = "You have a pending update request for your SCIONLab VM."
-	case REMOVE:
-		vmInfo.VMText = "Your SCIONLab VM configuration is currently scheduled for removal."
+	case models.CREATE:
+		asInfo.ASText = "You have a pending creation request for your SCIONLab AS."
+	case models.UPDATE:
+		asInfo.ASText = "You have a pending update request for your SCIONLab AS."
+	case models.REMOVE:
+		asInfo.ASText = "Your SCIONLab AS configuration is currently scheduled for removal."
 		buttons.Download.Disable = true
 	}
-	if vmInfo.VMStatus == ACTIVE || vmInfo.VMStatus == CREATE || vmInfo.VMStatus == UPDATE {
-		if vm.IsVPN {
-			vmInfo.ShowVPN = true
+	if asInfo.ASStatus == models.ACTIVE || asInfo.ASStatus == models.CREATE ||
+		asInfo.ASStatus == models.UPDATE {
+		// TODO(mlegner): This is only a temporary fix until multiple connections are implemented
+		if as.PublicIP == "" {
+			asInfo.ShowVPN = true
 		} else {
-			vmInfo.ShowIP = true
+			asInfo.ShowIP = true
 		}
 	}
 
-	return vmInfo, buttons, nil
+	return asInfo, buttons, nil
 }
 
 // generates the user-information struct to be used in dynamic HTML pages
@@ -139,7 +141,7 @@ func populateUserData(r *http.Request) (u user, err error) {
 		IsAdmin:      storedUser.IsAdmin,
 		Account:      storedUser.Account.Name,
 		Organisation: storedUser.Account.Organisation,
-		AccountID:    storedUser.Account.AccountId,
+		AccountID:    storedUser.Account.AccountID,
 		Secret:       storedUser.Account.Secret,
 	}
 
@@ -156,17 +158,17 @@ func (c *LoginController) UserInformation(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	vmInfo, buttons, err := populateVMStatusButtons(user.Email)
+	asInfo, buttons, err := populateASStatusButtons(user.Email)
 	if err != nil {
-		log.Printf("Error when generating VM info and button configuration for user %v: %v",
+		log.Printf("Error when generating AS info and button configuration for user %v: %v",
 			user.Email, err)
-		c.Forbidden(w, err, "Error when generating VM info and button configuration")
+		c.Forbidden(w, err, "Error when generating AS info and button configuration")
 		return
 	}
 
 	userData := userPageData{
 		User:      user,
-		VMInfo:    vmInfo,
+		ASInfo:    asInfo,
 		UIButtons: buttons,
 	}
 

@@ -27,9 +27,10 @@ import (
 )
 
 // Dummy error to return if the virtual credit system is disabled
-var systemDisabledError error = errors.New("VirtualCredit system disabled. This error should be ignored")
+var systemDisabledError error = errors.New(
+	"VirtualCredit system disabled. This error should be ignored")
 
-// REST resource to list the payed connections from one AS (identified by the parameter 'isdas')
+// REST resource to list the payed connections from one AS (identified by the parameter 'ia')
 // Example Response:
 //
 //{
@@ -48,7 +49,7 @@ var systemDisabledError error = errors.New("VirtualCredit system disabled. This 
 //  ]
 //}
 
-func (c *ASController) ListASesConnectionsWithCredits(w http.ResponseWriter, r *http.Request) {
+func (c *ASInfoController) ListASesConnectionsWithCredits(w http.ResponseWriter, r *http.Request) {
 	if config.VIRTUAL_CREDIT_ENABLE == false {
 		c.NotFound(w, nil, systemDisabledError.Error())
 		return
@@ -56,39 +57,39 @@ func (c *ASController) ListASesConnectionsWithCredits(w http.ResponseWriter, r *
 
 	var response struct {
 		ISD         int                            // The ISD of this AS
-		AS          int                            // This AS
+		ASID        int                            // This AS
 		Credits     int64                          // The current credits of this AS
 		Connections []models.ConnectionWithCredits // List of connections and their costs / yields
 	}
 
 	vars := mux.Vars(r)
-	isdas, ok := vars["isdas"]
+	ia, ok := vars["ia"]
 	if !ok {
-		c.BadRequest(w, nil, "missing isdas parameter")
+		c.BadRequest(w, nil, "missing ia parameter")
 		return
 	}
 
-	requestingAS, err := models.FindAsByIsdAs(isdas)
+	requestingAS, err := models.FindASInfoByIA(ia)
 	if err != nil {
-		c.NotFound(w, err, isdas+" not found")
+		c.NotFound(w, err, ia+" not found")
 		return
 	}
-	response.ISD = requestingAS.Isd
-	response.AS = requestingAS.As
+	response.ISD = requestingAS.ISD
+	response.ASID = requestingAS.ASID
 	response.Credits = requestingAS.Credits
 
 	connections, err := requestingAS.ListConnections()
 	if err != nil {
 		log.Printf("Error while retrieving list of ASes. ISD-AS: %v", requestingAS)
-		c.BadRequest(w, err, "Error while retrieving list of ASes. ISD-As: %v", requestingAS)
+		c.BadRequest(w, err, "Error while retrieving list of ASes. ISD-AS: %v", requestingAS)
 		return
 	}
 	response.Connections = connections
 
 	b, err := json.Marshal(response)
 	if err != nil {
-		log.Printf("Error during JSON Marshaling. ISD-AS: %v, %v", requestingAS, err)
-		c.Error500(w, err, "Error during JSON Marshaling. ISD-AS: %v", requestingAS)
+		log.Printf("Error during JSON marshaling. ISD-AS: %v, %v", requestingAS, err)
+		c.Error500(w, err, "Error during JSON marshaling. ISD-AS: %v", requestingAS)
 		return
 	}
 	fmt.Fprintln(w, string(b))
@@ -102,14 +103,14 @@ func (c *ASController) ListASesConnectionsWithCredits(w http.ResponseWriter, r *
 //	The function will handle the response itself in case of an error. If everything was fine the
 //	function returns nil.
 //
-func (c *ASController) checkAndUpdateCredits(w http.ResponseWriter, r *http.Request,
+func (c *ASInfoController) checkAndUpdateCredits(w http.ResponseWriter, r *http.Request,
 	cr *ConnRequest) error {
 
 	if config.VIRTUAL_CREDIT_ENABLE == false {
 		return systemDisabledError
 	}
 
-	as, err := models.FindAsByIsdAs(cr.RequestIA)
+	as, err := models.FindASInfoByIA(cr.RequestIA)
 	if err != nil {
 		log.Printf("Error: Unkown AS: %v, %v", r.Body, err)
 		c.BadRequest(w, err, "Error: Unkown AS: %v", r.Body)
@@ -141,28 +142,28 @@ func (c *ASController) checkAndUpdateCredits(w http.ResponseWriter, r *http.Requ
 //	The function will handle the response itself in case of an error and returns the error.
 //	If everything was fine, the function returns nil.
 //
-func (c *ASController) checkAndUpdateCreditsAtResponse(w http.ResponseWriter, r *http.Request,
+func (c *ASInfoController) checkAndUpdateCreditsAtResponse(w http.ResponseWriter, r *http.Request,
 	cr *models.ConnRequest, reply ConnReply) error {
 
 	if !config.VIRTUAL_CREDIT_ENABLE == false {
 		return systemDisabledError
 	}
 
-	as, _ := models.FindAsByIsdAs(cr.RequestIA)
+	as, _ := models.FindASInfoByIA(cr.RequestIA)
 	credits := models.BandwidthToCredits(cr.Bandwidth)
 	// If the connection is approved, add credits to the responding AS
 	if cr.Status == models.APPROVED {
-		otherAs, err := models.FindAsByIsdAs(cr.RespondIA)
+		otherAS, err := models.FindASInfoByIA(cr.RespondIA)
 		if err != nil {
 			log.Printf("Error finding the RespondIA. Request ID: %v RequestIA: %v, RespondIA: %v, %v",
-				reply.RequestId, reply.RequestIA, reply.RespondIA, err)
+				reply.RequestID, reply.RequestIA, reply.RespondIA, err)
 			c.Error500(w, err, "Error finding the RespondIA. Request ID: %v RequestIA: %v, RespondIA: %v",
-				reply.RequestId, reply.RequestIA, reply.RespondIA)
+				reply.RequestID, reply.RequestIA, reply.RespondIA)
 			return err
 		}
-		if err := otherAs.UpdateCurrency(credits); err != nil {
-			log.Printf("Error: Adding credits! OtherAS: %v, Request: %v, Error: %v", otherAs, r.Body, err)
-			c.Error500(w, err, "Error: Adding credits! OtherAS: %v, Request: %v", otherAs, r.Body)
+		if err := otherAS.UpdateCurrency(credits); err != nil {
+			log.Printf("Error: Adding credits! OtherAS: %v, Request: %v, Error: %v", otherAS, r.Body, err)
+			c.Error500(w, err, "Error: Adding credits! OtherAS: %v, Request: %v", otherAS, r.Body)
 			return err
 		}
 		// If the connection request is denied, release the reserved credits for the connection
@@ -182,12 +183,12 @@ func (c *ASController) checkAndUpdateCreditsAtResponse(w http.ResponseWriter, r 
 //
 //	If everything was fine, the function returns nil.
 //
-func (c *ASController) rollBackCreditUpdate(w http.ResponseWriter, r *http.Request, cr *ConnRequest) {
+func (c *ASInfoController) rollBackCreditUpdate(w http.ResponseWriter, r *http.Request, cr *ConnRequest) {
 	if !config.VIRTUAL_CREDIT_ENABLE {
 		return
 	}
 
-	as, err := models.FindAsByIsdAs(cr.RequestIA)
+	as, err := models.FindASInfoByIA(cr.RequestIA)
 	if err != nil {
 		log.Printf("Error: Unkown AS: %v, %v", r.Body, err)
 		c.BadRequest(w, err, "Error: Unkown AS: %v", r.Body)

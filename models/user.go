@@ -23,6 +23,8 @@ import (
 	"errors"
 	"time"
 
+	"fmt"
+
 	"github.com/astaxie/beego/orm"
 	uuid "github.com/pborman/uuid"
 	"golang.org/x/crypto/hkdf"
@@ -36,19 +38,18 @@ const (
 )
 
 type Account struct {
-	Id           uint64
+	ID           uint64 `orm:"column(id);auto;pk"`
 	Name         string
 	Organisation string
-	AccountId    string
+	AccountID    string `orm:"column(account_id)"`
 	Secret       string
 	Users        []*user `orm:"reverse(many);index"`
-	ASes         []*As   `orm:"reverse(many);index"`
 	Created      time.Time
 	Updated      time.Time
 }
 
 type user struct {
-	Id       uint64
+	ID       uint64 `orm:"column(id);auto;pk"`
 	Email    string `orm:"index"`
 	Password string
 	// whether the password is invalid due to reset or pre-approved registration
@@ -90,7 +91,7 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 	// find whether the user email is already taken
 	storedUser, err := FindUserByEmail(email)
 
-	if err == nil && storedUser != nil && storedUser.Id > 0 {
+	if err == nil && storedUser != nil && storedUser.ID > 0 {
 		return nil, errors.New("User already registered")
 	}
 
@@ -116,7 +117,7 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 		// if there is no account with the name then create it
 		if err == orm.ErrNoRows {
 
-			// Generate the accountId and the secret
+			// Generate the accountID and the secret
 			apiSecretReader := hkdf.New(sha256.New, derivedPassword, salt, []byte(API_CONTEXT))
 			apiSecretBytes, apiSecretError := bufio.NewReader(apiSecretReader).Peek(SECRET_LENGTH)
 
@@ -129,7 +130,7 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 			a.Name = accountName
 			a.Created = time.Now().UTC()
 			a.Updated = time.Now().UTC()
-			a.AccountId = uuid.New()
+			a.AccountID = uuid.New()
 			a.Secret = hex.EncodeToString(apiSecretBytes)
 			if err := a.Upsert(); err != nil {
 				return nil, err
@@ -170,8 +171,8 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 
 func (a *Account) Upsert() error {
 	storedAccount, err := FindAccountByName(a.Name)
-	if err == nil && storedAccount != nil && storedAccount.Id > 0 {
-		a.Id = storedAccount.Id
+	if err == nil && storedAccount != nil && storedAccount.ID > 0 {
+		a.ID = storedAccount.ID
 		a.Updated = time.Now().UTC()
 		_, err := o.Update(a)
 		return err
@@ -199,22 +200,30 @@ func FindUserByVerificationUUID(link string) (*user, error) {
 	return u, err
 }
 
-func FindUserById(id string) (*user, error) {
+func FindUserByID(id string) (*user, error) {
 	u := new(user)
-	err := o.QueryTable(u).Filter("Id", id).RelatedSel().One(u)
+	err := o.QueryTable(u).Filter("ID", id).RelatedSel().One(u)
 	return u, err
 }
 
-func FindUserByAccountIdSecret(acc_id, secret string) (*Account, error) {
-	u := new(Account)
-	err := o.QueryTable(u).Filter("AccountId", acc_id).Filter("Secret", secret).One(u)
-	return u, err
+func FindAccountByAccountIDAndSecret(acc_id, secret string) (*Account, error) {
+	a := new(Account)
+	err := o.QueryTable(a).Filter("AccountID", acc_id).Filter("Secret", secret).One(a)
+	return a, err
 }
 
-func FindAccountByAccountId(acc_id string) (*Account, error) {
-	u := new(Account)
-	err := o.QueryTable(u).Filter("AccountId", acc_id).One(u)
-	return u, err
+func FindAccountByAccountID(acc_id string) (*Account, error) {
+	a := new(Account)
+	err := o.QueryTable(a).Filter("AccountID", acc_id).One(a)
+	return a, err
+}
+
+func FindAccountByUserEmail(email string) (*Account, error) {
+	user, err := FindUserByEmail(email)
+	if err != nil {
+		return nil, fmt.Errorf("Error looking up user with email %v: %v", email, err)
+	}
+	return user.Account, nil
 }
 
 func (u *user) Delete() error {
