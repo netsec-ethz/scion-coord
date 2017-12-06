@@ -141,6 +141,12 @@
 			"revisionTime": "2017-09-27T15:21:54Z"
 		},
 		{
+                        "checksumSHA1": "um5Gw7FZwz/GoxIXVIlSL1NigXk=",
+                        "path": "github.com/oschwald/geoip2-golang",
+                        "revision": "5b1dc16861f81d05d9836bb21c2d0d65282fc0b8",
+                        "revisionTime": "2017-04-23T21:58:58Z"
+                },
+		{
 			"checksumSHA1": "JVGDxPn66bpe6xEiexs1r+y6jF0=",
 			"path": "github.com/patrickmn/go-cache",
 			"revision": "a3647f8e31d79543b2d0f0ae2fe5c379d72cedc0",
