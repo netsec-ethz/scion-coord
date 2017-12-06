@@ -115,31 +115,23 @@ func (c HTTPController) Error(w http.ResponseWriter, err error, errorCode int, d
 	log.Println(fmt.Sprintf(description+": %v", append(a, err)...))
 
 	// Forward the error to the web interface
-	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
 	http.Error(w, Verbosity(err, description, a...), errorCode)
 
 }
 
 func (c HTTPController) Error500(w http.ResponseWriter, err error, desc string, a ...interface{}) {
-	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
 	http.Error(w, Verbosity(err, desc, a...), http.StatusInternalServerError)
 }
 
 func (c HTTPController) BadRequest(w http.ResponseWriter, err error, desc string, a ...interface{}) {
-
-	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
 	http.Error(w, Verbosity(err, desc, a...), http.StatusBadRequest)
 }
 
 func (c HTTPController) NotFound(w http.ResponseWriter, err error, desc string, a ...interface{}) {
-
-	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
 	http.Error(w, Verbosity(err, desc, a...), http.StatusNotFound)
 }
 
 func (c HTTPController) Forbidden(w http.ResponseWriter, err error, desc string, a ...interface{}) {
-
-	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
 	http.Error(w, Verbosity(err, desc, a...), http.StatusForbidden)
 }
 

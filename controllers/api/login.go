@@ -128,9 +128,16 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 	// if the authentication fails
 	if err := dbUser.Authenticate(password); err != nil {
 		log.Printf("Authentication failed for user %v: %v", dbUser.Email, err)
-		//c.Forbidden(w, err, "Authentication failed for user %v", dbUser.Email)
-		c.Forbidden(w, nil, err.Error())
-		return
+		// Distinguish between different authentication errors
+		// The web interface uses this information to react accordingly
+		// 900: Email is not verified, 901: Password invalid
+		if err.Error() == "Email is not verified" {
+			c.Forbidden(w, err, "900 Authentication failed for user %v", dbUser.Email)
+			return
+		} else {
+			c.Forbidden(w, err, "901 Authentication failed for user %v", dbUser.Email)
+			return
+		}
 	}
 
 	// otherwise just continue, because the authentication succeeded
