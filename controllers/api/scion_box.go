@@ -60,7 +60,7 @@ type SCIONBoxController struct {
 //		    }
 func (s *SCIONBoxController) InitializeBox(w http.ResponseWriter, r *http.Request) {
 	// Parse the arguments
-	_, ip, mac, openPorts, startPort, err := s.parseRequest(r)
+	_, ip, external_ip, mac, openPorts, startPort, err := s.parseRequest(r)
 	if err != nil {
 		log.Printf("Error parsing parameters and source IP: %v", err)
 		s.BadRequest(err, w, r)
@@ -92,7 +92,7 @@ func (s *SCIONBoxController) InitializeBox(w http.ResponseWriter, r *http.Reques
 	slas, err := models.FindSCIONLabASByIAInt(sb.ISD, sb.AS)
 	if err != nil {
 		if err == orm.ErrNoRows {
-			s.initializeNewBox(sb, ip, mac, w, r)
+			s.initializeNewBox(sb, external_ip, mac, w, r)
 		} else {
 			log.Printf("Error retrieving ScionlabAS info: %v, %v", mac, err)
 			s.Error500(err, w, r)
@@ -160,31 +160,34 @@ type InitRequest struct {
 }
 
 // Receive a Post request with json: {IPAddress: 'string', MacAddress: 'string', OpenPorts: int, StartPort: int}
-func (s *SCIONBoxController) parseRequest(r *http.Request) (bool, string, string, int, int, error) {
+func (s *SCIONBoxController) parseRequest(r *http.Request) (bool, string, string, string, int, int, error) {
 	var isNAT bool
 	var request InitRequest
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&request); err != nil {
 		log.Printf("Error decoding JSON: %v, %v", r.Body, err)
-		return false, "", "", 0, 0, err
+		return false, "", "", "", 0, 0, err
 	}
 	mac_address := request.MacAddress
 	ip := request.IPAddress
 	sourceIP, err := s.getSourceIP(r)
 	if err != nil {
-		return false, "", "", 0, 0, err
+		return false, "", "", "", 0, 0, err
 	}
 	// Check if the box is behind a NAT or not
+	var external_ip string
 	if utility.IPCompare(sourceIP, ip) == 0 {
 		isNAT = false
+		external_ip = ip
 	} else {
 		isNAT = true
+		external_ip = sourceIP
 	}
 	// parse the Connection results
 	openPorts := request.OpenPorts
 	startPort := request.StartPort
 	log.Printf("isNAT: %t, source_ip: %v, ip_address: %v, Connections: %v", isNAT, sourceIP, ip, openPorts)
-	return isNAT, ip, mac_address, openPorts, startPort, nil
+	return isNAT, ip, external_ip, mac_address, openPorts, startPort, nil
 }
 
 type initReply struct {

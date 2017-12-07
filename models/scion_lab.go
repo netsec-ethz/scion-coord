@@ -256,7 +256,7 @@ func GetAllAPs() ([]*SCIONLabAS, error) {
 	var w []*SCIONLabAS
 	_, err := o.QueryTable(new(AttachmentPoint)).RelatedSel().All(&v)
 	if err != nil {
-		return w, err
+		return nil, err
 	}
 	for _, ap := range v {
 		o.LoadRelated(&ap, "AS")

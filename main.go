@@ -33,7 +33,43 @@ import (
 	"github.com/netsec-ethz/scion-coord/models"
 	"github.com/netsec-ethz/scion-coord/utility"
 	"golang.org/x/crypto/acme/autocert"
+	"encoding/json"
+	"io/ioutil"
 )
+
+// initialize ISD location mapping
+func initializeISD() error {
+	raw, err := ioutil.ReadFile(config.ISD_LOCATION_MAPPING)
+	if (err != nil) {
+		fmt.Errorf("ERROR: Cannot access ISD location mapping json file:"+
+					" %v", err)
+	}
+	var isd_loc []struct {
+		ISD       int
+		Country   string
+		Continent string
+	}
+	json.Unmarshal(raw, &isd_loc)
+
+	for _, ISD := range(isd_loc) {
+		_, err = models.FindISDbyID(ISD.ISD)
+		if err != nil {
+			if err == orm.ErrNoRows {
+				isd :=  models.IsdLocation{
+					ISD:		ISD.ISD,
+					Country:	ISD.Country,
+					Continent:	ISD.Continent,
+				}
+				err = isd.Insert()
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("ERROR: Cannot insert ISD location mapping into database:"+
+				" %v", err)
+		}
+	}
+	return nil
+}
 
 // make sure that data about SCIONLab ASes in database is correct
 // TODO (mlegner): remove deprecated servers?
@@ -102,6 +138,12 @@ func main() {
 	// update database of SCIONLab ASes
 	if err := initializeSLS(); err != nil {
 		fmt.Printf("There was an error updating the server database: %v", err)
+		return
+	}
+
+	if err := initializeISD(); err != nil {
+		fmt.Printf("There was an error updating" +
+			" the ISD location mapping in the database: %v", err)
 		return
 	}
 

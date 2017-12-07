@@ -105,6 +105,12 @@ func (il *IsdLocation) Update() error {
 	return err
 }
 
+func FindISDbyID(id int) (*IsdLocation, error) {
+	v := new(IsdLocation)
+	err := o.QueryTable(v).Filter("ISD", id).RelatedSel().One(v)
+	return v, err
+}
+
 func FindISDbyCountry(country string) (*IsdLocation, error) {
 	v := new(IsdLocation)
 	err := o.QueryTable(v).Filter("Country", country).RelatedSel().One(v)
