@@ -541,6 +541,7 @@ func (s *SCIONBoxController) generateTopologyFile(slas *models.SCIONLabAS) error
 		COMMA        string
 		ID           string
 		LINK_TYPE    string
+		BR_PORT		 string
 	}
 	type Topo struct {
 		ISD_ID string
@@ -573,6 +574,7 @@ func (s *SCIONBoxController) generateTopologyFile(slas *models.SCIONLabAS) error
 			BIND_PORT:    strconv.Itoa(br.LocalPort),
 			ID:           strconv.Itoa(br.BRID),
 			LINK_TYPE:    linktype,
+			BR_PORT:	  strconv.Itoa(BR_START_PORT + i),
 		}
 		// if last neighbor do not add the Comma to the end
 		if i == len(brs)-1 {

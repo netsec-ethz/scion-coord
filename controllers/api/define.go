@@ -29,3 +29,7 @@ var (
 	CACertPath      = filepath.Join(RSAKeyPath, "ca.crt")
 	HeartBeatPeriod = time.Duration(config.HB_PERIOD)
 )
+
+const(
+	BR_START_PORT = 31046
+)
