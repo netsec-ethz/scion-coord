@@ -9,18 +9,33 @@ scionApp
             });
         },
         // Create SCIONLab AS
-        generateSCIONLabAS: function (user) {
-            // TODO(ercanucan): compose the URL in a cleaner fashion
-            let url = '/api/as/generateAS?isVPN=' + (!user.isNotVPN) + '&scionLabASIP='
-                + user.scionLabASIP;
-            return $http.post(url).then(function (response) {
+        generateSCIONLabAS: function () {
+            return $http.post('/api/as/generateAS').then(function (response) {
+                console.log(response);
+                return response.data;
+            });
+        },
+        // Configure SCIONLab AS
+        configureSCIONLabAS: function (user, asInfo) {
+            let request = {
+                asID: asInfo.ASID,
+                userEmail: user.Email,
+                isVPN: asInfo.IsVPN,
+                ip: asInfo.IP,
+                serverIA: asInfo.AP,
+                label: asInfo.Label,
+                type: asInfo.Type == "2" ? 2 : 1,
+                port: asInfo.Port,
+            };
+            console.log(request);
+            return $http.post('/api/as/configureAS', request).then(function (response) {
                 console.log(response);
                 return response.data;
             });
         },
         // Remove SCIONLab AS
-        removeSCIONLabAS: function (user) {
-            return $http.post('/api/as/removeAS').then(function (response) {
+        removeSCIONLabAS: function (asID) {
+            return $http.post('/api/as/removeAS/' + asID).then(function (response) {
                 console.log(response);
                 return response.data;
             });

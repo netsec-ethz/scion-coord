@@ -3,7 +3,7 @@
     "bs{{.ISD_ID}}-{{.AS_ID}}-1": {
       "Public": [
         {
-          "Addr": "10.0.2.15",
+          "Addr": "{{.LOCAL_ADDR}}",
           "L4Port": 31041
         }
       ]
@@ -15,7 +15,7 @@
         {
           "Public": [
             {
-              "Addr": "10.0.2.15",
+              "Addr": "{{.LOCAL_ADDR}}",
               "L4Port": 31042
             }
           ]
@@ -35,11 +35,11 @@
           "ISD_AS": "{{.TARGET_ISDAS}}",
           "Public": {
             "Addr": "{{.IP}}",
-            "L4Port": 50000
+            "L4Port": {{.LOCAL_PORT}}
           },
           "Bind": {
             "Addr": "{{.BIND_IP}}",
-            "L4Port": 50000
+            "L4Port": {{.LOCAL_PORT}}
           }
         }
       }
@@ -50,7 +50,7 @@
     "cs{{.ISD_ID}}-{{.AS_ID}}-1": {
       "Public": [
         {
-          "Addr": "10.0.2.15",
+          "Addr": "{{.LOCAL_ADDR}}",
           "L4Port": 31043
         }
       ]
@@ -60,7 +60,7 @@
     "ps{{.ISD_ID}}-{{.AS_ID}}-1": {
       "Public": [
         {
-          "Addr": "10.0.2.15",
+          "Addr": "{{.LOCAL_ADDR}}",
           "L4Port": 31044
         }
       ]
@@ -71,7 +71,7 @@
     "sb{{.ISD_ID}}-{{.AS_ID}}-1": {
       "Public": [
         {
-          "Addr": "10.0.2.15",
+          "Addr": "{{.LOCAL_ADDR}}",
           "L4Port": 31045
         }
       ]

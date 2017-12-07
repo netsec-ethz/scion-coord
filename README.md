@@ -89,18 +89,12 @@ and then executing the following command:
 
 #### Credentials
 
-In order for the configurations to be generated, the following files must exist:
-The credentials inside the ISD folder are used when a Box is connected in that ISD.
+In order for the configurations to be generated, for each ISD with an Attachment Point the following
+files must exist (here shown for ISD1):
 ```
-credentials/ISD1-AS1-V0.crt
-credentials/as-sig.key
-credentials/ISD1-V0.trc
-credentials/ISD1/ISD1-AS1-V0.crt
-credentials/ISD1/as-sig.key
-credentials/ISD1/ISD1-V0.trc
-credentials/ISD2/ISD2-AS1-V0.crt
-credentials/ISD2/as-sig.key
-credentials/ISD2/ISD2-V0.trc
+credentials/ISD1.crt (certificate of one core AS in the ISD)
+credentials/ISD1.key (signing key of one core AS in the ISD)
+credentials/ISD1.trc (TRC of the ISD)
 ```
 
 

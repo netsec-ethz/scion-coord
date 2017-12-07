@@ -70,31 +70,41 @@ func initializeISD() error {
 }
 
 // check if credential files exist and create necessary directories
-func checkCredentials() bool {
-	for _, f := range []string{api.TrcFile, api.CoreCertFile, api.CoreSigKey} {
-		if _, err := os.Stat(f); err != nil {
-			if os.IsNotExist(err) {
-				fmt.Println("ERROR: Please make sure that the necessary credential files exist.")
-				fmt.Println("Consult the README.md for further details.")
-			} else {
-				fmt.Println("An error occurred when accessing " + f + ".")
+func checkCredentialsDirectories() error {
+	aps, err := models.GetAllAPs()
+	if err != nil {
+		return err
+	}
+	for _, ap := range aps {
+		isd := ap.ISD
+		for _, f := range []string{api.TrcFile(isd), api.CoreCertFile(isd),
+			api.CoreSigKey(isd)} {
+			if _, err := os.Stat(f); err != nil {
+				if os.IsNotExist(err) {
+					return fmt.Errorf("ERROR: Credential file %s does not exist. Please make "+
+						"sure that the necessary credential files exist.\n"+
+						"Consult the README.md for further details.", f)
+				} else {
+					return fmt.Errorf("An error occurred when accessing " + f + ".")
+				}
 			}
-			return false
 		}
 	}
 	os.MkdirAll(api.TempPath, os.ModePerm)
 	os.MkdirAll(api.PackagePath, os.ModePerm)
-	return true
+	return nil
 }
 
 func main() {
-
 	if err := initializeISD(); err != nil {
 		fmt.Printf("There was an error updating"+
 			" the ISD location mapping in the database: %v", err)
 		return
 	}
-	if !checkCredentials() {
+
+	// check if credential files exist and create necessary directories
+	if err := checkCredentialsDirectories(); err != nil {
+		fmt.Printf("There was an error checking credential files: %v", err)
 		return
 	}
 
@@ -183,13 +193,16 @@ func main() {
 	// generates a SCIONLab AS
 	// TODO(ercanucan): fix the authentication
 	router.Handle("/api/as/generateAS", userChain.ThenFunc(
-		scionLabASController.GenerateSCIONLabAS))
-	router.Handle("/api/as/removeAS", userChain.ThenFunc(scionLabASController.RemoveSCIONLabAS))
-	router.Handle("/api/as/downloadTarball", userChain.ThenFunc(
+		scionLabASController.GenerateNewSCIONLabAS)).Methods(http.MethodPost)
+	router.Handle("/api/as/configureAS", userChain.ThenFunc(
+		scionLabASController.ConfigureSCIONLabAS)).Methods(http.MethodPost)
+	router.Handle("/api/as/removeAS/{as_id}", userChain.ThenFunc(
+		scionLabASController.RemoveSCIONLabAS))
+	router.Handle("/api/as/downloadTarball/{as_id}", userChain.ThenFunc(
 		scionLabASController.ReturnTarball))
-	router.Handle("/api/as/getSCIONLabVMASes/{account_id}/{secret}",
+	router.Handle("/api/as/getUpdatesForAP/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabASController.GetUpdatesForAP))
-	router.Handle("/api/as/confirmSCIONLabVMASes/{account_id}/{secret}",
+	router.Handle("/api/as/confirmUpdatesFromAP/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabASController.ConfirmUpdatesFromAP))
 
 	//SCIONBox API

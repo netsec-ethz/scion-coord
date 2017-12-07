@@ -42,17 +42,23 @@ var (
 	LOG_DEBUG_MODE, _        = goconf.AppConf.Bool("log.debug_mode")
 	PACKAGE_DIRECTORY        = goconf.AppConf.DefaultString("directory.package_directory",
 		filepath.Join(os.Getenv("HOME"), "scionLabConfigs"))
-	ISD_LOCATION_MAPPING  = goconf.AppConf.String("directory.isd_location_map")
-	DB_NAME               = goconf.AppConf.String("db.name")
-	DB_HOST               = goconf.AppConf.String("db.host")
-	DB_PORT, _            = goconf.AppConf.Int("db.port")
-	DB_USER               = goconf.AppConf.String("db.user")
-	DB_PASS               = goconf.AppConf.String("db.pass")
-	DB_MAX_CONNECTIONS, _ = goconf.AppConf.Int("db.max_connections")
-	DB_MAX_IDLE, _        = goconf.AppConf.Int("db.max_idle")
-	BASE_AS_ID, _         = goconf.AppConf.Int("base_as_id")
-	AP_IA                 = goconf.AppConf.String("ap_ia")
-	START_PORT, _         = goconf.AppConf.Int("start_port")
+	ISD_LOCATION_MAPPING           = goconf.AppConf.String("directory.isd_location_map")
+	DB_NAME                        = goconf.AppConf.String("db.name")
+	DB_HOST                        = goconf.AppConf.String("db.host")
+	DB_PORT, _                     = goconf.AppConf.Int("db.port")
+	DB_USER                        = goconf.AppConf.String("db.user")
+	DB_PASS                        = goconf.AppConf.String("db.pass")
+	DB_MAX_CONNECTIONS, _          = goconf.AppConf.Int("db.max_connections")
+	DB_MAX_IDLE, _                 = goconf.AppConf.Int("db.max_idle")
+	BASE_AS_ID, _                  = goconf.AppConf.Int("base_as_id")
+	MAX_BR_ID, _                   = goconf.AppConf.Int("max_br_id")
+	RESERVED_BRS_INFRASTRUCTURE, _ = goconf.AppConf.Int("reserved_brs_infrastructure")
+	ASES_PER_USER, _               = goconf.AppConf.Int("ases_per_user")
+	ASES_PER_ADMIN, _              = goconf.AppConf.Int("ases_per_admin")
+	SIGNING_ASES                   = goconf.AppConf.Strings("signing_ases")
+	MTU, _                         = goconf.AppConf.Int("mtu")
+	BR_START_PORT                  uint16
+	BR_INTERNAL_START_PORT         uint16
 
 	// Virtual Credit system
 	VIRTUAL_CREDIT_ENABLE, _        = goconf.AppConf.Bool("virtualCredit.enable")
@@ -61,13 +67,25 @@ var (
 	// Local IP address in VM; this is a default set by
 	// vagrant and may have to be adjusted if vagrant configuration is changed
 	VM_LOCAL_IP   = "10.0.2.15"
+	LOCALHOST_IP  = "127.0.0.1"
 	HTTP_PROTOCOL = "http"
 	HB_PERIOD, _  = goconf.AppConf.Int("heartbeat.period")
 	HB_LIMIT, _   = goconf.AppConf.Int("heartbeat.limit")
 )
 
 func init() {
+	sp := goconf.AppConf.DefaultInt("br_bind_start_port", 50000)
+	BR_START_PORT = uint16(sp) // Ports are only 16 bits
+	sp = goconf.AppConf.DefaultInt("br_internal_start_port", 31046)
+	BR_INTERNAL_START_PORT = uint16(sp) // Ports are only 16 bits
 	if HTTP_ENABLE_HTTPS {
 		HTTP_PROTOCOL = "https"
 	}
+}
+
+func MaxASes(isAdmin bool) int {
+	if isAdmin {
+		return ASES_PER_ADMIN
+	}
+	return ASES_PER_USER
 }

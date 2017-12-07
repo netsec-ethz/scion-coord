@@ -69,7 +69,7 @@ db.max_idle = 3
 # False = Every method associated with VirtualCredit system will return immediately
 virtualCredit.enable = false
 # 1 Credit = 10 MegaBits/s worth of bandwidth
-virtualCredit.startCredit = 100
+virtualCredit.startCredits = 100
 
 # HeartBeat period in seconds
 heartbeat.period = 60
@@ -77,6 +77,18 @@ heartbeat.period = 60
 heartbeat.limit = 10
 
 # General settings
-ap_ia = "1-7"
-start_port = 50000
+# Standard port for border routers
+br_bind_start_port = 50000
+br_internal_start_port = 31046
+mtu = 1472
+# Maximal number of border routers in one AS
+max_br_id = 1000
+# First ID given to users' ASes
 base_as_id = 1000
+# Reserve first few BR IDs of INFRASTRUCTURE ASes for custom configuration
+reserved_brs_infrastructure = 10
+# Maximal number of ASes a user or admin can have
+ases_per_user = 2
+ases_per_admin = 10
+# ASes signing certificates for new ASes in each ISD starting by ISD1, separated by ";"
+signing_ases = 1;21;31
