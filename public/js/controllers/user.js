@@ -2,8 +2,10 @@ scionApp
     .controller('userCtrl', ['$scope', '$rootScope', 'userService', '$location', '$window', '$http',
         function ($scope, $rootScope, userService, $location, $window, $http) {
 
-            $scope.error = "";
-            $scope.message = "";
+            $scope.error1 = "";
+            $scope.message1 = "";
+            $scope.error2 = "";
+            $scope.message2 = "";
 
             $scope.userPageData = function () {
 
@@ -11,9 +13,15 @@ scionApp
                     function (data) {
                         console.log(data);
                         $rootScope.user = data["User"];
-                        $scope.asInfo = data["ASInfo"];
-                        $scope.buttonConfig = data["UIButtons"];
-                        $scope.user.isNotVPN = false;
+                        $scope.maxASes = data["MaxASes"];
+                        $scope.aps = data["APs"];
+                        $scope.asInfos = data["ASInfos"];
+                        if ($scope.currentIndex === undefined) {
+                            if ($scope.asInfos.length > 0)
+                                $scope.asInfo = $scope.asInfos[0];
+                        }
+                        else
+                            $scope.asInfo = $scope.asInfos[$scope.currentIndex];
                     },
                     function (response) {
                         console.log(response);
@@ -23,77 +31,109 @@ scionApp
                     });
             };
 
-            $scope.submitForm = function (action, user) {
+            $scope.generateSCIONLabAS = function () {
+                setCurrentIndex();
+                userService.generateSCIONLabAS().then(
+                    function (data) {
+                        console.log(data);
+                        $scope.userPageData();
+                        $scope.message1 = data;
+                    },
+                    function (response) {
+                        console.log(response);
+                        $scope.error1 = response.data;
+                    });
+            };
+
+            $scope.submitForm = function (action, user, asInfo) {
+                setCurrentIndex();
                 switch (action) {
                     case "update":
-                        if (user.isNotVPN) {
-                            $scope.scionLabASForm.scionLabASIP.$setValidity("required", user.scionLabASIP != null);
-                        }
-                        if (user.isNotVPN && !$scope.scionLabASForm.scionLabASIP.$valid) {
-                            $scope.error = "Please enter a correct public IP address.";
+                        if (asInfo.isNotVPN && !$scope.scionLabASForm.IP.$valid) {
+                            $scope.error2 = "Please enter a correct public IP address.";
+                        } else if (!$scope.scionLabASForm.Port.$valid) {
+                            $scope.error2 = "Please enter a correct port in the range 1024-65535.";
                         } else {
-                            $scope.generateSCIONLabAS(user);
+                            $scope.configureSCIONLabAS(user, asInfo);
                         }
                         break;
                     case "download":
-                        $scope.downloadSCIONLabAS(user);
+                        $scope.downloadSCIONLabAS(asInfo);
                         break;
                     case "remove":
-                        $scope.removeSCIONLabAS(user);
+                        $scope.removeSCIONLabAS(asInfo);
                         break;
                 }
             };
 
-            let downloadlink = function () {
-                return ('/api/as/downloadTarball');
+            let setCurrentIndex = function () {
+                $scope.currentIndex = $scope.asInfos.length > 0 ?
+                    $scope.asInfos.indexOf($scope.asInfo) :
+                    undefined;
             };
 
-            $scope.generateSCIONLabAS = function (user) {
-                $scope.error = "";
-                $scope.message = "";
+            let downloadlink = function (asID) {
+                return ('/api/as/downloadTarball/' + asID);
+            };
 
-                userService.generateSCIONLabAS(user).then(
+            $scope.configureSCIONLabAS = function (user, asInfo) {
+                $scope.error2 = "";
+                $scope.message2 = "";
+
+                userService.configureSCIONLabAS(user, asInfo).then(
                     function (data) {
                         console.log(data);
-                        window.location.assign(downloadlink());
-                        $scope.message = data;
+                        window.location.assign(downloadlink(asInfo.ASID));
+                        $scope.message2 = data;
                         $scope.userPageData();
                     },
                     function (response) {
                         console.log(response);
-                        $scope.error = response.data;
+                        $scope.error2 = response.data;
                     });
             };
 
-            $scope.downloadSCIONLabAS = function (user) {
-                $scope.error = "";
-                $scope.message = "";
+            $scope.downloadSCIONLabAS = function (asInfo) {
+                $scope.error2 = "";
+                $scope.message2 = "";
 
-                window.location.assign(downloadlink());
+                window.location.assign(downloadlink(asInfo.ASID));
             };
 
-            $scope.removeSCIONLabAS = function (user) {
-                $scope.error = "";
-                $scope.message = "";
+            $scope.removeSCIONLabAS = function (asInfo) {
+                $scope.error2 = "";
+                $scope.message2 = "";
 
-                userService.removeSCIONLabAS(user).then(
+                userService.removeSCIONLabAS(asInfo.ASID).then(
                     function (data) {
                         console.log(data);
-                        $scope.message = data;
+                        $scope.message2 = data;
                         $scope.userPageData();
                     },
                     function (response) {
                         console.log(response);
-                        $scope.error = response.data;
+                        $scope.error2 = response.data;
                     });
             };
 
-            $scope.dismissSuccess = function () {
-                $scope.message = "";
+            $scope.dismissSuccess = function (i) {
+                switch (i) {
+                    case 1:
+                        $scope.message1 = "";
+                        break;
+                    case 2:
+                        $scope.message2 = "";
+                }
             };
 
-            $scope.dismissError = function () {
-                $scope.error = "";
+            $scope.dismissError = function (i) {
+                switch (i) {
+                    case 1:
+                        $scope.error1 = "";
+                        break;
+                    case 2:
+                        $scope.error2 = "";
+                }
             };
 
             $scope.$watch(

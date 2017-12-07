@@ -31,6 +31,7 @@ import (
 
 	"github.com/astaxie/beego/orm"
 	"github.com/gorilla/mux"
+	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/models"
 	"github.com/netsec-ethz/scion-coord/utility"
@@ -159,14 +160,14 @@ func (s *SCIONBoxController) initializeOldBox(sb *models.SCIONBox, slas *models.
 type InitRequest struct {
 	MacAddress string
 	IPAddress  string
-	OpenPorts  int // Number of open ports starting from StartPort
-	StartPort  int
+	OpenPorts  uint16 // Number of open ports starting from StartPort
+	StartPort  uint16
 }
 
 // Receive a Post request with json:
 // {IPAddress: 'string', MacAddress: 'string', OpenPorts: int, StartPort: int}
 func (s *SCIONBoxController) parseRequest(r *http.Request) (isNAT bool, inernal_ip string,
-	external_ip string, macAddress string, openPorts int, startPort int, err error) {
+	external_ip string, macAddress string, openPorts, startPort uint16, err error) {
 	var request InitRequest
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&request); err != nil {
@@ -383,15 +384,15 @@ func (s *SCIONBoxController) updateDBnewSB(sb *models.SCIONBox,
 			log.Printf("Neighbor Slas not found %v ", err)
 			continue
 		}
-		acceptId := s.findLowestBRId(nbSlas)
+		acceptID := s.findLowestBRId(nbSlas)
 		// Connection for the two ASes
 		cn := models.Connection{
 			JoinIP:        ip,
 			RespondIP:     nbSlas.PublicIP,
 			JoinAS:        newSlas,
 			RespondAP:     nbSlas.AP,
-			JoinBRID:      i + 1,
-			RespondBRID:   acceptId,
+			JoinBRID:      uint16(i + 1),
+			RespondBRID:   uint16(acceptID),
 			Linktype:      models.PARENT,
 			IsVPN:         false,
 			JoinStatus:    models.CREATE,
@@ -471,8 +472,8 @@ func (s *SCIONBoxController) getNewSCIONBoxASID(isd int) (int, error) {
 }
 
 // Find the lowest available Port number
-func (s *SCIONBoxController) findLowestBRId(slas *models.SCIONLabAS) int {
-	var ID = 1
+func (s *SCIONBoxController) findLowestBRId(slas *models.SCIONLabAS) uint16 {
+	var ID uint16 = 1
 	cns, _ := slas.GetConnectionInfo()
 	for {
 		idFound := true
@@ -514,7 +515,7 @@ func (s *SCIONBoxController) generateTopologyFile(slas *models.SCIONLabAS) error
 		return fmt.Errorf("Error creating topology file config. User: %v, %v", slas.UserEmail,
 			err)
 	}
-	type Br struct {
+	type BR struct {
 		ISD_ID       string
 		AS_ID        string
 		REMOTE_ADDR  string
@@ -536,36 +537,36 @@ func (s *SCIONBoxController) generateTopologyFile(slas *models.SCIONLabAS) error
 		AS_ID    string
 		IP       string
 		IP_LOCAL string
-		BR       []Br
+		BRs      []BR
 	}
-	var borderrouters []Br
+	var borderrouters []BR
 	brs, err := slas.GetConnectionInfo()
 	if err != nil {
-		return fmt.Errorf("Error retrivieng brs for slas. User: %v, %v", slas.UserEmail,
+		return fmt.Errorf("Error retrivieng border routers for AS. User: %v, %v", slas.UserEmail,
 			err)
 	}
 	for i, br := range brs {
-		log.Printf("adding BR objects in topology genareation")
+		log.Printf("adding BR objects in topology generation")
 		ia := addr.ISD_AS{
 			I: br.NeighborISD,
 			A: br.NeighborAS,
 		}
 		linktype := GetLinktype(br.Linktype)
-		bro := Br{
+		bro := BR{
 			ISD_ID:       strconv.Itoa(slas.ISD),
 			AS_ID:        strconv.Itoa(slas.ASID),
 			REMOTE_ADDR:  br.NeighborIP,
-			REMOTE_PORT:  strconv.Itoa(br.RemotePort),
-			LOCAL_PORT:   strconv.Itoa(br.LocalPort),
+			REMOTE_PORT:  fmt.Sprintf("%v", br.NeighborPort),
+			LOCAL_PORT:   fmt.Sprintf("%v", br.LocalPort),
 			TARGET_ISDAS: ia.String(),
 			IP:           slas.PublicIP,
 			IP_LOCAL:     sb.InternalIP,
 			BIND_IP:      sb.InternalIP,
-			BIND_PORT:    strconv.Itoa(br.LocalPort),
-			ID:           strconv.Itoa(br.BRID),
+			BIND_PORT:    fmt.Sprintf("%v", br.LocalPort),
+			ID:           fmt.Sprintf("%v", br.BRID),
 			LINK_TYPE:    linktype,
-			BR_PORT:      strconv.Itoa(BR_START_PORT + i),
-			MTU:          strconv.Itoa(MTU),
+			BR_PORT:      strconv.Itoa(int(config.BR_INTERNAL_START_PORT) + i),
+			MTU:          strconv.Itoa(config.MTU),
 		}
 		// if last neighbor do not add the Comma to the end
 		if i == len(brs)-1 {
@@ -578,7 +579,7 @@ func (s *SCIONBoxController) generateTopologyFile(slas *models.SCIONLabAS) error
 	topo := Topo{
 		ISD_ID:   strconv.Itoa(slas.ISD),
 		AS_ID:    strconv.Itoa(slas.ASID),
-		BR:       borderrouters,
+		BRs:      borderrouters,
 		IP:       slas.PublicIP,
 		IP_LOCAL: sb.InternalIP,
 	}
@@ -717,7 +718,7 @@ func (s *SCIONBoxController) disconnectBox(sb *models.SCIONBox, slas *models.SCI
 type CurrentCn struct {
 	NeighborIA string
 	NeighborIP string
-	RemotePort int
+	RemotePort uint16
 }
 
 type IA struct {
@@ -939,7 +940,7 @@ func findCnInNbs(cn models.ConnectionInfo, neighbors []CurrentCn) bool {
 	var found = false
 	for _, nb := range neighbors {
 		if nb.NeighborIP == cn.NeighborIP {
-			if nb.RemotePort == cn.RemotePort {
+			if nb.RemotePort == cn.NeighborPort {
 				found = true
 				break
 			}

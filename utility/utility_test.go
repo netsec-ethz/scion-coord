@@ -36,7 +36,7 @@ type ipIncrementTest struct {
 type brTest struct {
 	name  string
 	error bool
-	id    int
+	id    uint16
 }
 
 func TestIPFunctions(t *testing.T) {

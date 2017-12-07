@@ -59,9 +59,9 @@ from ad_manager.util.local_config_util import (
 # Directory structure and credential files
 SCION_COORD_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 DEFAULT_PACKAGE_PATH = os.path.expanduser("~/scionLabConfigs")
-DEFAULT_CORE_CERT_FILE = os.path.join(SCION_COORD_PATH, "credentials", "ISD1-AS1-V0.crt")
-DEFAULT_CORE_SIG_KEY = os.path.join(SCION_COORD_PATH, "credentials", "as-sig.key")
-DEFAULT_TRC_FILE = os.path.join(SCION_COORD_PATH, "credentials", "ISD1-V0.trc")
+DEFAULT_CORE_CERT_FILE = os.path.join(SCION_COORD_PATH, "credentials", "ISD1.crt")
+DEFAULT_CORE_SIG_KEY = os.path.join(SCION_COORD_PATH, "credentials", "ISD1.key")
+DEFAULT_TRC_FILE = os.path.join(SCION_COORD_PATH, "credentials", "ISD1.trc")
 
 
 def create_scionlab_as_local_gen(args, tp):
@@ -138,6 +138,7 @@ def main():
     """
     Parse the command-line arguments and run the local config generation utility.
     """
+    # TODO(mlegner): Add option specifying already existing keys and certificates
     parser = argparse.ArgumentParser()
     parser.add_argument("--joining_ia",
                         help='ISD-AS for which the configuration is generated.')
@@ -159,7 +160,7 @@ def main():
                         help='Path to generate and store AS configurations.',
                         default=DEFAULT_PACKAGE_PATH)
     parser.add_argument("--user_id",
-                        help='User Identifier (email)')
+                        help='User Identifier (email + IA)')
     args = parser.parse_args()
 
     with open(args.topo_file) as json_data:

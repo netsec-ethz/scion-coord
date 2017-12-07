@@ -38,12 +38,13 @@ const (
 // The struct used for API calls between scion-coord and SCIONLab APs
 // TODO(mlegner): Change field names here and in the `update_gen.py` to reflect new conventions
 type APConnectionInfo struct {
-	ASID         string // ISD-AS of the AS
-	IsVPN        bool
-	RemoteIAPort int    // port number of the remote SCIONLab AP being connected to
-	UserEmail    string // User identifier used for VPN, currently the user's email
-	VMIP         string // VMIP address of the SCIONLab AS
-	RemoteBR     string // The name of the remote border router
+	ASID      string // ISD-AS of the AS
+	IsVPN     bool   // is this a VPN connection
+	UserEmail string // User identifier used for VPN, currently the user's email
+	IP        string // IP address of the SCIONLab AS
+	UserPort  uint16 // port number of the AS connecting to the AP
+	APPort    uint16 // port number at the AP
+	APBRID    uint16 // ID of the border router at the AP
 }
 
 // API end-point for the SCIONLab APs to query actions to be done for users' SCIONLabASes.
@@ -53,17 +54,18 @@ type APConnectionInfo struct {
 //         "Remove":[],
 //         "Update":[{"ASID":"1-1020",
 //                    "IsVPN":true,
-//                    "RemoteIAPort":50053,
 //                    "UserEmail":"user@example.com",
-//                    "VMIP":"10.0.8.42",
-//                    "RemoteBR":"br1-5-5"}]
+//                    "IP":"10.0.8.42",
+//                    "UserPort":50000,
+//                    "APPort":50053,
+//                    "APBRID":5}]
 //        }
 // }
 func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Inside GetUpdatesForAP = %v", r.URL.Query())
-	apIA := r.URL.Query().Get("scionLabAS")
+	apIA := r.URL.Query().Get("scionLabAP")
 	if len(apIA) == 0 {
-		s.BadRequest(w, nil, "scionLabAS parameter missing")
+		s.BadRequest(w, nil, "scionLabAP parameter missing")
 		return
 	}
 
@@ -78,12 +80,13 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 	cnsRemoveResp := []APConnectionInfo{}
 	for _, cn := range cns {
 		cnInfo := APConnectionInfo{
-			ASID:         utility.IAString(cn.NeighborISD, cn.NeighborAS),
-			IsVPN:        cn.IsVPN,
-			UserEmail:    cn.NeighborUser,
-			VMIP:         cn.NeighborIP,
-			RemoteIAPort: cn.RemotePort,
-			RemoteBR:     utility.BRString(apIA, cn.BRID),
+			ASID:      utility.IAString(cn.NeighborISD, cn.NeighborAS),
+			IsVPN:     cn.IsVPN,
+			UserEmail: cn.NeighborUser,
+			IP:        cn.NeighborIP,
+			UserPort:  cn.NeighborPort,
+			APPort:    cn.LocalPort,
+			APBRID:    cn.BRID,
 		}
 		switch cn.Status {
 		case models.CREATE:
@@ -115,16 +118,13 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 // {"1-7":
 //        {"Created":[],
 //         "Removed":[],
-//         "Updated":[{"ASID":"1-1020",
-//                     "RemoteIAPort":50053,
-//                     "VMIP":"203.0.113.0",
-//                     "RemoteBR":"br1-5-5"}]
+//         "Updated":["1-1020", "1-1023"]
 //        }
 // }
 // If sucessful, the API will return an empty JSON response with HTTP code 200.
 func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Inside ConfirmUpdatesFromAP")
-	var UpdateLists map[string]map[string][]APConnectionInfo
+	var UpdateLists map[string]map[string][]string
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&UpdateLists); err != nil {
 		log.Printf("Error decoding JSON: %v, %v", r.Body, err)
@@ -137,8 +137,8 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 		if err != nil {
 			log.Printf("Error finding AS %v when processing confirmations: %v", ia, err)
 			for _, cns := range event {
-				for _, cn := range cns {
-					failedConfirmations = append(failedConfirmations, cn.ASID)
+				for _, ia := range cns {
+					failedConfirmations = append(failedConfirmations, ia)
 				}
 			}
 		}
@@ -158,50 +158,39 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 // Updates the relevant DB tables based on the received confirmations from the SCIONLab AP and sends
 // out confirmation emails
 func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONLabAS, action string,
-	cns []APConnectionInfo) []string {
+	cns []string) []string {
 	log.Printf("action = %v, cns = %v", action, cns)
 	failedConfirmations := []string{}
-	for _, cn := range cns {
+	for _, ia := range cns {
 		// find the connection to the SCIONLabAS
-		slas, err := models.FindSCIONLabASByIAString(cn.ASID)
+		as, err := models.FindSCIONLabASByIAString(ia)
 		if err != nil {
-			log.Printf("Error finding SCIONLabAS %v: %v", cn.ASID, err)
-			failedConfirmations = append(failedConfirmations, cn.ASID)
+			log.Printf("Error finding SCIONLabAS %v: %v", ia, err)
+			failedConfirmations = append(failedConfirmations, ia)
 			continue
 		}
-		cn_db, err := slas.GetJoinConnectionInfoToAS(apAS.String())
+		cn_db, err := as.GetJoinConnectionInfoToAS(apAS.IA())
 		if err != nil {
-			log.Printf("Error finding the connection to SCIONLabAS %v: %v", cn.ASID, err)
-			failedConfirmations = append(failedConfirmations, cn.ASID)
+			log.Printf("Error finding the connection to SCIONLabAS %v: %v", ia, err)
+			failedConfirmations = append(failedConfirmations, ia)
 			continue
 		}
 		switch action {
 		case CREATED, UPDATED:
-			br, err := utility.BRIDFromString(cn.RemoteBR)
-			if err != nil {
-				log.Printf("Error parsing the BR name: %v", err)
-				failedConfirmations = append(failedConfirmations, cn.ASID)
-				continue
-			}
-			if br != cn_db.BRID {
-				log.Printf("Reported BR ID %v differs from stored value %v", br, cn_db.BRID)
-				failedConfirmations = append(failedConfirmations, cn.ASID)
-				continue
-			}
 			cn_db.Status = models.ACTIVE
 		case REMOVED:
 			cn_db.Status = models.INACTIVE
-			cn_db.BRID = -1 // Set BRID to -1 for inactive connections
+			cn_db.BRID = 0 // Set BRID to 0 for inactive connections
 		default:
-			log.Printf("Unsupported action \"%v\" for AS %v. User: %v", action, cn.ASID,
+			log.Printf("Unsupported action \"%v\" for AS %v. User: %v", action, ia,
 				cn_db.NeighborUser)
-			failedConfirmations = append(failedConfirmations, cn.ASID)
+			failedConfirmations = append(failedConfirmations, ia)
 			continue
 		}
-		slas.Status = cn_db.Status
-		if err = slas.UpdateASAndConnection(&cn_db); err != nil {
-			log.Printf("Error updating database tables for AS %v: %v", slas.String(), err)
-			failedConfirmations = append(failedConfirmations, cn.ASID)
+		as.Status = cn_db.Status
+		if err = as.UpdateASAndConnection(&cn_db); err != nil {
+			log.Printf("Error updating database tables for AS %v: %v", as.IA(), err)
+			failedConfirmations = append(failedConfirmations, ia)
 			continue
 		}
 		if err := sendConfirmationEmail(cn_db.NeighborUser, action); err != nil {
