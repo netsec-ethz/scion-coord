@@ -238,7 +238,7 @@ func main() {
 
 	// serve website using https or standard http
 	if config.HTTP_ENABLE_HTTPS {
-		fmt.Printf("Serving website on %v over HTTPS", config.HTTP_HOST_ADDRESS)
+		fmt.Printf("Serving website on %v over HTTPS\n", config.HTTP_HOST_ADDRESS)
 		// redirect HTTP traffic to HTTPS
 		go http.ListenAndServe(":80", http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -249,7 +249,7 @@ func main() {
 		log.Fatal(http.Serve(autocert.NewListener(
 			config.HTTP_HOST_ADDRESS), handlers.CompressHandler(router)))
 	} else {
-		fmt.Printf("Serving website on %v over HTTP", config.HTTP_HOST_ADDRESS)
+		fmt.Printf("Serving website on %v over HTTP\n", config.HTTP_HOST_ADDRESS)
 		log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d",
 			config.HTTP_BIND_ADDRESS, config.HTTP_BIND_PORT), handlers.CompressHandler(router)))
 	}

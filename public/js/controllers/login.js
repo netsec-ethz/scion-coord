@@ -11,7 +11,7 @@ scionApp
                     },
                     function (response) {
                         console.log(response);
-                        if (response.data.trim() === "Email is not verified") {
+                        if (response.data.substring(0,3) === "900") {
                             $rootScope.resendAddress = user.email;
                             $location.path('/resend');
                         } else{

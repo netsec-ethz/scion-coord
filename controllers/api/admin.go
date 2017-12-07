@@ -53,11 +53,10 @@ type emailTemplateInfo struct {
 type invitationsData []invitationInfo
 
 func (c AdminController) AdminInformation(w http.ResponseWriter, r *http.Request) {
-
-	user, err := populateUserData(w, r)
+	user, err := populateUserData(r)
 	if err != nil {
-		log.Println(err)
-		c.Forbidden(err, w, r)
+		log.Printf("Error authenticating user: %v", err)
+		c.Forbidden(w, err, "Error authenticating user")
 		return
 	}
 
@@ -102,8 +101,8 @@ func preregisterAndSendInvitation(userSession *models.Session, invitation *invit
 func (c AdminController) SendInvitationEmails(w http.ResponseWriter, r *http.Request) {
 
 	if err := r.ParseForm(); err != nil {
-		log.Printf("There was an error parsing form for email invitations: %v", err)
-		c.BadRequest(err, w, r)
+		log.Printf("There was an error parsing the form for email invitations: %v", err)
+		c.BadRequest(w, err, "There was an error parsing form for email invitations")
 		return
 	}
 
@@ -114,14 +113,14 @@ func (c AdminController) SendInvitationEmails(w http.ResponseWriter, r *http.Req
 	// check if the parsing succeeded
 	if err := decoder.Decode(&invitations); err != nil {
 		log.Printf("Error decoding json data for email invitations: %v", err)
-		c.Error500(err, w, r)
+		c.Error500(w, err, "Error decoding json data for email invitations")
 		return
 	}
 
 	session, userSession, err := middleware.GetUserSession(r)
 	if session == nil || err != nil {
 		log.Printf("No user session found: %v", err)
-		c.Forbidden(err, w, r)
+		c.Forbidden(w, err, "No user session found")
 	}
 
 	errorEmails := []string{}
@@ -131,7 +130,7 @@ func (c AdminController) SendInvitationEmails(w http.ResponseWriter, r *http.Req
 		if err != nil {
 			log.Printf("Error sending invitation email to %v: %v", invitation.Email, err)
 			errorEmails = append(errorEmails, invitation.Email)
-			errors = append(errors, err.Error())
+			errors = append(errors, controllers.Verbosity(err, "Could not send email to user %v", invitation.Email))
 		} else {
 			errors = append(errors, "")
 		}

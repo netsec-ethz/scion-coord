@@ -39,6 +39,7 @@ var (
 	SESSION_ENCRYPTION_KEY   = goconf.AppConf.String("session.encryption_key")
 	SESSION_VERIFICATION_KEY = goconf.AppConf.String("session.verification_key")
 	LOG_FILE                 = goconf.AppConf.String("log.file")
+	LOG_DEBUG_MODE, _        = goconf.AppConf.Bool("log.debug_mode")
 	PACKAGE_DIRECTORY        = goconf.AppConf.DefaultString("directory.package_directory",
 		filepath.Join(os.Getenv("HOME"), "scionLabConfigs"))
 	DB_NAME               = goconf.AppConf.String("db.name")

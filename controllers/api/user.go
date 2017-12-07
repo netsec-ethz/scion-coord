@@ -117,14 +117,12 @@ func populateVMStatusButtons(userEmail string) (vmInfo, uiButtons, error) {
 }
 
 // generates the user-information struct to be used in dynamic HTML pages
-func populateUserData(w http.ResponseWriter, r *http.Request) (u user, err error) {
+func populateUserData(r *http.Request) (u user, err error) {
 	// get the current user session if present.
 	// if not then, abort
 	_, userSession, err := middleware.GetUserSession(r)
 
 	if err != nil || userSession == nil {
-		log.Printf("Error authenticating user: Not logged in")
-		http.Error(w, "Error authenticating user: Not logged in", http.StatusForbidden)
 		return
 	}
 
@@ -151,18 +149,18 @@ func populateUserData(w http.ResponseWriter, r *http.Request) (u user, err error
 // API function that generates all information necessary for displaying the user page
 func (c *LoginController) UserInformation(w http.ResponseWriter, r *http.Request) {
 
-	user, err := populateUserData(w, r)
+	user, err := populateUserData(r)
 	if err != nil {
 		log.Println(err)
-		c.Forbidden(err, w, r)
+		c.Forbidden(w, err, "Error authenticating user: Not logged in")
 		return
 	}
 
 	vmInfo, buttons, err := populateVMStatusButtons(user.Email)
 	if err != nil {
-		c.Forbidden(err, w, r)
 		log.Printf("Error when generating VM info and button configuration for user %v: %v",
 			user.Email, err)
+		c.Forbidden(w, err, "Error when generating VM info and button configuration")
 		return
 	}
 
