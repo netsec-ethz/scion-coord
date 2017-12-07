@@ -40,10 +40,10 @@ const (
 type APConnectionInfo struct {
 	ASID         string // ISD-AS of the AS
 	IsVPN        bool
-	RemoteIAPort int    // port number of the remote SCIONLab AP being connected to
+	RemoteIAPort uint16 // port number of the remote SCIONLab AP being connected to
 	UserEmail    string // User identifier used for VPN, currently the user's email
-	VMIP         string // VMIP address of the SCIONLab AS
-	RemoteBR     string // The name of the remote border router
+	IP           string // IP address of the SCIONLab AS
+	RemoteBRID   uint16 // The name of the remote border router
 }
 
 // API end-point for the SCIONLab APs to query actions to be done for users' SCIONLabASes.
@@ -55,8 +55,8 @@ type APConnectionInfo struct {
 //                    "IsVPN":true,
 //                    "RemoteIAPort":50053,
 //                    "UserEmail":"user@example.com",
-//                    "VMIP":"10.0.8.42",
-//                    "RemoteBR":"br1-5-5"}]
+//                    "IP":"10.0.8.42",
+//                    "RemoteBRID":5}]
 //        }
 // }
 func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Request) {
@@ -81,9 +81,9 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 			ASID:         utility.IAString(cn.NeighborISD, cn.NeighborAS),
 			IsVPN:        cn.IsVPN,
 			UserEmail:    cn.NeighborUser,
-			VMIP:         cn.NeighborIP,
+			IP:           cn.NeighborIP,
 			RemoteIAPort: cn.RemotePort,
-			RemoteBR:     utility.BRString(apIA, cn.BRID),
+			RemoteBRID:   cn.BRID,
 		}
 		switch cn.Status {
 		case models.CREATE:
@@ -117,8 +117,8 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 //         "Removed":[],
 //         "Updated":[{"ASID":"1-1020",
 //                     "RemoteIAPort":50053,
-//                     "VMIP":"203.0.113.0",
-//                     "RemoteBR":"br1-5-5"}]
+//                     "IP":"203.0.113.0",
+//                     "RemoteBRID":5}]
 //        }
 // }
 // If sucessful, the API will return an empty JSON response with HTTP code 200.
@@ -163,13 +163,13 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 	failedConfirmations := []string{}
 	for _, cn := range cns {
 		// find the connection to the SCIONLabAS
-		slas, err := models.FindSCIONLabASByIAString(cn.ASID)
+		as, err := models.FindSCIONLabASByIAString(cn.ASID)
 		if err != nil {
 			log.Printf("Error finding SCIONLabAS %v: %v", cn.ASID, err)
 			failedConfirmations = append(failedConfirmations, cn.ASID)
 			continue
 		}
-		cn_db, err := slas.GetJoinConnectionInfoToAS(apAS.String())
+		cn_db, err := as.GetJoinConnectionInfoToAS(apAS.IA())
 		if err != nil {
 			log.Printf("Error finding the connection to SCIONLabAS %v: %v", cn.ASID, err)
 			failedConfirmations = append(failedConfirmations, cn.ASID)
@@ -177,12 +177,7 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 		}
 		switch action {
 		case CREATED, UPDATED:
-			br, err := utility.BRIDFromString(cn.RemoteBR)
-			if err != nil {
-				log.Printf("Error parsing the BR name: %v", err)
-				failedConfirmations = append(failedConfirmations, cn.ASID)
-				continue
-			}
+			br := cn.RemoteBRID
 			if br != cn_db.BRID {
 				log.Printf("Reported BR ID %v differs from stored value %v", br, cn_db.BRID)
 				failedConfirmations = append(failedConfirmations, cn.ASID)
@@ -191,16 +186,16 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 			cn_db.Status = models.ACTIVE
 		case REMOVED:
 			cn_db.Status = models.INACTIVE
-			cn_db.BRID = -1 // Set BRID to -1 for inactive connections
+			cn_db.BRID = 0 // Set BRID to -1 for inactive connections
 		default:
 			log.Printf("Unsupported action \"%v\" for AS %v. User: %v", action, cn.ASID,
 				cn_db.NeighborUser)
 			failedConfirmations = append(failedConfirmations, cn.ASID)
 			continue
 		}
-		slas.Status = cn_db.Status
-		if err = slas.UpdateASAndConnection(&cn_db); err != nil {
-			log.Printf("Error updating database tables for AS %v: %v", slas.String(), err)
+		as.Status = cn_db.Status
+		if err = as.UpdateASAndConnection(&cn_db); err != nil {
+			log.Printf("Error updating database tables for AS %v: %v", as.IA(), err)
 			failedConfirmations = append(failedConfirmations, cn.ASID)
 			continue
 		}

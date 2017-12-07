@@ -18,18 +18,25 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/astaxie/beego/orm"
+	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/models"
+	"github.com/netsec-ethz/scion-coord/utility"
 )
 
 type asInfo struct {
-	ASStatus uint8  // Current status of the AS
-	ASText   string // Text to be displayed by the frontent
-	ASIP     string // IP address of the AS
-	ShowIP   bool   // whether frontend should print the IP address
-	ShowVPN  bool   // whether frontend should print the VPN info
-	IA       string // ISD-AS information of the user's SCIONLab AS
+	ASID    int       // AS ID of the user's SCIONLab AS
+	ISD     int       // Current ISD of the user's SCIONLab AS
+	IA      string    // ISD-AS string of the AS
+	Label   string    // Label of the AS
+	Status  uint8     // Current status of the AS
+	IP      string    // IP address of the AS
+	Type    uint8     // Type of the SCIONLab AS
+	IsVPN   bool      // Is this a VPN-based setup
+	AP      string    // ISD-AS of the connected Attachment Point
+	Port    uint16    // Port of BR on the user's AS
+	ASText  string    // Text to be displayed by the frontend
+	Buttons uiButtons // Buttons shown for this AS
 }
 
 type buttonConfiguration struct {
@@ -42,82 +49,103 @@ type buttonConfiguration struct {
 }
 
 type uiButtons struct {
-	Update   buttonConfiguration // Button to create or update AS
-	Download buttonConfiguration // Button to re-download AS
-	Remove   buttonConfiguration // Button to remove AS
+	Configure  buttonConfiguration // Button to create or update AS
+	Download   buttonConfiguration // Button to re-download AS
+	Disconnect buttonConfiguration // Button to remove AS
 }
 
 type userPageData struct {
-	User      user
-	ASInfo    asInfo
-	UIButtons uiButtons
+	User    user
+	MaxASes int // maximal number of ASes this user can have
+	APs     []string
+	ASInfos []asInfo
 }
 
 // generates the structs containing information about the user's AS and the
 // configuration of UI buttons
-func populateASStatusButtons(userEmail string) (asInfo, uiButtons, error) {
-	asInfo := asInfo{}
-	buttons := uiButtons{
-		Update: buttonConfiguration{
-			Text:            "Update and Download SCIONLab AS Configuration",
-			Action:          "update",
-			TooltipDisabled: "Updates are disabled as you have a pending request.",
-			Disable:         true,
-		},
-		Download: buttonConfiguration{
-			Text:            "Re-download my SCIONLab AS Configuration",
-			Action:          "download",
-			TooltipDisabled: "You currently do not have an active AS configuration.",
-		},
-		Remove: buttonConfiguration{
-			Text:            "Remove my SCIONLab AS Configuration",
-			Class:           "btn-danger",
-			Action:          "remove",
-			TooltipDisabled: "You currently do not have an active AS configuration.",
-			Disable:         true,
-		},
-	}
-
-	as, err := models.FindOneSCIONLabASByUserEmail(userEmail)
+func populateASStatusButtons(userEmail string) ([]asInfo, []string, error) {
+	asInfos := []asInfo{}
+	apInfos := []string{}
+	ases, err := models.FindSCIONLabASesByUserEmail(userEmail)
 	if err != nil {
-		if err != orm.ErrNoRows {
-			return asInfo, buttons, err
-		}
-	} else {
-		asInfo.ASIP = as.PublicIP
-		asInfo.ASStatus = as.Status
-		asInfo.IA = as.String()
+		return asInfos, apInfos, err
 	}
-	switch asInfo.ASStatus {
-	case models.INACTIVE:
-		asInfo.ASText = "You currently do not have an active SCIONLab AS."
-		buttons.Update.Text = "Create and Download SCIONLab AS Configuration"
-		buttons.Update.Disable = false
-		buttons.Download.Hide = true
-		buttons.Remove.Hide = true
-	case models.ACTIVE:
-		asInfo.ASText = "You currently have an active SCIONLab AS."
-		buttons.Update.Disable = false
-		buttons.Remove.Disable = false
-	case models.CREATE:
-		asInfo.ASText = "You have a pending creation request for your SCIONLab AS."
-	case models.UPDATE:
-		asInfo.ASText = "You have a pending update request for your SCIONLab AS."
-	case models.REMOVE:
-		asInfo.ASText = "Your SCIONLab AS configuration is currently scheduled for removal."
-		buttons.Download.Disable = true
+	aps, err := models.GetAllAPs()
+	if err != nil {
+		return asInfos, apInfos, err
 	}
-	if asInfo.ASStatus == models.ACTIVE || asInfo.ASStatus == models.CREATE ||
-		asInfo.ASStatus == models.UPDATE {
-		// TODO(mlegner): This is only a temporary fix until multiple connections are implemented
-		if as.PublicIP == "" {
-			asInfo.ShowVPN = true
-		} else {
-			asInfo.ShowIP = true
+	for _, ap := range aps {
+		// TODO(mlegner): Add label
+		apInfos = append(apInfos, ap.IA())
+	}
+	for _, as := range ases {
+		buttons := uiButtons{
+			Configure: buttonConfiguration{
+				Text:            "Update and Download SCIONLab AS Configuration",
+				Action:          "update",
+				TooltipDisabled: "Updates are disabled as you have a pending request.",
+				Disable:         true,
+			},
+			Download: buttonConfiguration{
+				Text:            "Re-download my SCIONLab AS Configuration",
+				Action:          "download",
+				TooltipDisabled: "You currently do not have an active AS configuration.",
+			},
+			Disconnect: buttonConfiguration{
+				Text:            "Disconnect my SCIONLab AS from the Network",
+				Class:           "btn-danger",
+				Action:          "remove",
+				TooltipDisabled: "You currently do not have an active AS configuration.",
+				Disable:         true,
+			},
 		}
+
+		asI := asInfo{
+			ASID:   as.ASID,
+			ISD:    as.ISD,
+			IA:     as.IA(),
+			Label:  as.Label,
+			Status: as.Status,
+			IP:     as.PublicIP,
+			Type:   as.Type,
+			Port:   as.StartPort,
+		}
+
+		cns, err := as.GetJoinConnectionInfo()
+		if err != nil {
+			return asInfos, apInfos, err
+		}
+		// TODO(mlegner): Currently only one connection allowed
+		if len(cns) > 0 {
+			asI.IsVPN = cns[0].IsVPN
+			asI.AP = utility.IAString(cns[0].NeighborISD, cns[0].NeighborAS)
+		}
+
+		switch asI.Status {
+		case models.INACTIVE:
+			asI.ASText = "This AS is currently inactive."
+			buttons.Configure.Text = "Create and Download SCIONLab AS Configuration"
+			buttons.Configure.Disable = false
+			buttons.Download.Hide = true
+			buttons.Disconnect.Hide = true
+		case models.ACTIVE:
+			asI.ASText = "This AS is currently active."
+			buttons.Configure.Disable = false
+			buttons.Disconnect.Disable = false
+		case models.CREATE:
+			asI.ASText = "You have a pending creation request for your SCIONLab AS."
+		case models.UPDATE:
+			asI.ASText = "You have a pending update request for your SCIONLab AS."
+		case models.REMOVE:
+			asI.ASText = "Your SCIONLab AS configuration is currently scheduled for removal."
+			buttons.Download.Disable = true
+		}
+		asI.Buttons = buttons
+
+		asInfos = append(asInfos, asI)
 	}
 
-	return asInfo, buttons, nil
+	return asInfos, apInfos, nil
 }
 
 // generates the user-information struct to be used in dynamic HTML pages
@@ -160,7 +188,7 @@ func (c *LoginController) UserInformation(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	asInfo, buttons, err := populateASStatusButtons(user.Email)
+	aI, aps, err := populateASStatusButtons(user.Email)
 	if err != nil {
 		log.Printf("Error when generating AS info and button configuration for user %v: %v",
 			user.Email, err)
@@ -169,9 +197,10 @@ func (c *LoginController) UserInformation(w http.ResponseWriter, r *http.Request
 	}
 
 	userData := userPageData{
-		User:      user,
-		ASInfo:    asInfo,
-		UIButtons: buttons,
+		User:    user,
+		MaxASes: config.MaxASes(user.IsAdmin),
+		ASInfos: aI,
+		APs:     aps,
 	}
 
 	c.JSON(&userData, w, r)

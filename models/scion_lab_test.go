@@ -24,7 +24,7 @@ var (
 	u3Email = "mail3"
 
 	// SCIONLabASes
-	slas1 = &SCIONLabAS{
+	as1 = &SCIONLabAS{
 		UserEmail: u1Email,
 		PublicIP:  "1.2.3.4",
 		StartPort: 50000,
@@ -33,7 +33,7 @@ var (
 		Status:    ACTIVE,
 		Type:      BOX,
 	}
-	slas2 = &SCIONLabAS{
+	as2 = &SCIONLabAS{
 		UserEmail: u2Email,
 		StartPort: 50000,
 		ISD:       1,
@@ -41,7 +41,7 @@ var (
 		Status:    INACTIVE,
 		Type:      VM,
 	}
-	slas3 = &SCIONLabAS{
+	as3 = &SCIONLabAS{
 		UserEmail: u3Email,
 		PublicIP:  "6.4.9.4",
 		StartPort: 50000,
@@ -68,7 +68,7 @@ var (
 	cn1 = Connection{
 		JoinIP:        "10.0.0.3",
 		RespondIP:     ap1.VPNIP,
-		JoinAS:        slas2,
+		JoinAS:        as2,
 		RespondAP:     ap1,
 		JoinBRID:      2,
 		RespondBRID:   6,
@@ -78,9 +78,9 @@ var (
 		RespondStatus: ACTIVE,
 	}
 	cn2 = Connection{
-		JoinIP:        slas1.PublicIP,
-		RespondIP:     slas3.PublicIP,
-		JoinAS:        slas1,
+		JoinIP:        as1.PublicIP,
+		RespondIP:     as3.PublicIP,
+		JoinAS:        as1,
 		RespondAP:     ap2,
 		JoinBRID:      2,
 		RespondBRID:   1,
@@ -92,7 +92,7 @@ var (
 	cn3 = Connection{
 		JoinIP:        "62.0.0.53",
 		RespondIP:     ap2.VPNIP,
-		JoinAS:        slas2,
+		JoinAS:        as2,
 		RespondAP:     ap2,
 		JoinBRID:      4,
 		RespondBRID:   7,
@@ -119,22 +119,22 @@ func TestSCIONLabAS(t *testing.T) {
 	}
 
 	t.Run("Insert SCIONLabASes", func(t *testing.T) {
-		err := slas1.Insert()
+		err := as1.Insert()
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = slas2.Insert()
+		err = as2.Insert()
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = slas3.Insert()
+		err = as3.Insert()
 		if err != nil {
 			t.Fatal(err)
 		}
 	})
 
 	t.Run("Insert APs", func(t *testing.T) {
-		// SLAS1 & 3 are attachment Points
+		// AS1 & AS3 are attachment Points
 		err := ap1.Insert()
 		if err != nil {
 			t.Fatal(err)
@@ -143,14 +143,14 @@ func TestSCIONLabAS(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// Link AP to SLAS
-		slas1.AP = ap1
-		err = slas1.Update()
+		// Link AP to AS
+		as1.AP = ap1
+		err = as1.Update()
 		if err != nil {
 			t.Fatal(err)
 		}
-		slas3.AP = ap2
-		err = slas3.Update()
+		as3.AP = ap2
+		err = as3.Update()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -199,8 +199,8 @@ func TestSCIONLabAS(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, slas := range smail1 {
-			t.Logf("FindSCIONLabASesByUserEmail mail1: %v", slas)
+		for _, as := range smail1 {
+			t.Logf("FindSCIONLabASesByUserEmail mail1: %v", as)
 		}
 		// Test FindSCIONLabASesByIP
 		sIP, err := FindSCIONLabASesByIP("1.2.3.4")
@@ -227,9 +227,9 @@ func TestSCIONLabAS(t *testing.T) {
 	})
 
 	t.Run("Find and update Connections", func(t *testing.T) {
-		s1 := slas1
-		s2 := slas2
-		s3 := slas3
+		s1 := as1
+		s2 := as2
+		s3 := as3
 
 		// Test GetConnectionInfo for all ASes
 		cns1, err := s1.GetConnectionInfo()
@@ -325,13 +325,13 @@ func TestSCIONLabAS(t *testing.T) {
 	if err := ap2.Delete(); err != nil {
 		t.Error(err)
 	}
-	if err := slas1.Delete(); err != nil {
+	if err := as1.Delete(); err != nil {
 		t.Error(err)
 	}
-	if err := slas2.Delete(); err != nil {
+	if err := as2.Delete(); err != nil {
 		t.Error(err)
 	}
-	if err := slas3.Delete(); err != nil {
+	if err := as3.Delete(); err != nil {
 		t.Error(err)
 	}
 

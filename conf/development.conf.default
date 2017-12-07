@@ -71,6 +71,16 @@ virtualCredit.enable = false
 virtualCredit.startCredit = 100
 
 # General settings
-ap_ia = "1-7"
+# Standard port for border routers
 start_port = 50000
+# Maximal number of border routers in one AS
+max_br_id = 1000
+# First ID given to users' ASes
 base_as_id = 1000
+# Reserve first few BR IDs of INFRASTRUCTURE ASes for custom configuration
+reserved_brs_infrastructure = 10
+# Maximal number of ASes a user or admin can have
+ases_per_user = 2
+ases_per_admin = 10
+# ASes signing certificates for new ASes in each ISD starting by ISD1, separated by ";"
+signing_ases = 1;21;31

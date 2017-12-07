@@ -40,9 +40,9 @@ type ConnectionWithCredits struct {
 }
 
 // Look for all connection to and from this AS and calculates the necessary credits for it
-func (as *ASInfo) ListConnections() ([]ConnectionWithCredits, error) {
+func (asInfo *ASInfo) ListConnections() ([]ConnectionWithCredits, error) {
 	var connections []ConnectionWithCredits
-	isdas := utility.IAString(as.ISD, as.ASID)
+	isdas := utility.IAString(asInfo.ISD, asInfo.ASID)
 
 	// Outgoing ones (this AS pays for)
 	var outGoings []ConnRequest
@@ -87,11 +87,11 @@ func (as *ASInfo) ListConnections() ([]ConnectionWithCredits, error) {
 
 // Changes the Credits the AS has. CreditsDiff can be negative to subtract and be positive to add
 // Credits
-func (as *ASInfo) UpdateCurrency(CreditsDiff int64) error {
-	slas, err := FindSCIONLabASByASInfo(*as)
+func (asInfo *ASInfo) UpdateCurrency(CreditsDiff int64) error {
+	as, err := FindSCIONLabASByASInfo(*asInfo)
 	if err != nil {
 		return err
 	}
-	slas.Credits += CreditsDiff
-	return slas.Update()
+	as.Credits += CreditsDiff
+	return as.Update()
 }

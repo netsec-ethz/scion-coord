@@ -16,7 +16,9 @@ package utility
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"html/template"
 	"io"
 	"net"
 	"os"
@@ -78,30 +80,30 @@ func IPCompare(ip1, ip2 string) int8 {
 }
 
 // Create IA string from ISD and AS IDs
-func IAString(isd, as int) string {
+func IAString(isd, as interface{}) string {
 	return fmt.Sprintf("%v-%v", isd, as)
 }
 
 // Parses a BR name and returns the BRID
-func BRIDFromString(s string) (int, error) {
+func BRIDFromString(s string) (uint16, error) {
 	parts := strings.Split(s, "-")
 	if len(parts) != 3 {
 		return 0, fmt.Errorf("Invalid BR name structure: %v", s)
 	}
-	id, err := strconv.Atoi(parts[2])
+	id, err := strconv.ParseInt(parts[2], 10, 16)
 	if err != nil {
 		return 0, fmt.Errorf("Unable to parse BRID: %v", err)
 	}
-	return id, nil
+	return uint16(id), nil
 }
 
 // Creates BR name from IA string and BRID
-func BRString(ia string, id int) string {
+func BRString(ia string, id uint16) string {
 	return fmt.Sprintf("br%v-%v", ia, id)
 }
 
-// Returns the smallest integer >= min that is not present in the given ids
-func GetFreeID(ids []int, min int) int {
+// Returns the smallest integer in the range [min, max] that is not present in the given ids
+func GetFreeID(ids []int, min, max int) (int, error) {
 	res := min
 	sort.Ints(ids)
 	for _, i := range ids {
@@ -113,5 +115,28 @@ func GetFreeID(ids []int, min int) int {
 		}
 		break
 	}
-	return res
+	if res > max {
+		return 0, errors.New("No free ID found")
+	}
+	return res, nil
+}
+
+// general helper function which fills a template with given data and saves it
+// to the specified path
+func FillTemplateAndSave(templatePath string, data interface{}, savePath string) error {
+	t, err := template.ParseFiles(templatePath)
+	if err != nil {
+		return fmt.Errorf("Error parsing template %v: %v", templatePath, err)
+	}
+	f, err := os.Create(savePath)
+	if err != nil {
+		return fmt.Errorf("Error creating file %v: %v", savePath, err)
+	}
+	err = t.Execute(f, data)
+	f.Close()
+
+	if err != nil {
+		return fmt.Errorf("Error executing template file %v: %v", templatePath, err)
+	}
+	return nil
 }
