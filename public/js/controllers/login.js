@@ -11,14 +11,52 @@ scionApp
                     },
                     function (response) {
                         console.log(response);
-                        if (response.data.substring(0,3) === "900") {
-                            $rootScope.resendAddress = user.email;
-                            $location.path('/resend');
-                        } else{
-                            $scope.error = "Failed to log you in: Make sure your email address \
-                                and password are correct and your email address is verified."
-                            $scope.message = "";
+
+                        let err;
+                        switch (response.data.substring(0,3)) {
+                            case "901":
+                                err = "Your username/password combination is incorrect. Please " +
+                                    "try again or reset the password with the link below.";
+                                $scope.showReset = true;
+                                break;
+                            case "900":
+	                            $rootScope.resendAddress = user.email;
+	                            $location.path('/resend');
+                                break;
+                            case "902":
+                                err = "You have not set a valid password. Please check your " +
+                                    "email and follow the link to set a new password";
+                                break;
+                            default:
+                                err = "Failed to log you in: Make sure your email address and " +
+                                    "password are correct and your email address is verified.";
                         }
+                        $scope.error = err;
+                        $scope.message = "";
                     });
             };
- }]);
+
+            // reset password
+            $scope.resetPassword = function (email) {
+                loginService.resetPassword(email).then(
+                    function (data) {
+                        $scope.error = "";
+                        $scope.message = "Your password has been reset. You will receive an " +
+                            "email with further instructions.";
+                    },
+                    function (response) {
+                        console.log(response);
+                        $scope.error = response.data;
+                        $scope.message = "";
+                    }
+                )
+            };
+
+            $scope.dismissSuccess = function () {
+                $scope.message = "";
+            };
+
+            $scope.dismissError = function () {
+                $scope.error = "";
+            };
+        }]);
