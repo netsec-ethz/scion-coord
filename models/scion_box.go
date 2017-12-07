@@ -22,6 +22,7 @@ type SCIONBox struct {
 	UserEmail      string
 	ISD            int `orm:"default(0)"`
 	AS             int `orm:"default(0)"`
+	InternalIP     string
 	Shipping       string
 	OpenPorts      int `orm:"default(0)"` // Number of free ports UDP ports starting from StartPort
 	StartPort      int `orm:"default(50000)"`

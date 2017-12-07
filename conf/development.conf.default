@@ -76,5 +76,5 @@ virtualCredit.enable = false
 # 1 Credit = 10 MegaBits/s worth of bandwidth
 virtualCredit.startCredit = 100
 
-# HeartBeat period in hours
+# HeartBeat period in minutes
 heartbeat.period = 1

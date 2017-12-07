@@ -60,7 +60,7 @@ type SCIONBoxController struct {
 //		    }
 func (s *SCIONBoxController) InitializeBox(w http.ResponseWriter, r *http.Request) {
 	// Parse the arguments
-	_, ip, external_ip, mac, openPorts, startPort, err := s.parseRequest(r)
+	_, internal_ip, external_ip, mac, openPorts, startPort, err := s.parseRequest(r)
 	if err != nil {
 		log.Printf("Error parsing parameters and source IP: %v", err)
 		s.BadRequest(err, w, r)
@@ -76,6 +76,7 @@ func (s *SCIONBoxController) InitializeBox(w http.ResponseWriter, r *http.Reques
 	// Update Connectivity info of the Box
 	sb.StartPort = startPort
 	sb.OpenPorts = openPorts
+	sb.InternalIP = internal_ip
 	sb.Update()
 	if err != nil {
 		log.Printf("Error updating the box connection info: %v, %v", openPorts, err)
@@ -98,7 +99,7 @@ func (s *SCIONBoxController) InitializeBox(w http.ResponseWriter, r *http.Reques
 			s.Error500(err, w, r)
 		}
 	} else {
-		s.initializeOldBox(sb, slas, ip, mac, w, r)
+		s.initializeOldBox(sb, slas, external_ip, mac, w, r)
 	}
 }
 
@@ -169,25 +170,22 @@ func (s *SCIONBoxController) parseRequest(r *http.Request) (bool, string, string
 		return false, "", "", "", 0, 0, err
 	}
 	mac_address := request.MacAddress
-	ip := request.IPAddress
-	sourceIP, err := s.getSourceIP(r)
+	internal_ip := request.IPAddress
+	external_ip, err := s.getSourceIP(r)
 	if err != nil {
 		return false, "", "", "", 0, 0, err
 	}
 	// Check if the box is behind a NAT or not
-	var external_ip string
-	if utility.IPCompare(sourceIP, ip) == 0 {
+	if utility.IPCompare(external_ip, internal_ip) == 0 {
 		isNAT = false
-		external_ip = ip
 	} else {
 		isNAT = true
-		external_ip = sourceIP
 	}
 	// parse the Connection results
 	openPorts := request.OpenPorts
 	startPort := request.StartPort
-	log.Printf("isNAT: %t, source_ip: %v, ip_address: %v, Connections: %v", isNAT, sourceIP, ip, openPorts)
-	return isNAT, ip, external_ip, mac_address, openPorts, startPort, nil
+	log.Printf("isNAT: %t, internal_ip: %v, external_ip: %v, Connections: %v", isNAT, internal_ip, external_ip, openPorts)
+	return isNAT, internal_ip, external_ip, mac_address, openPorts, startPort, nil
 }
 
 type initReply struct {
@@ -313,10 +311,10 @@ func (s *SCIONBoxController) ConnectNewBox(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	// Get the Reqeust IP
-	ip := req.IP
+	external_ip := req.IP
 	isd := sb.ISD
 	// Update the Database with the new ScionLabAS
-	slas, err := s.updateDBnewSB(sb, neighbors, isd, ip)
+	slas, err := s.updateDBnewSB(sb, neighbors, isd, external_ip)
 	if err != nil {
 		log.Printf("Updating the Database, %v", err)
 		s.Error500(err, w, r)
@@ -518,6 +516,11 @@ func (s *SCIONBoxController) topologyFile(slas *models.SCIONLabAS) string {
 // JSON file.
 func (s *SCIONBoxController) generateTopologyFile(slas *models.SCIONLabAS) error {
 	log.Printf("Generating topology file for SCIONLab Box")
+	sb, err := models.FindSCIONBoxByIAint(slas.ISD, slas.AS)
+	if err != nil {
+		return fmt.Errorf("Error looking for SCIONBox. User: %v, %v",
+			slas.UserMail, err)
+	}
 	t, err := template.ParseFiles("templates/simple_box_config_topo.tmpl")
 	if err != nil {
 		return fmt.Errorf("Error parsing topology template config. User: %v, %v",
@@ -536,12 +539,13 @@ func (s *SCIONBoxController) generateTopologyFile(slas *models.SCIONLabAS) error
 		LOCAL_PORT   string
 		TARGET_ISDAS string
 		IP           string
+		IP_LOCAL     string
 		BIND_IP      string
 		BIND_PORT    string
 		COMMA        string
 		ID           string
 		LINK_TYPE    string
-		BR_PORT		 string
+		BR_PORT      string
 	}
 	type Topo struct {
 		ISD_ID string
@@ -570,11 +574,12 @@ func (s *SCIONBoxController) generateTopologyFile(slas *models.SCIONLabAS) error
 			LOCAL_PORT:   strconv.Itoa(br.LocalPort),
 			TARGET_ISDAS: ia.String(),
 			IP:           slas.PublicIP,
-			BIND_IP:      slas.PublicIP,
+			IP_LOCAL:     sb.InternalIP,
+			BIND_IP:      sb.InternalIP,
 			BIND_PORT:    strconv.Itoa(br.LocalPort),
 			ID:           strconv.Itoa(br.BRID),
 			LINK_TYPE:    linktype,
-			BR_PORT:	  strconv.Itoa(BR_START_PORT + i),
+			BR_PORT:      strconv.Itoa(BR_START_PORT + i),
 		}
 		// if last neighbor do not add the Comma to the end
 		if i == len(brs)-1 {
@@ -935,7 +940,7 @@ func findCnInNbs(cn models.ConnectionInfo, neighbors []CurrentCn) bool {
 // goroutine that periodically checks the time between the time the SLAS called the Heartbeat API
 // if the time is 10 times the HBPERIOD status is set to INACTIVE
 func (s *SCIONBoxController) checkHBStatus(Isd int, As int) {
-	time.Sleep(HeartBeatPeriod * time.Hour)
+	time.Sleep(HeartBeatPeriod * time.Minute)
 	for true {
 		slas, err := models.FindSCIONLabASByIAInt(Isd, As)
 		if err != nil {
@@ -946,7 +951,7 @@ func (s *SCIONBoxController) checkHBStatus(Isd int, As int) {
 			}
 		}
 		delta := time.Now().Sub(slas.Updated)
-		if delta.Hours() > float64(10*HeartBeatPeriod) {
+		if delta.Minutes() > float64(10*HeartBeatPeriod) {
 			if slas.Status != models.INACTIVE {
 				log.Printf("AS Status set to inactive, AS: %v, Time since last HB: %v", slas, delta)
 				slas.Status = models.INACTIVE
@@ -954,7 +959,7 @@ func (s *SCIONBoxController) checkHBStatus(Isd int, As int) {
 			}
 
 		}
-		time.Sleep(HeartBeatPeriod * time.Hour)
+		time.Sleep(HeartBeatPeriod * time.Minute)
 	}
 }
 
