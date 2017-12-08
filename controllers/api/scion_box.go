@@ -29,6 +29,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/astaxie/beego/orm"
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/models"
@@ -768,7 +769,16 @@ func (s *SCIONBoxController) HeartBeatFunction(w http.ResponseWriter, r *http.Re
 		s.Error500(err, w, r)
 		return
 	}
-	ip := req.IP
+	vars := mux.Vars(r)
+	account_id := vars["account_id"]
+	secret := vars["secret"]
+	log.Printf("account_id: %v secret: %v", account_id, secret)
+	ip, err := s.getSourceIP(r)
+	if err != nil {
+		log.Printf("Error retrivieng source IP: %v", account_id, secret)
+		s.Error500(err, w, r)
+		return
+	}
 	var needGen = false
 	var slasList []*models.SCIONLabAS
 	for _, ia := range req.IAList {
@@ -782,6 +792,19 @@ func (s *SCIONBoxController) HeartBeatFunction(w http.ResponseWriter, r *http.Re
 				s.Error500(err, w, r)
 				return
 			}
+		}
+		// check if IA belongs to credentials
+		u, err := models.FindUserByEmail(slas.UserMail)
+		if err != nil{
+			log.Printf("Error looking for user: %v", account_id, secret)
+			s.Error500(err, w, r)
+			return
+		}
+		account := u.Account
+		if account_id != account.AccountId || secret != account.Secret{
+			log.Printf("HB requested for not belonging IA", ia, slas.UserMail)
+			s.Error500(err, w, r)
+			return
 		}
 		// check if box needs an update
 		if slas.Status == models.UPDATE {

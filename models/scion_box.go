@@ -14,7 +14,9 @@
 
 package models
 
-import "time"
+import (
+	"time"
+)
 
 type SCIONBox struct {
 	ID             uint64 `orm:"column(id);auto;pk"`
@@ -47,28 +49,6 @@ func FindSCIONBoxByIAint(Isd int, As int) (*SCIONBox, error) {
 	v := new(SCIONBox)
 	err := o.QueryTable(v).Filter("ISD", Isd).Filter("AS", As).RelatedSel().One(v)
 	return v, err
-}
-
-func FindSCIONBoxByIdSecret(acc_id string, secret string) (*SCIONBox, error) {
-	acc, err := FindUserByAccountIdSecret(acc_id, secret)
-	if err != nil {
-		return nil, err
-	}
-	var boxFound bool
-	var sb *SCIONBox
-	for _, user := range acc.Users {
-		// check if user has a box
-		sb, err = FindSCIONBoxByEMail(user.Email)
-		boxFound = false
-		if err == nil {
-			boxFound = true
-			break
-		}
-	}
-	if boxFound {
-		return sb, nil
-	}
-	return nil, err
 }
 
 func (sb *SCIONBox) Insert() error {
