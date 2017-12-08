@@ -16,6 +16,7 @@ package api
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"log"
 	"net/http"
 
@@ -31,7 +32,8 @@ type AdminController struct {
 }
 
 type adminPageData struct {
-	User user
+	User         user
+	EmailMessage string
 }
 
 type invitationInfo struct {
@@ -46,23 +48,29 @@ type emailTemplateInfo struct {
 	LastName         string
 	InviterFirstName string
 	InviterLastName  string
+	Protocol         string
 	HostAddress      string
 	UUID             string
 }
 
 type invitationsData []invitationInfo
 
-func (c AdminController) AdminInformation(w http.ResponseWriter, r *http.Request) {
+var invitationsTemplate = "invitation.html"
 
-	user, err := populateUserData(w, r)
+func (c AdminController) AdminInformation(w http.ResponseWriter, r *http.Request) {
+	user, err := populateUserData(r)
 	if err != nil {
-		log.Println(err)
-		c.Forbidden(err, w, r)
+		log.Printf("Error authenticating user: %v", err)
+		c.Forbidden(w, err, "Error authenticating user")
 		return
 	}
 
+	// TODO (mlegner): Fill in template except FirstName and LastName
+	text, err := ioutil.ReadFile(email.EmailTemplatePath(invitationsTemplate))
+
 	adminData := adminPageData{
-		User: user,
+		User:         user,
+		EmailMessage: string(text),
 	}
 
 	c.JSON(&adminData, w, r)
@@ -89,12 +97,17 @@ func preregisterAndSendInvitation(userSession *models.Session, invitation *invit
 		LastName:         invitation.LastName,
 		InviterFirstName: userSession.First,
 		InviterLastName:  userSession.Last,
+		Protocol:         config.HTTP_PROTOCOL,
 		HostAddress:      config.HTTP_HOST_ADDRESS,
 		UUID:             user.VerificationUUID,
 	}
 
-	email.ConstructAndSend("invitation.html", "[SCIONLab] Invitation to join the SCION network",
-		data, "scion-invitation", invitation.Email)
+	email.ConstructAndSend(
+		"invitation.html",
+		"[SCIONLab] Invitation to join the SCION network",
+		data,
+		"scion-invitation",
+		invitation.Email)
 
 	return nil
 }
@@ -102,8 +115,8 @@ func preregisterAndSendInvitation(userSession *models.Session, invitation *invit
 func (c AdminController) SendInvitationEmails(w http.ResponseWriter, r *http.Request) {
 
 	if err := r.ParseForm(); err != nil {
-		log.Printf("There was an error parsing form for email invitations: %v", err)
-		c.BadRequest(err, w, r)
+		log.Printf("There was an error parsing the form for email invitations: %v", err)
+		c.BadRequest(w, err, "There was an error parsing form for email invitations")
 		return
 	}
 
@@ -114,14 +127,14 @@ func (c AdminController) SendInvitationEmails(w http.ResponseWriter, r *http.Req
 	// check if the parsing succeeded
 	if err := decoder.Decode(&invitations); err != nil {
 		log.Printf("Error decoding json data for email invitations: %v", err)
-		c.Error500(err, w, r)
+		c.Error500(w, err, "Error decoding json data for email invitations")
 		return
 	}
 
 	session, userSession, err := middleware.GetUserSession(r)
 	if session == nil || err != nil {
 		log.Printf("No user session found: %v", err)
-		c.Forbidden(err, w, r)
+		c.Forbidden(w, err, "No user session found")
 	}
 
 	errorEmails := []string{}
@@ -131,7 +144,7 @@ func (c AdminController) SendInvitationEmails(w http.ResponseWriter, r *http.Req
 		if err != nil {
 			log.Printf("Error sending invitation email to %v: %v", invitation.Email, err)
 			errorEmails = append(errorEmails, invitation.Email)
-			errors = append(errors, err.Error())
+			errors = append(errors, controllers.Verbosity(err, "Could not send email to user %v", invitation.Email))
 		} else {
 			errors = append(errors, "")
 		}

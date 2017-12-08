@@ -39,6 +39,7 @@ var (
 	SESSION_ENCRYPTION_KEY   = goconf.AppConf.String("session.encryption_key")
 	SESSION_VERIFICATION_KEY = goconf.AppConf.String("session.verification_key")
 	LOG_FILE                 = goconf.AppConf.String("log.file")
+	LOG_DEBUG_MODE, _        = goconf.AppConf.Bool("log.debug_mode")
 	PACKAGE_DIRECTORY        = goconf.AppConf.DefaultString("directory.package_directory",
 		filepath.Join(os.Getenv("HOME"), "scionLabConfigs"))
 	ISD_LOCATION_MAPPING  = goconf.AppConf.String("directory.isd_location_map")
@@ -62,6 +63,13 @@ var (
 
 	// Local IP address in VM; this is a default set by
 	// vagrant and may have to be adjusted if vagrant configuration is changed
-	VM_LOCAL_IP  = "10.0.2.15"
+	VM_LOCAL_IP   = "10.0.2.15"
+	HTTP_PROTOCOL = "http"
 	HB_PERIOD, _ = goconf.AppConf.Int("heartbeat.period")
 )
+
+func init() {
+	if HTTP_ENABLE_HTTPS {
+		HTTP_PROTOCOL = "https"
+	}
+}

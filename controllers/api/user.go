@@ -15,6 +15,7 @@
 package api
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -24,11 +25,12 @@ import (
 )
 
 type vmInfo struct {
-	VMStatus uint8
-	VMText   string
-	VMIP     string
-	ShowIP   bool
-	ShowVPN  bool
+	VMStatus uint8  // Current status of the VM
+	VMText   string // Text to be displayed by the frontent
+	VMIP     string // IP address of the VM
+	ShowIP   bool   // whether frontend should print the IP address
+	ShowVPN  bool   // whether frontend should print the VPN info
+	IA       string // ISD-AS information of the user's SCIONLab AS
 }
 
 type buttonConfiguration struct {
@@ -85,6 +87,7 @@ func populateVMStatusButtons(userEmail string) (vmInfo, uiButtons, error) {
 	} else {
 		vmInfo.VMIP = vm.IP
 		vmInfo.VMStatus = vm.Status
+		vmInfo.IA = fmt.Sprintf("%d-%d", vm.IA.Isd, vm.IA.As)
 	}
 	switch vmInfo.VMStatus {
 	case INACTIVE:
@@ -117,14 +120,12 @@ func populateVMStatusButtons(userEmail string) (vmInfo, uiButtons, error) {
 }
 
 // generates the user-information struct to be used in dynamic HTML pages
-func populateUserData(w http.ResponseWriter, r *http.Request) (u user, err error) {
+func populateUserData(r *http.Request) (u user, err error) {
 	// get the current user session if present.
 	// if not then, abort
 	_, userSession, err := middleware.GetUserSession(r)
 
 	if err != nil || userSession == nil {
-		log.Printf("Error authenticating user: Not logged in")
-		http.Error(w, "Error authenticating user: Not logged in", http.StatusForbidden)
 		return
 	}
 
@@ -151,18 +152,18 @@ func populateUserData(w http.ResponseWriter, r *http.Request) (u user, err error
 // API function that generates all information necessary for displaying the user page
 func (c *LoginController) UserInformation(w http.ResponseWriter, r *http.Request) {
 
-	user, err := populateUserData(w, r)
+	user, err := populateUserData(r)
 	if err != nil {
 		log.Println(err)
-		c.Forbidden(err, w, r)
+		c.Forbidden(w, err, "Error authenticating user: Not logged in")
 		return
 	}
 
 	vmInfo, buttons, err := populateVMStatusButtons(user.Email)
 	if err != nil {
-		c.Forbidden(err, w, r)
 		log.Printf("Error when generating VM info and button configuration for user %v: %v",
 			user.Email, err)
+		c.Forbidden(w, err, "Error when generating VM info and button configuration")
 		return
 	}
 
