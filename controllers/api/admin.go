@@ -16,6 +16,7 @@ package api
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"log"
 	"net/http"
 
@@ -31,7 +32,8 @@ type AdminController struct {
 }
 
 type adminPageData struct {
-	User user
+	User         user
+	EmailMessage string
 }
 
 type invitationInfo struct {
@@ -46,11 +48,14 @@ type emailTemplateInfo struct {
 	LastName         string
 	InviterFirstName string
 	InviterLastName  string
+	Protocol         string
 	HostAddress      string
 	UUID             string
 }
 
 type invitationsData []invitationInfo
+
+var invitationsTemplate = "invitation.html"
 
 func (c AdminController) AdminInformation(w http.ResponseWriter, r *http.Request) {
 	user, err := populateUserData(r)
@@ -60,8 +65,12 @@ func (c AdminController) AdminInformation(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// TODO (mlegner): Fill in template except FirstName and LastName
+	text, err := ioutil.ReadFile(email.EmailTemplatePath(invitationsTemplate))
+
 	adminData := adminPageData{
-		User: user,
+		User:         user,
+		EmailMessage: string(text),
 	}
 
 	c.JSON(&adminData, w, r)
@@ -88,12 +97,17 @@ func preregisterAndSendInvitation(userSession *models.Session, invitation *invit
 		LastName:         invitation.LastName,
 		InviterFirstName: userSession.First,
 		InviterLastName:  userSession.Last,
+		Protocol:         config.HTTP_PROTOCOL,
 		HostAddress:      config.HTTP_HOST_ADDRESS,
 		UUID:             user.VerificationUUID,
 	}
 
-	email.ConstructAndSend("invitation.html", "[SCIONLab] Invitation to join the SCION network",
-		data, "scion-invitation", invitation.Email)
+	email.ConstructAndSend(
+		"invitation.html",
+		"[SCIONLab] Invitation to join the SCION network",
+		data,
+		"scion-invitation",
+		invitation.Email)
 
 	return nil
 }

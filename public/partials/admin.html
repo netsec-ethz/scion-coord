@@ -1,9 +1,18 @@
 <div class="admin-box" ng-show="user.IsAdmin">
+  <div class="spacer"></div>
+  <h3>Welcome to the SCIONLab Admin Interface!</h3>
+  <p>Your account credentials are the following:</p>
+
+  <p><strong>AccountI:</strong> {{user.AccountID}}</p>
+  <p><strong>Secret:</strong> {{user.Secret}}</p>
+
+  <div class="spacer"></div>
+  <h3>Email invitations</h3>
+  <p>
+    Please contribute to SCIONLab's growth by inviting other people to join via the following form:
+  </p>
   <br/>
-  <br/>
-  <p>Welcome to the SCIONLab admin interface! Please contribute to SCIONLab's growth by inviting other people to
-    join via the following form:</p>
-  <br/>
+
   <form name="invitationsForm">
     <!--Use invisible button such that pressing "Enter" submits the form.-->
     <div class="row">
@@ -21,21 +30,24 @@
       <tr ng-repeat="i in invitations" ng-class="{'has-error' : i.error}">
         <td>
           <div class="form-group has-feedback">
-            <input type="text" class="form-control" ng-model="i.FirstName" name="first" placeholder="First name"
+            <input type="text" class="form-control" ng-model="i.FirstName" name="first"
+                   placeholder="First name"
                    required>
             <span class="glyphicon glyphicon-user form-control-feedback"></span>
           </div>
         </td>
         <td>
           <div class="form-group has-feedback">
-            <input type="text" class="form-control" ng-model="i.LastName" name="last" placeholder="Last name" required>
+            <input type="text" class="form-control" ng-model="i.LastName" name="last"
+                   placeholder="Last name" required>
             <span class="glyphicon glyphicon-user form-control-feedback"></span>
           </div>
         </td>
         <td>
           <ng-form name="emailForm">
             <div class="form-group has-feedback">
-              <input type="email" class="form-control" ng-model="i.Email" name="email" placeholder="Email address"
+              <input type="email" class="form-control" ng-model="i.Email" name="email"
+                     placeholder="Email address"
                      required
                      ng-blur="i.email_entered=true">
               <span class="glyphicon glyphicon-envelope form-control-feedback"></span>
@@ -47,7 +59,8 @@
         </td>
         <td>
           <div class="form-group has-feedback">
-            <input type="text" class="form-control" ng-model="i.Organisation" name="org" placeholder="Organisation">
+            <input type="text" class="form-control" ng-model="i.Organisation" name="org"
+                   placeholder="Organisation">
             <span class="glyphicon glyphicon-briefcase form-control-feedback"></span>
           </div>
         </td>
@@ -69,18 +82,28 @@
     <div class="spacer"></div>
     <div class="row">
       <div class="col-xs-12">
-        <button type="submit" class="btn btn-primary btn-block" ng-click="sendInvitations(invitations)">Send invitation emails</button>
+        <button type="submit" class="btn btn-primary btn-block"
+                ng-click="sendInvitations(invitations)">Send invitation emails
+        </button>
       </div>
     </div>
   </form>
   <div class="spacer"></div>
   <div ng-show="error" class="alert alert-danger alert-dismissible fade in">
-    <button type="button" class="close" aria-label="Close" ng-click="dismissError()">&times;</button>
+    <button type="button" class="close" aria-label="Close" ng-click="dismissError()">&times;
+    </button>
     {{error}}
   </div>
   <div ng-show="message" class="alert alert-success alert-dismissible fade in">
-    <button type="button" class="close" aria-label="Close" ng-click="dismissSuccess()">&times;</button>
+    <button type="button" class="close" aria-label="Close" ng-click="dismissSuccess()">&times;
+    </button>
     {{message}}
+  </div>
+  <div>
+    <p>
+      The following message will be sent to all users:
+    </p>
+    <p><pre>{{emailMessage}}</pre></p>
   </div>
   <div class="spacer"></div>
 </div>

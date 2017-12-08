@@ -640,12 +640,14 @@ func sendConfirmationEmail(userEmail, action string) error {
 	data := struct {
 		FirstName   string
 		LastName    string
+		Protocol    string
 		HostAddress string
 		Message     string
-	}{user.FirstName, user.LastName, config.HTTP_HOST_ADDRESS, message}
+	}{user.FirstName, user.LastName, config.HTTP_PROTOCOL, config.HTTP_HOST_ADDRESS, message}
 
 	log.Printf("Sending confirmation email to user %v.", userEmail)
-	if err := email.ConstructAndSend("vm_status.html", subject, data, "vm-update", userEmail); err != nil {
+	if err := email.ConstructAndSend("vm_status.html", subject, data, "vm-update",
+		userEmail); err != nil {
 		return err
 	}
 
