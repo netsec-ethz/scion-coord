@@ -256,7 +256,7 @@ func TestSCIONLabAS(t *testing.T) {
 
 		// Test UpdateDBConnection
 		s1.PublicIP = "CONNECTIONTEST"
-		cns1[0].BRID = 99999
+		cns1[0].BRID = 60000
 		cns1[0].Status = UPDATE
 		err = s1.Update()
 		if err != nil {
@@ -267,7 +267,7 @@ func TestSCIONLabAS(t *testing.T) {
 			t.Fatal(err)
 		}
 		s2.PublicIP = "CONNECTIONTEST"
-		cns2[0].BRID = 99999
+		cns2[0].BRID = 60000
 		cns2[0].Status = UPDATE
 		err = s2.Update()
 		if err != nil {
