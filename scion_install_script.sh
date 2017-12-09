@@ -122,6 +122,13 @@ bash -c 'yes | GO_INSTALL=true ./env/deps'
 
 sudo cp docker/zoo.cfg /etc/zookeeper/conf/zoo.cfg
 
+# Add cron script which removes old zk logs
+sudo bash -c 'cat > /etc/cron.daily/zookeeper << CRON1
+#! /bin/sh
+/usr/share/zookeeper/bin/zkCleanup.sh -n 3
+CRON1'
+sudo chmod 755 /etc/cron.daily/zookeeper
+
 # Check if gen directory exists
 if  [[ ( ! -z ${gen_dir+x} ) && -d ${gen_dir} ]]
 then
