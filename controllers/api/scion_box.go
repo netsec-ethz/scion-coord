@@ -64,14 +64,14 @@ func (s *SCIONBoxController) InitializeBox(w http.ResponseWriter, r *http.Reques
 	_, internal_ip, external_ip, mac, openPorts, startPort, err := s.parseRequest(r)
 	if err != nil {
 		log.Printf("Error parsing parameters and source IP: %v", err)
-		s.BadRequest(err, w, r)
+		s.Error500(w, err, "Error parsing parameters and source IP")
 		return
 	}
 	// Retrieve the SCIONBox information
 	sb, err := models.FindSCIONBoxByMAC(mac)
 	if err != nil {
 		log.Printf("Error retrieving the box info: %v, %v", mac, err)
-		s.Error500(err, w, r)
+		s.BadRequest(w, err, "Error retrieving the box info")
 		return
 	}
 	// Update Connectivity info of the Box
@@ -80,14 +80,13 @@ func (s *SCIONBoxController) InitializeBox(w http.ResponseWriter, r *http.Reques
 	sb.InternalIP = internal_ip
 	sb.Update()
 	if err != nil {
-		log.Printf("Error updating the box connection info: %v, %v", openPorts, err)
-		s.Error500(err, w, r)
+		log.Printf("Error updating the box info: %v, %v", openPorts, err)
+		s.Error500(w, err, "Error updating the box info")
 		return
 	}
 	if openPorts == 0 {
 		log.Printf("no Free UDP ports for Border Routers !: %v, %v", openPorts, err)
-		s.BadRequest(fmt.Errorf("No open UDP ports!"),
-			w, r)
+		s.BadRequest(w, fmt.Errorf("No open UDP ports!"), "no open UDP ports")
 		return
 	}
 	// Check if the box already exists
@@ -97,7 +96,7 @@ func (s *SCIONBoxController) InitializeBox(w http.ResponseWriter, r *http.Reques
 			s.initializeNewBox(sb, external_ip, mac, w, r)
 		} else {
 			log.Printf("Error retrieving ScionlabAS info: %v, %v", mac, err)
-			s.Error500(err, w, r)
+			s.Error500(w, err, "Error retrieving ScionlabAS info")
 		}
 	} else {
 		s.initializeOldBox(sb, slas, external_ip, mac, w, r)
@@ -140,7 +139,8 @@ func (s *SCIONBoxController) initializeOldBox(sb *models.SCIONBox, slas *models.
 			os.RemoveAll(userPackagePath(slas.UserMail))
 			os.Remove(filepath.Join(BoxPackagePath, slas.UserMail+".tar.gz"))
 			if err := s.generateGen(slas); err != nil {
-				s.Error500(err, w, r)
+				log.Printf("Error generating gen folder: %v", err)
+				s.Error500(w, err, "Error generating gen folder")
 				return
 			}
 			s.serveGen(slas.UserMail, w, r)
@@ -148,6 +148,8 @@ func (s *SCIONBoxController) initializeOldBox(sb *models.SCIONBox, slas *models.
 			if err := s.disconnectBox(sb, slas, false); err != nil {
 				log.Printf("Error disconnecting box, %v, source_ip: %v, mac_address %v",
 					err, ip, mac)
+				s.Error500(w, err, "Error disconnecting box")
+				return
 			}
 			s.sendPotentialNeighbors(sb, ip, mac, w, r)
 		}
@@ -204,14 +206,14 @@ func (s *SCIONBoxController) sendPotentialNeighbors(sb *models.SCIONBox, ip stri
 	pns, isd, err := s.getPotentialNeighbors(ip, mac)
 	if err != nil {
 		log.Printf("Error looking for potential neighbors, %v, source_ip: %v, mac_address %v", err, ip, mac)
-		s.Error500(err, w, r)
+		s.Error500(w, err, "Error looking for potential neighbors")
 		return
 	}
 	// update the SCIONBox database
 	sb.ISD = isd
 	if err := sb.Update(); err != nil {
 		log.Printf("Error updating scionbox database, %v", err)
-		s.Error500(err, w, r)
+		s.Error500(w, err, "Error updating scionbox database")
 		return
 	}
 	// build the reply json with IP, ID and SECRET
@@ -294,21 +296,21 @@ func (s *SCIONBoxController) ConnectNewBox(w http.ResponseWriter, r *http.Reques
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&req); err != nil {
 		log.Printf("Error decoding JSON: %v, %v", r.Body, err)
-		s.BadRequest(err, w, r)
+		s.Error500(w, err, "Error decoding JSON")
 		return
 	}
 	// Retrive scionbox object using email
 	sb, err := models.FindSCIONBoxByEMail(req.UserMail)
 	if err != nil {
 		log.Printf("Error looking for Scionbox, %v, %v", err, req.UserMail)
-		s.Error500(err, w, r)
+		s.Error500(w, err, "Error looking for Scionbox")
 		return
 	}
 	// Choose the neigbhbors of the box
 	neighbors := topologyAlgorithm.ChooseNeighbors(req.Neighbors, sb.OpenPorts)
 	if len(neighbors) == 0 {
 		log.Printf("Error no Neighbors for ScionBox, %v, ", req.UserMail)
-		s.Error500(fmt.Errorf("No Neighbors!"), w, r)
+		s.BadRequest(w, nil, "no potential Neighbors!")
 		return
 	}
 	// Get the Reqeust IP
@@ -317,15 +319,16 @@ func (s *SCIONBoxController) ConnectNewBox(w http.ResponseWriter, r *http.Reques
 	// Update the Database with the new ScionLabAS
 	slas, err := s.updateDBnewSB(sb, neighbors, isd, external_ip)
 	if err != nil {
-		log.Printf("Updating the Database, %v", err)
-		s.Error500(err, w, r)
+		log.Printf("Error Updating the Database, %v", err)
+		s.Error500(w, err, "Error Updating the Database")
 		return
 	}
 	// Generate necessary files and send them to the Box
 	os.RemoveAll(userPackagePath(slas.UserMail))
 	os.Remove(filepath.Join(BoxPackagePath, slas.UserMail+".tar.gz"))
 	if err := s.generateGen(slas); err != nil {
-		s.Error500(err, w, r)
+		log.Printf("Error generating gen folder, %v", err)
+		s.Error500(w, err, "Error generating gen folder")
 		return
 	}
 	s.serveGen(slas.UserMail, w, r)
@@ -435,7 +438,7 @@ func (s *SCIONBoxController) generateGen(slas *models.SCIONLabAS) error {
 func (s *SCIONBoxController) serveGen(userMail string, w http.ResponseWriter, r *http.Request) {
 	if err := s.packageGenFolder(userMail); err != nil {
 		log.Printf("Error packaging gen folder: %v", err)
-		s.Error500(err, w, r)
+		s.Error500(w, err, "Error packaging gen folder")
 		return
 	}
 	// Wait to make sure a previous version is not served
@@ -446,7 +449,7 @@ func (s *SCIONBoxController) serveGen(userMail string, w http.ResponseWriter, r 
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		log.Printf("Error reading tar file: %v", err)
-		s.Error500(err, w, r)
+		s.Error500(w, err, "Error reading tar file")
 		return
 	}
 	// Send the gzip file to the Box
@@ -766,7 +769,7 @@ func (s *SCIONBoxController) HeartBeatFunction(w http.ResponseWriter, r *http.Re
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&req); err != nil {
 		log.Printf("Error decoding JSON: %v, %v", r.Body, err)
-		s.Error500(err, w, r)
+		s.Error500(w, err, "Error decoding JSON")
 		return
 	}
 	vars := mux.Vars(r)
@@ -776,7 +779,7 @@ func (s *SCIONBoxController) HeartBeatFunction(w http.ResponseWriter, r *http.Re
 	ip, err := s.getSourceIP(r)
 	if err != nil {
 		log.Printf("Error retrivieng source IP: %v", account_id, secret)
-		s.Error500(err, w, r)
+		s.Error500(w, err, "Error retrivieng source IP")
 		return
 	}
 	var needGen = false
@@ -788,22 +791,22 @@ func (s *SCIONBoxController) HeartBeatFunction(w http.ResponseWriter, r *http.Re
 				// no row found AS is not a SCIONLabAS
 				continue
 			} else {
-				log.Printf("no SCIONLabAS found in HB, %v %v", ia, err)
-				s.Error500(err, w, r)
+				log.Printf("no SCIONLabAS found in HB, %v %v", req, err)
+				s.Error500(w, err, "no SCIONLabAS found in HB")
 				return
 			}
 		}
 		// check if IA belongs to credentials
 		u, err := models.FindUserByEmail(slas.UserMail)
 		if err != nil{
-			log.Printf("Error looking for user: %v", account_id, secret)
-			s.Error500(err, w, r)
+			log.Printf("Error looking for user: %v", err)
+			s.Error500(w, err, "Error looking for user")
 			return
 		}
 		account := u.Account
 		if account_id != account.AccountId || secret != account.Secret{
-			log.Printf("HB requested for not belonging IA", ia, slas.UserMail)
-			s.Error500(err, w, r)
+			log.Printf("HB requested for user with not associated IA, %v, %v", req, slas.UserMail)
+			s.BadRequest(w, err, "HB requested for user with not associated IA")
 			return
 		}
 		// check if box needs an update
@@ -816,7 +819,7 @@ func (s *SCIONBoxController) HeartBeatFunction(w http.ResponseWriter, r *http.Re
 		needGen, err = s.HBCheckIP(slas, ip, ia, r)
 		if err != nil {
 			log.Printf("Error running IP checks in HB: %v,", err)
-			s.Error500(err, w, r)
+			s.Error500(w, err, "Error running IP check in HB")
 			return
 		}
 		// Send connections in the Database to the Box
@@ -830,7 +833,7 @@ func (s *SCIONBoxController) HeartBeatFunction(w http.ResponseWriter, r *http.Re
 		for _, slas := range slasList {
 			// Generate necessary files and send them to the Bo
 			if err := s.generateGen(slas); err != nil {
-				s.Error500(err, w, r)
+				s.Error500(w, err, "Error generating gen folder")
 				return
 			}
 		}
@@ -841,14 +844,14 @@ func (s *SCIONBoxController) HeartBeatFunction(w http.ResponseWriter, r *http.Re
 			cns, err := slas.GetConnectionInfo()
 			log.Printf("Got Connection Info")
 			if err != nil {
-				log.Printf("Error retrivieng brs %v", err)
-				s.Error500(err, w, r)
+				log.Printf("Error retrivieng connections: %v", err)
+				s.Error500(w, err, "Error retrieving connections")
 				return
 			}
 			slas.Status = models.ACTIVE
 			if err := slas.Update(); err != nil {
 				log.Printf("Error updating slas %v", err)
-				s.Error500(err, w, r)
+				s.Error500(w, err, "Error updating slas")
 				return
 			}
 			ia := ResponseIA{
