@@ -27,8 +27,8 @@ import (
 type asInfo struct {
 	ASID    int       // AS ID of the user's SCIONLab AS
 	ISD     int       // Current ISD of the user's SCIONLab AS
-	IA      string    // ISD-AS string of the AS
 	Label   string    // Label of the AS
+	IALabel string    // ISD-AS string + Label of the AS
 	Status  uint8     // Current status of the AS
 	IP      string    // IP address of the AS
 	Type    uint8     // Type of the SCIONLab AS
@@ -101,14 +101,14 @@ func populateASStatusButtons(userEmail string) ([]asInfo, []string, error) {
 		}
 
 		asI := asInfo{
-			ASID:   as.ASID,
-			ISD:    as.ISD,
-			IA:     as.IA(),
-			Label:  as.Label,
-			Status: as.Status,
-			IP:     as.PublicIP,
-			Type:   as.Type,
-			Port:   as.StartPort,
+			ASID:    as.ASID,
+			ISD:     as.ISD,
+			IALabel: as.String(),
+			Label:   as.Label,
+			Status:  as.Status,
+			IP:      as.PublicIP,
+			Type:    as.Type,
+			Port:    as.StartPort,
 		}
 
 		cns, err := as.GetJoinConnectionInfo()

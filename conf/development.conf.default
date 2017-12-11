@@ -68,7 +68,7 @@ db.max_idle = 3
 # False = Every method associated with VirtualCredit system will return immediately
 virtualCredit.enable = false
 # 1 Credit = 10 MegaBits/s worth of bandwidth
-virtualCredit.startCredit = 100
+virtualCredit.startCredits = 100
 
 # General settings
 # Standard port for border routers
