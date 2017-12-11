@@ -123,7 +123,8 @@ go build
 ```
 
 
-### Current APIs
+### APIs
 
-The APIs are defined in the `main.go` file.
-Additional documentation can be found under Wiki.
+[OpenAPI 3.0](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md "OpenAPI 3.0") is used to document the API. The [openapi.yml](openapi.yml) can be viewed in the 
+[swagger editor](
+https://editor.swagger.io/?url=https://raw.githubusercontent.com/netsec-ethz/scion-coord/openApi/openapi.yml "Swagger Editor")

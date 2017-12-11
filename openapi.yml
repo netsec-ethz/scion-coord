@@ -1,0 +1,953 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: SCION coordinator
+  description: The RESTful API of the SCION coordinator to administrate the SCION network and its testbed SCIONLab
+  contact:
+    name: SCION Coordinator repository
+    url: https://github.com/netsec-ethz/scion-coord
+  license:
+    name: Apache 2.0
+    url: https://raw.githubusercontent.com/netsec-ethz/scion-coord/master/LICENSE
+servers: 
+  - url: /api/
+tags: 
+  - name: User
+    description: Create and modify user and everthing around this
+  - name: ScionLab
+    description: Everything related to ScionLab and its VM administration
+  - name: Coordinator
+    description: Administrate conection between ASes in an ISD
+  - name: VirtualCredit
+    description: The virtual credit system to limit the connections an AS can make
+paths:
+  /register:
+    post:
+      description: Register a new user
+      tags:
+        - User
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref:
+                '#/components/schemas/RegistrationRequest'
+      responses:
+        '200':
+          description: User was sucessfully registered
+        '500':
+          description: Error with invalid data, sending the email or creating the user
+  /captchaSiteKey:
+    get:
+      description: Get the captcha key from the coordinator
+      tags:
+        - User
+      responses:
+        '200':
+          description: The captcha code
+          content:
+            text/plain:
+              schema:
+                type: string
+  /resendLink:
+    post:
+      description: Send request to coordinator to resend the activation link of an account
+      tags:
+        - User
+      requestBody:
+        description: The email of the user to resend
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: string
+              format: email
+      responses:
+        '204':
+          description: Link was sent
+        '500':
+          description: The user was not found, the user is already verified or the email could not be sent
+  /resetPassword:
+    post:
+      description: Resets the password of a certain user
+      tags:
+        - User
+      requestBody:
+        description: The email of the user to resend
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: string
+              format: email
+      responses:
+        '200':
+          description: Link was sent
+        '400':
+          description: User was not found, the uuid or password could not be resetted or the email could not be sent
+        '500':
+          description: The form is invalid
+  /login:
+    post:
+      description: Resets the password of a certain user
+      tags:
+        - User
+      requestBody:
+        description: The email and password of the user
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Password and email match and a user session is created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSession'
+        '400':
+          description: There is no user with this email
+        '403':
+          description: Can't get users session, the email or password is empty, the user is not verified or the password and email do not match
+  /logout:
+    get:
+      description: Terminates the session of the user
+      tags:
+        - User
+      parameters:
+        - $ref: '#/components/parameters/scionSession'
+      responses:
+        '200':
+          description: Session was sucessfully terminated
+        '403':
+          description: There is no session
+        '500':
+          description: Session expired
+  /userPageData:
+    get:
+      description: Fetches the data (userdata, vm config) for the user page
+      tags:
+        - user
+      parameters:
+        - $ref: '#/components/parameters/scionSession'
+      responses:
+        '200':
+          description: The data of the user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPageData'
+        '403':
+          description: No user session found or an error occured while generating the page
+  /verifyEmail/{uuid}:
+    get:
+      description: Email validation endpoint
+      tags:
+        - User
+      parameters:
+        - in: path
+          name: uuid
+          description: The uuid generated to validate the email
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description:
+            The email was sucessfully verified.
+          content:
+            text/html:
+              schema:
+                type: string
+                format: website
+        '400':
+          description:  The uuid is not a validation uuid
+        '500':
+          description: Can't update the verification status or render the users website 
+  /setPassword:
+    post:
+      description: Update the password of a user
+      tags:
+        - User
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordRequest'
+      responses:
+        '200':
+          description: Password was changed
+        '400':
+          description: Password reset link was invalid
+        '500':
+          description: Invalid json format, passwords are invalid , the password was already set or it can't be saved
+  /adminPageData:
+    get:
+      description: The administator page information
+      tags:
+        - User
+      parameters:
+        - $ref: '#/components/parameters/scionSession'
+      responses:
+        '200':
+          description: The admin page data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminPageData'
+        '403':
+          description: User authentication failed
+  /sendInvitations:
+    post:
+      description: Invite the targets to join
+      tags:
+        - User
+      parameters:
+        - $ref: '#/components/parameters/scionSession'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/InvitationInfo'
+      responses:
+        '200':
+          description: Invitations were sent OR list of errors!
+        '400':
+          description: Invalid form
+        '403':
+          description: No user session found with that token id
+        '500':
+          description: Can't decode json
+  /as/generateVM:
+    get:
+      description: Generates a SCIONLab VM for the user
+      tags:
+        - ScionLab
+      parameters:
+        - $ref: '#/components/parameters/scionLabVMIP'
+        - $ref: '#/components/parameters/isVpn'
+        - $ref: '#/components/parameters/scionSession'
+      responses:
+        '200':
+          description: The VM is creating and will be activated in a few minutes.
+        '400':
+          description: Wrong parameters or there is a pending update/create operation
+        '500':
+          description: Error at creating the VM
+  /as/removeVM:
+    get:
+      description: Removes a VM from ScionLab
+      tags:
+        - ScionLab
+      parameters:
+        - $ref: '#/components/parameters/scionSession'
+      responses:
+        '200':
+          description: The VM will be removed
+        '400':
+          description: The user does not have an active VM to remove
+        '500':
+          description: Error while removing the VM
+  /as/downloadTarball:
+    get:
+      description: Downloads the VM configuration as a TAR ball
+      tags:
+        - ScionLab
+      parameters:
+          - $ref: '#/components/parameters/scionSession'
+      responses:
+        '200':
+          description: The configuration as a tar.gz archive.
+          content:
+            application/gzip:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: No active VM configuration found
+        '403':
+          description: Invalid user session
+        '500':
+          description: Can't create tar ball
+  /as/getSCIONLabVMASes/{account_id}/{secret}:
+    get:
+      description: Fetch information about a certain SCIONLabVm
+      tags:
+        - ScionLab
+      parameters:
+        - $ref: '#/components/parameters/accountId'
+        - $ref: '#/components/parameters/secret'
+        - in: query
+          name: scionLabAS
+          description: List of ISD-ASes to get the information about
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Everything went fine
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScionLabVmASes'
+        '400':
+          description: scionLabAS parameter is missing
+        '500':
+          description: Error while looking up ScionLab VMs
+  /as/confirmSCIONLabVMASes/{account_id}/{secret}:
+    post:
+      description: Mark provided SCIONLabVMs as Created, Updated or Removed.
+      tags:
+        - ScionLab
+      parameters:
+        - $ref: '#/components/parameters/accountId'
+        - $ref: '#/components/parameters/secret'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScionLabVmASes'
+      responses:
+        '200':
+          description: Everything went fine
+        '400':
+          description: Malformed JSON
+        '500':
+          description: Error while looking up ScionLab VMs
+  # Is this method necessary? The implementation and API are not equal!
+  /as/exists/{as_id}/{account_id}/{secret}:
+    get:
+      description: Checks if an AS exists. Warning! This method do not function.
+      tags:
+        - Coordinator
+      deprecated: true
+      parameters:
+        - in: path
+          name: as_id
+          required: true
+          schema:
+            type: string
+            format: AS-ISD
+        - $ref: '#/components/parameters/accountId'
+        - $ref: '#/components/parameters/secret'
+      responses:
+        '200':
+          description: The particular AS exists
+        '404':
+          description: There is no AS with that AS-ISD
+        '400':
+          description: Missing isdas parameter.
+  /as/uploadJoinRequest/{account_id}/{secret}:
+    post:
+      description: Upload an attempt to join a certain ISD
+      tags:
+        - Coordinator
+      parameters:
+        - $ref: '#/components/parameters/accountId'
+        - $ref: '#/components/parameters/secret'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JoinRequest'
+      responses:
+        '200':
+          description: Join request sucessfully sent
+        '400':
+          description: Malformed JSON
+        '500':
+          description: can't find an account with that ID or an core AS for that ISD or can't persists the request
+  /as/uploadJoinReply/{account_id}/{secret}:
+    post:
+      description: Upload a reply to join request
+      tags:
+        - Coordinator
+      parameters:
+        - $ref: '#/components/parameters/accountId'
+        - $ref: '#/components/parameters/secret'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JoinReply'
+      responses:
+        '200':
+          description: Join reply was sucessfully
+        '400':
+          description: Malformed JSON
+        '500':
+          description: can't find an account with that ID or an core AS for that ISD or can't persists the reply
+  /as/pollJoinReply/{account_id}/{secret}:
+    get:
+      description: Fetches the join reply
+      tags:
+        - Coordinator
+      parameters:
+        - $ref: '#/components/parameters/accountId'
+        - $ref: '#/components/parameters/secret'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                request_id:
+                  type: integer
+                  format: uint64
+      responses:
+        '200':
+          description: Empty json object when there is no reply
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JoinReply'
+        '400':
+          description: Malformed JSON or unknown account id
+        '500':
+          description: Error while searching for replies or marshalling the reply
+  /as/uploadConnRequest/{account_id}/{secret}:
+    post:
+      description: Uploads a connection request to create a connecion to another AS
+      tags:
+        - Coordinator
+      parameters:
+        - $ref: '#/components/parameters/accountId'
+        - $ref: '#/components/parameters/secret'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConnRequest'
+      responses:
+        '200':
+          description: Empty json object
+        '400':
+          description: Malformed JSON or unknown account id or the AS does not have enough credits for the connection (if VC is enabled)
+        '403':
+          description: Account and AS do not match
+        '500':
+          description: Error while inserting the reply or searching for account or finding the connection request or changing the ASes credits (if VC is enabled)
+  /as/uploadConnReply/{account_id}/{secret}:
+    post:
+      description: Uploads a connection reply
+      tags:
+        - Coordinator
+      parameters:
+        - $ref: '#/components/parameters/accountId'
+        - $ref: '#/components/parameters/secret'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConnReply'
+      responses:
+        '200':
+          description: Empty json object
+        '400':
+          description: Malformed JSON or unknown account id
+        '403':
+          description: Account and AS do not match
+        '500':
+          description: Error while inserting the request or searching for account
+  /as/pollEvents/{account_id}/{secret}:
+    post:
+      description: Poll all requests to the caller's AS
+      tags:
+        - Coordinator
+      parameters:
+        - $ref: '#/components/parameters/accountId'
+        - $ref: '#/components/parameters/secret'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                isdAs:
+                  type: string
+                  format: ISD-AS
+      responses:
+        '200':
+          description: All requests his AS
+          content:
+            application/json:
+              schema:
+                properties:
+                  JoinRequests:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/JoinRequest'
+                  ConnRequests:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ConnRequest'
+                  ConnReplies:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ConnReply'
+        '400':
+          description: Malformed JSON or unknown account id
+        '403':
+          description: Account and AS do not match
+        '500':
+          description: Error while searching or converting the requests
+  /as/listASes/{account_id}/{secret}:
+    post:
+      description: List all ASes the requesting AS can connect to
+      tags:
+        - Coordinator
+      parameters:
+        - $ref: '#/components/parameters/accountId'
+        - $ref: '#/components/parameters/secret'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                isdAs:
+                  type: string
+                  format: ISD-AS
+      responses:
+        '200':
+          description: All requests his AS
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        '400':
+          description: Malformed JSON or unknown account id or an error while retrieving the ASes
+        '403':
+          description: Account and AS do not match
+        '500':
+          description: Error at marshalling ASes
+  /listASConnections/{account_id}/{secret}/{isdas}:
+    post:
+      description: List all payed connection this AS has created or accepted with the information
+      tags:
+        - Coordinator
+        - VirtualCredit
+      parameters:
+        - $ref: '#/components/parameters/accountId'
+        - $ref: '#/components/parameters/secret'
+        - in: path
+          name: isdas
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: All requests his AS
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ASPaymentInformation'
+        '400':
+          description: Missing parameter or an error while retrieving the ASes
+        '404':
+          description: If the virtual credit system is disabled or the ISD-AS is not found
+        '500':
+          description: Error at marshalling ASes
+components:
+  schemas:
+    RegistrationRequest:
+      properties:
+        email:
+          type: string
+          format: email
+        organisation:
+          type: string
+        password:
+          type: string
+        passwordConfiration:
+          type: string
+        first:
+          type: string
+        last:
+          type: string
+        account:
+          type: string
+        captcha:
+          type: string
+          
+    LoginRequest:
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          
+    UserSession:
+      properties:
+        userId:
+          type: integer
+          format: uint64
+        email:
+          type: string
+          format: email
+        first:
+          type: string
+        last:
+          type: string
+        organisation:
+          type: string
+        xsrfToken:
+          type: string
+        hasLoggedIn:
+          type: boolean
+        isAdmin:
+          type: boolean
+        error:
+          type: string
+    UserPageData:
+      properties:
+        user:
+          $ref: '#/components/schemas/UserInformation'
+        vmInfo:
+          $ref: '#/components/schemas/VmInfo'
+        uiButtons:
+          $ref: '#/components/schemas/ButtonConfigurations'
+    VmInfo:
+      properties:
+        vmStatus:
+          type: integer
+          format: uint8
+        vmText:
+          type: string
+        vmIp:
+          type: string
+          format: ipv4
+        showIp:
+          type: boolean
+        showVpn:
+          type: boolean
+        ia:
+          type: string
+          format: isd-as
+    ButtonConfigurations:
+      properties:
+        update:
+          $ref: '#/components/schemas/ButtonConfiguration'
+        download:
+          $ref: '#/components/schemas/ButtonConfiguration'
+        remove:
+          $ref: '#/components/schemas/ButtonConfiguration'
+    ButtonConfiguration:
+      properties:
+        text:
+          type: string
+        class:
+          type: string
+        action:
+          type: string
+        hide:
+          type: boolean
+        disable:
+          type: boolean
+        tooltipDisplay:
+          type: string
+    UserInformation:
+      properties:
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        isAdmin:
+          type: boolean
+        account:
+          type: string
+        organisation:
+          type: string
+        accountId:
+          type: integer
+          format: unint64
+        secret:
+          type: string
+    PasswordRequest:
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        password:
+          type: string
+          format: password
+        passwordConfirmation:
+          type: string
+          format: password
+    User:
+      properties:
+        id:
+          type: integer
+          format: uint64
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        passwordInvalid:
+          description: Indicates if the user requested a password reset and its current password is invalid
+          type: boolean
+        salt:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        verified:
+          type: boolean
+        isAdmin:
+          type: boolean
+        verificationUuid:
+          type: string
+          format: uuid
+        account:
+          description: Foreign key to the account
+          type: integer
+          format: uint64
+        created:
+          type: string
+          format: date-time
+        updated:
+          type: string
+          format: date-time
+    AdminPageData:
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        emailMessage:
+          type: string
+    InvitationInfo:
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        organisation:
+          type: string
+    SCIONLabVM:
+      properties:
+        asId:
+          type: string
+          format: ISD-AS
+        isVpn:
+          type: boolean
+        remoteIAPort:
+          type: integer
+        userEmail:
+          type: string
+          format: email
+        vmIp:
+          type: string
+          format: ipv4
+        remoteBr:
+          type: string
+    ScionLabVmASes:
+        type: object
+        additionalProperties:
+          type: object
+          properties:
+            Create:
+              $ref: '#/components/schemas/SCIONLabVM'
+            Update:
+              $ref: '#/components/schemas/SCIONLabVM'
+            Remove:
+              $ref: '#/components/schemas/SCIONLabVM'
+    JoinRequest:
+      properties:
+        requestId:
+          type: integer
+          format: uint64
+        info:
+          description: Free form text motivation for the request
+          type: string
+        isdToJoin:
+          description: The ISD that the sender wants to join
+          type: integer
+        joinAsCoreAS:
+          description: Whether to join the ISD as a core AS or not
+          type: boolean
+        requesterId:
+          description: The string to identify which account made the request
+          type: string
+        sigPubKey:
+          description: Signing public key
+          type: string
+        encPubKey:
+          description: Encryption public key
+          type: string
+    JoinReply:
+      properties:
+        requestId:
+          type: integer
+          format: uint64
+        status:
+          type: string
+        info:
+          description: Free form text the reply
+          type: string
+        joiningIA:
+          type: string
+          format: ISD-AS
+        isCore:
+          description: Whether the new AS joins as core AS or not
+          type: boolean
+        RequesterId:
+          type: string
+          description: The string to identify the requester
+        RespondIA:
+          type: string
+          format: ISD-AS
+        JoiningIACertificate:
+          type: string
+        RespondIACertificate:
+          type: string
+        TRC:
+          type: string
+    ConnRequest:
+      properties:
+        RequestId:
+          type: integer
+          format: uint64
+        Info:
+          description: Free form text motiviation for the request
+          type: string
+        RequestIA:
+          type: string
+        RespondIA:
+          type: string
+        OverlayType:
+          type: string
+        IP:
+          type: string
+        Port:
+          type: integer
+          format: uint64
+        MTU:
+          type: integer
+          format: uint64
+          description: Bytes
+        Bandwidth:
+          type: integer
+          format: uint64
+          description: kbps
+        LinkType:
+          type: string
+        Timestamp:
+          type: string
+          format: date-time
+        Signature:
+          type: string
+        Certificate:
+          type: string
+    ConnReply:
+      properties:
+        RequestId:
+          type: integer
+          format: uint64
+        Status:
+          type: string
+        Info:
+          type: string
+          description: Free form text for the reply
+        RequestIA:
+          type: string
+        RespondIA:
+          type: string
+        OverlayType:
+          type: string
+        IP:
+          type: string
+        port:
+          type: integer
+          format: uint64
+        MTU:
+          type: integer
+          format: uint64
+          description: Bytes
+        Bandwidth:
+          type: integer
+          format: uint64
+          description: kbps
+        Certificate:
+          type: string
+          description: Certificate of the responding AS
+    ASPaymentInformation:
+      properties:
+        ISD:
+          type: integer
+        AS:
+          type: integer
+        Credits:
+          type: integer
+        Connections:
+          type: array
+          items:
+            $ref: '#/components/schemas/PayedConnection'
+    PayedConnection:
+      properties:
+        ISD:
+          type: integer
+        AS:
+          type: integer
+        CreditsBalance:
+          type: integer
+          description: How much credits the connection costs / yields
+        Bandwidth:
+          type: integer
+          description: kbps
+        IsOutgoing:
+          type: boolean
+          description: false = the other AS has to pay for, true = the other AS gets credits for
+        Timestamp:
+          type: string
+          format: date-time
+  parameters:
+    scionLabVMIP:
+      name: scionLabVMIP
+      in: query
+      description: The IP of the ScionLab VM
+      required: true
+      schema:
+        type: string
+        format: ipv4
+    isVpn:
+      name: isVpn
+      in: query
+      description: If the VM is using a VPN
+      required: true
+      schema:
+        type: boolean
+    scionSession:
+      name: X-Xsrf-Token
+      in: header
+      description: The token beloning to a session
+      required: true
+      schema:
+        type: string
+        format: uuid
+    accountId:
+      in: path
+      name: account_id
+      description: Used for authentification.
+      required: true
+      schema:
+        type: string
+    secret:
+      in: path
+      name: secret
+      description: Used for authentification.
+      required: true
+      schema:
+        type: string
