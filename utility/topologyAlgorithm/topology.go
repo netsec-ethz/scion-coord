@@ -113,7 +113,7 @@ func (nb Neighbor) getPF() int {
 	if nb.BW == -1 || nb.RTT == -1 {
 		return 5
 	}
-	var bw = 1 / nb.BW
+	var bw = 8 / nb.BW
 	var rtt = nb.RTT * math.Pow10(3)
 	if bw > BW3 {
 		return 4
