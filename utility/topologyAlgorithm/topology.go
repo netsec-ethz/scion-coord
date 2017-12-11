@@ -15,8 +15,6 @@
 package topologyAlgorithm
 
 import (
-	"math"
-
 	"github.com/astaxie/beego/orm"
 	"github.com/netsec-ethz/scion-coord/models"
 )
