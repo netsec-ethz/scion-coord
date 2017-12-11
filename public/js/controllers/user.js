@@ -32,7 +32,7 @@ scionApp
             };
 
             $scope.generateSCIONLabAS = function () {
-                $scope.currentIndex = $scope.asInfos.indexOf($scope.asInfo);
+                setCurrentIndex();
                 userService.generateSCIONLabAS().then(
                     function (data) {
                         console.log(data);
@@ -46,7 +46,7 @@ scionApp
             };
 
             $scope.submitForm = function (action, user, asInfo) {
-                $scope.currentIndex = $scope.asInfos.indexOf($scope.asInfo);
+                setCurrentIndex();
                 switch (action) {
                     case "update":
                         if (asInfo.isNotVPN) {
@@ -66,6 +66,12 @@ scionApp
                         $scope.removeSCIONLabAS(asInfo);
                         break;
                 }
+            };
+
+            let setCurrentIndex = function () {
+                $scope.currentIndex = $scope.asInfos.length > 0 ?
+                    $scope.asInfos.indexOf($scope.asInfo) :
+                    undefined;
             };
 
             let downloadlink = function (asID) {
