@@ -555,6 +555,7 @@ func (s *SCIONBoxController) generateTopologyFile(slas *models.SCIONLabAS) error
 		ISD_ID string
 		AS_ID  string
 		IP     string
+		IP_LOCAL string
 		BR     []Br
 	}
 	var borderrouters []Br
@@ -598,6 +599,7 @@ func (s *SCIONBoxController) generateTopologyFile(slas *models.SCIONLabAS) error
 		AS_ID:  strconv.Itoa(slas.AS),
 		BR:     borderrouters,
 		IP:     slas.PublicIP,
+		IP_LOCAL: sb.InternalIP,
 	}
 	if err = t.Execute(f, topo); err != nil {
 		return fmt.Errorf("Error executing topology template file. User: %v, %v",
@@ -775,7 +777,6 @@ func (s *SCIONBoxController) HeartBeatFunction(w http.ResponseWriter, r *http.Re
 	vars := mux.Vars(r)
 	account_id := vars["account_id"]
 	secret := vars["secret"]
-	log.Printf("account_id: %v secret: %v", account_id, secret)
 	ip, err := s.getSourceIP(r)
 	if err != nil {
 		log.Printf("Error retrivieng source IP: %v", account_id, secret)
