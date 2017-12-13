@@ -79,5 +79,7 @@ virtualCredit.enable = false
 # 1 Credit = 10 MegaBits/s worth of bandwidth
 virtualCredit.startCredit = 100
 
-# HeartBeat period in minutes
-heartbeat.period = 1
+# HeartBeat period in seconds
+heartbeat.period = 60
+# Number of heartbeat periods that can be missed before status is set to inactive
+heartbeat.limit = 10

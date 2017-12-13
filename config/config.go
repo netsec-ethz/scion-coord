@@ -66,6 +66,7 @@ var (
 	VM_LOCAL_IP   = "10.0.2.15"
 	HTTP_PROTOCOL = "http"
 	HB_PERIOD, _ = goconf.AppConf.Int("heartbeat.period")
+	HB_LIMIT, _ = goconf.AppConf.Int("heartbeat.limit")
 )
 
 func init() {

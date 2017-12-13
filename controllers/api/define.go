@@ -28,8 +28,10 @@ var (
 	RSAKeyPath      = filepath.Join(EasyRSAPath, "keys")
 	CACertPath      = filepath.Join(RSAKeyPath, "ca.crt")
 	HeartBeatPeriod = time.Duration(config.HB_PERIOD)
+	HeartBeatLimit  = time.Duration(config.HB_LIMIT)
 )
 
 const(
 	BR_START_PORT = 31046
+	MTU = 1472
 )

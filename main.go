@@ -53,15 +53,13 @@ func initializeISD() error {
 
 	for _, ISD := range(isd_loc) {
 		_, err = models.FindISDbyID(ISD.ISD)
-		if err != nil {
-			if err == orm.ErrNoRows {
-				isd :=  models.IsdLocation{
-					ISD:		ISD.ISD,
-					Country:	ISD.Country,
-					Continent:	ISD.Continent,
-				}
-				err = isd.Insert()
+		if err == orm.ErrNoRows {
+			isd := models.IsdLocation{
+				ISD:       ISD.ISD,
+				Country:   ISD.Country,
+				Continent: ISD.Continent,
 			}
+			err = isd.Insert()
 		}
 		if err != nil {
 			return fmt.Errorf("ERROR: Cannot insert ISD location mapping into database:"+

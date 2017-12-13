@@ -29,8 +29,8 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/astaxie/beego/orm"
+	"github.com/gorilla/mux"
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/models"
 	"github.com/netsec-ethz/scion-coord/utility"
@@ -164,17 +164,17 @@ type InitRequest struct {
 }
 
 // Receive a Post request with json: {IPAddress: 'string', MacAddress: 'string', OpenPorts: int, StartPort: int}
-func (s *SCIONBoxController) parseRequest(r *http.Request) (bool, string, string, string, int, int, error) {
-	var isNAT bool
+func (s *SCIONBoxController) parseRequest(r *http.Request) (isNAT bool, inernal_ip string, external_ip string,
+		mac_address string, openPorts int, startPort int, err error) {
 	var request InitRequest
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&request); err != nil {
 		log.Printf("Error decoding JSON: %v, %v", r.Body, err)
 		return false, "", "", "", 0, 0, err
 	}
-	mac_address := request.MacAddress
+	mac_address = request.MacAddress
 	internal_ip := request.IPAddress
-	external_ip, err := s.getSourceIP(r)
+	external_ip, err = s.getSourceIP(r)
 	if err != nil {
 		return false, "", "", "", 0, 0, err
 	}
@@ -185,8 +185,8 @@ func (s *SCIONBoxController) parseRequest(r *http.Request) (bool, string, string
 		isNAT = true
 	}
 	// parse the Connection results
-	openPorts := request.OpenPorts
-	startPort := request.StartPort
+	openPorts = request.OpenPorts
+	startPort = request.StartPort
 	log.Printf("isNAT: %t, internal_ip: %v, external_ip: %v, Connections: %v", isNAT, internal_ip, external_ip, openPorts)
 	return isNAT, internal_ip, external_ip, mac_address, openPorts, startPort, nil
 }
@@ -313,7 +313,7 @@ func (s *SCIONBoxController) ConnectNewBox(w http.ResponseWriter, r *http.Reques
 		s.BadRequest(w, nil, "no potential Neighbors!")
 		return
 	}
-	// Get the Reqeust IP
+	// Get the request IP
 	external_ip := req.IP
 	isd := sb.ISD
 	// Update the Database with the new ScionLabAS
@@ -442,7 +442,7 @@ func (s *SCIONBoxController) serveGen(userMail string, w http.ResponseWriter, r 
 		return
 	}
 	// Wait to make sure a previous version is not served
-	time.Sleep(1000 * time.Millisecond)
+	time.Sleep(time.Second)
 	// serve the packaged gen folder to the box
 	fileName := userMail + ".tar.gz"
 	filePath := filepath.Join(BoxPackagePath, fileName)
@@ -465,7 +465,6 @@ func (s *SCIONBoxController) getSourceIP(r *http.Request) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	//userIP := net.ParseIP(ip)
 	return ip, nil
 }
 
@@ -550,13 +549,14 @@ func (s *SCIONBoxController) generateTopologyFile(slas *models.SCIONLabAS) error
 		ID           string
 		LINK_TYPE    string
 		BR_PORT      string
+		MTU			 string
 	}
 	type Topo struct {
-		ISD_ID string
-		AS_ID  string
-		IP     string
+		ISD_ID   string
+		AS_ID    string
+		IP       string
 		IP_LOCAL string
-		BR     []Br
+		BR       []Br
 	}
 	var borderrouters []Br
 	brs, err := slas.GetConnectionInfo()
@@ -585,6 +585,7 @@ func (s *SCIONBoxController) generateTopologyFile(slas *models.SCIONLabAS) error
 			ID:           strconv.Itoa(br.BRID),
 			LINK_TYPE:    linktype,
 			BR_PORT:      strconv.Itoa(BR_START_PORT + i),
+			MTU:		  strconv.Itoa(MTU),
 		}
 		// if last neighbor do not add the Comma to the end
 		if i == len(brs)-1 {
@@ -595,10 +596,10 @@ func (s *SCIONBoxController) generateTopologyFile(slas *models.SCIONLabAS) error
 		borderrouters = append(borderrouters, bro)
 	}
 	topo := Topo{
-		ISD_ID: strconv.Itoa(slas.ISD),
-		AS_ID:  strconv.Itoa(slas.AS),
-		BR:     borderrouters,
-		IP:     slas.PublicIP,
+		ISD_ID:   strconv.Itoa(slas.ISD),
+		AS_ID:    strconv.Itoa(slas.AS),
+		BR:       borderrouters,
+		IP:       slas.PublicIP,
 		IP_LOCAL: sb.InternalIP,
 	}
 	if err = t.Execute(f, topo); err != nil {
@@ -799,13 +800,13 @@ func (s *SCIONBoxController) HeartBeatFunction(w http.ResponseWriter, r *http.Re
 		}
 		// check if IA belongs to credentials
 		u, err := models.FindUserByEmail(slas.UserMail)
-		if err != nil{
+		if err != nil {
 			log.Printf("Error looking for user: %v", err)
 			s.Error500(w, err, "Error looking for user")
 			return
 		}
 		account := u.Account
-		if account_id != account.AccountId || secret != account.Secret{
+		if account_id != account.AccountId || secret != account.Secret {
 			log.Printf("HB requested for user with not associated IA, %v, %v", req, slas.UserMail)
 			s.BadRequest(w, err, "HB requested for user with not associated IA")
 			return
@@ -967,7 +968,7 @@ func findCnInNbs(cn models.ConnectionInfo, neighbors []CurrentCn) bool {
 // goroutine that periodically checks the time between the time the SLAS called the Heartbeat API
 // if the time is 10 times the HBPERIOD status is set to INACTIVE
 func (s *SCIONBoxController) checkHBStatus(Isd int, As int) {
-	time.Sleep(HeartBeatPeriod * time.Minute)
+	time.Sleep(HeartBeatPeriod * time.Second)
 	for true {
 		slas, err := models.FindSCIONLabASByIAInt(Isd, As)
 		if err != nil {
@@ -977,16 +978,18 @@ func (s *SCIONBoxController) checkHBStatus(Isd int, As int) {
 				continue
 			}
 		}
+		if slas.Status == models.REMOVED {
+			return
+		}
 		delta := time.Now().Sub(slas.Updated)
-		if delta.Minutes() > float64(10*HeartBeatPeriod) {
+		if delta.Seconds() > float64(HeartBeatLimit*HeartBeatPeriod) {
 			if slas.Status != models.INACTIVE {
 				log.Printf("AS Status set to inactive, AS: %v, Time since last HB: %v", slas, delta)
 				slas.Status = models.INACTIVE
 				slas.Update()
 			}
-
 		}
-		time.Sleep(HeartBeatPeriod * time.Minute)
+		time.Sleep(HeartBeatPeriod * time.Second)
 	}
 }
 
