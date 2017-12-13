@@ -486,27 +486,21 @@ func (s *SCIONBoxController) getNewSCIONBoxASID(isd int) (int, error) {
 
 // Find the lowest available Port number
 func (s *SCIONBoxController) findLowestBRId(slas *models.SCIONLabAS) int {
-	var newIdFound = false
 	var ID = 1
-	var idFound bool
 	cns, _ := slas.GetConnectionInfo()
-	for !newIdFound {
-		idFound = false
+	for {
+		idFound := true
 		for _, cn := range cns {
-			if cn.Status != models.REMOVED {
-				if cn.BRID == ID {
-					idFound = true
-					break
-				}
+			if cn.Status != models.REMOVED && cn.BRID == ID {
+				idFound = false
+				ID++
+				break
 			}
 		}
 		if idFound {
-			ID++
-		} else {
-			newIdFound = true
+			return ID
 		}
 	}
-	return ID
 }
 
 // Generates the path to the temporary topology file
