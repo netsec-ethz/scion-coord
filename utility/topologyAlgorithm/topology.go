@@ -19,15 +19,6 @@ import (
 	"github.com/netsec-ethz/scion-coord/models"
 )
 
-const (
-	BW1  = 0.05
-	BW2  = 0.1
-	BW3  = 0.5
-	RTT1 = 10
-	RTT2 = 50
-	RTT3 = 100
-)
-
 type Neighbor struct {
 	ISD int
 	AS  int
@@ -41,7 +32,7 @@ func ChooseNeighbors(potentialneighbors []Neighbor, freePorts int) []Neighbor {
 	var neighbors []Neighbor
 	counter := 0
 	// compute number of new neighbors that will be chosen
-	newNeighbors := 3
+	newNeighbors := CHOSEN_NEIGHBORS
 	if freePorts < newNeighbors {
 		newNeighbors = freePorts
 	}
@@ -65,6 +56,13 @@ func chooseBestNeighbor(potentialneighbors []Neighbor) (Neighbor, int) {
 	var bestNb = potentialneighbors[0]
 	var index = 0
 	for i, nb := range potentialneighbors {
+		if bestNb.getDegree() >= MAX_NEIGHBORS{
+			bestNb = nb
+			index = i
+		}
+		if nb.getDegree() >= MAX_NEIGHBORS{
+			continue
+		}
 		if bestNb.getPF() > nb.getPF() {
 			sbNb, err := models.FindSCIONBoxByIAint(nb.ISD, nb.AS)
 			if err != nil {
