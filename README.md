@@ -7,8 +7,28 @@ SCIONLab Coordination service
 
 ##### Setup go, scion, and scion-coord
 
-Make sure that you have `go` and `python3` installed. Then, follow instructions 2 and 3 at 
-https://github.com/netsec-ethz/scion.
+
+
+Make sure that you have `go` and `python3` installed. 
+Make sure that you have a Go workspace setup, and that `~/.local/bin`, and `$GOPATH/bin` can be found in your `$PATH` variable. For example:
+
+```
+echo 'export GOPATH="$HOME/go"' >> ~/.profile
+echo 'export PATH="$HOME/.local/bin:$GOPATH/bin:$PATH"' >> ~/.profile
+source ~/.profile
+mkdir -p "$GOPATH"
+```
+
+Then, check out the `scionlab` branch of `netsec-scion` into the appropriate directory inside your go workspace:
+
+```
+mkdir -p "$GOPATH/src/github.com/netsec-ethz"
+cd "$GOPATH/src/github.com/netsec-ethz"
+git clone --recursive -b scionlab git@github.com:netsec-ethz/scion scion
+cd scion
+```
+
+If you don't have a github account, or haven't setup ssh access to it, this command will make git use https instead: `git config --global url.https://github.com/.insteadOf git@github.com:`
 
 Then, download this repository either by cloning it or by using 
 `go get github.com/netsec-ethz/scion-coord`.
