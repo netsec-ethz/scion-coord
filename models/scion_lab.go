@@ -85,9 +85,9 @@ type ConnectionInfo struct {
 	LocalIP        string
 	BindIP         string
 	BRID           uint16
-	RemotePort     uint16
-	LocalPort      uint16
-	Linktype       uint8 //"PARENT","CHILD"
+	NeighborPort   uint16 // port of the neighbor's border router
+	LocalPort      uint16 // port of the local border router
+	Linktype       uint8  //"PARENT","CHILD"
 	IsVPN          bool
 	Status         uint8
 }
@@ -295,7 +295,7 @@ func (as *SCIONLabAS) GetJoinConnectionInfo() ([]ConnectionInfo, error) {
 			LocalIP:        cn.JoinIP,
 			BindIP:         cn.JoinBindIP(),
 			BRID:           cn.JoinBRID,
-			RemotePort:     respondAS.GetPortNumberFromBRID(cn.RespondBRID),
+			NeighborPort:   respondAS.GetPortNumberFromBRID(cn.RespondBRID),
 			LocalPort:      joinAS.GetPortNumberFromBRID(cn.JoinBRID),
 			Linktype:       cn.Linktype,
 			IsVPN:          cn.IsVPN,
@@ -334,7 +334,7 @@ func (as *SCIONLabAS) GetRespondConnectionInfo() ([]ConnectionInfo, error) {
 			LocalIP:        cn.RespondIP,
 			BindIP:         cn.RespondBindIP(),
 			BRID:           cn.RespondBRID,
-			RemotePort:     joinAS.GetPortNumberFromBRID(cn.JoinBRID),
+			NeighborPort:   joinAS.GetPortNumberFromBRID(cn.JoinBRID),
 			LocalPort:      respondAS.GetPortNumberFromBRID(cn.RespondBRID),
 			Linktype:       linktype,
 			IsVPN:          cn.IsVPN,
