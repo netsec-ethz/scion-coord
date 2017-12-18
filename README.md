@@ -24,7 +24,7 @@ Then, check out the `scionlab` branch of `netsec-scion` into the appropriate dir
 ```
 mkdir -p "$GOPATH/src/github.com/netsec-ethz"
 cd "$GOPATH/src/github.com/netsec-ethz"
-git clone --recursive -b scionlab git@github.com:netsec-ethz/scion scion
+git clone --recursive -b scionlab git@github.com:netsec-ethz/netsec-scion scion
 cd scion
 ```
 
