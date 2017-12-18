@@ -105,26 +105,25 @@ func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http
 	isVPN, scionLabVMIP, userEmail, err := s.parseURLParameters(r)
 	if err != nil {
 		log.Printf("Error parsing the parameters: %v", err)
-		s.BadRequest(err, w, r)
+		s.BadRequest(w, err, "Error parsing the parameters")
 		return
 	}
 	// check if there is already a create or update in progress
 	canCreateOrUpdate, err := s.canCreateOrUpdate(userEmail)
 	if err != nil {
 		log.Printf("Error checking pending create or update. User: %v, %v", userEmail, err)
-		s.Error500(err, w, r)
+		s.Error500(w, err, "Error checking pending create or update")
 		return
 	}
 	if !canCreateOrUpdate {
-		s.BadRequest(fmt.Errorf("You have a pending operation. Please wait a few minutes."),
-			w, r)
+		s.BadRequest(w, nil, "You have a pending operation. Please wait a few minutes.")
 		return
 	}
 	// Target SCIONLab ISD and AS to connect to is determined by config file
 	svmInfo, err := s.getSCIONLabVMInfo(scionLabVMIP, userEmail, config.SERVER_IA, isVPN)
 	if err != nil {
 		log.Printf("Error getting SCIONLabVMInfo: %v", err)
-		s.Error500(err, w, r)
+		s.Error500(w, err, "Error getting SCIONLabVMInfo")
 		return
 	}
 	// Remove all existing files from UserPackagePath
@@ -133,33 +132,33 @@ func (s *SCIONLabVMController) GenerateSCIONLabVM(w http.ResponseWriter, r *http
 	// Generate topology file
 	if err = s.generateTopologyFile(svmInfo); err != nil {
 		log.Printf("Error generating topology file: %v", err)
-		s.Error500(err, w, r)
+		s.Error500(w, err, "Error generating topology file")
 		return
 	}
 	// Generate local gen
 	if err = s.generateLocalGen(svmInfo); err != nil {
 		log.Printf("Error generating local config: %v", err)
-		s.Error500(err, w, r)
+		s.Error500(w, err, "Error generating local config")
 		return
 	}
 	// Generate VPN config if this is a VPN setup
 	if svmInfo.IsVPN {
 		if err = s.generateVPNConfig(svmInfo); err != nil {
 			log.Printf("Error generating VPN config: %v", err)
-			s.Error500(err, w, r)
+			s.Error500(w, err, "Error generating VPN config")
 			return
 		}
 	}
 	// Package the VM
 	if err = s.packageSCIONLabVM(svmInfo.UserEmail); err != nil {
 		log.Printf("Error packaging SCIONLabVM: %v", err)
-		s.Error500(err, w, r)
+		s.Error500(w, err, "Error packaging SCIONLabVM")
 		return
 	}
 	// Persist the relevant data into the DB
 	if err = s.updateDB(svmInfo); err != nil {
 		log.Printf("Error updating DB tables: %v", err)
-		s.Error500(err, w, r)
+		s.Error500(w, err, "Error updating DB tables")
 		return
 	}
 
@@ -494,13 +493,13 @@ func (s *SCIONLabVMController) GetSCIONLabVMASes(w http.ResponseWriter, r *http.
 	log.Printf("Inside GetSCIONLabVMASes = %v", r.URL.Query())
 	scionLabAS := r.URL.Query().Get("scionLabAS")
 	if len(scionLabAS) == 0 {
-		s.BadRequest(fmt.Errorf("scionLabAS parameter missing."), w, r)
+		s.BadRequest(w, nil, "scionLabAS parameter missing")
 		return
 	}
 	vms, err := models.FindSCIONLabVMsByRemoteIA(scionLabAS)
 	if err != nil {
 		log.Printf("Error looking up SCIONLab VMs from DB. SCIONLabAS %v: %v", scionLabAS, err)
-		s.Error500(err, w, r)
+		s.Error500(w, err, "Error looking up SCIONLab VMs from DB")
 		return
 	}
 	vmsCreateResp := []SCIONLabVM{}
@@ -534,7 +533,7 @@ func (s *SCIONLabVMController) GetSCIONLabVMASes(w http.ResponseWriter, r *http.
 	b, err := json.Marshal(resp)
 	if err != nil {
 		log.Printf("Error during JSON Marshaling: %v", err)
-		s.Error500(err, w, r)
+		s.Error500(w, err, "Error during JSON Marshaling")
 		return
 	}
 	fmt.Fprintln(w, string(b))
@@ -558,7 +557,7 @@ func (s *SCIONLabVMController) ConfirmSCIONLabVMASes(w http.ResponseWriter, r *h
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&ASIDs2VMs); err != nil {
 		log.Printf("Error decoding JSON: %v, %v", r.Body, err)
-		s.BadRequest(err, w, r)
+		s.BadRequest(w, err, "Error decoding JSON")
 		return
 	}
 	failedConfirmations := []string{}
@@ -569,8 +568,8 @@ func (s *SCIONLabVMController) ConfirmSCIONLabVMASes(w http.ResponseWriter, r *h
 		}
 	}
 	if len(failedConfirmations) > 0 {
-		s.Error500(fmt.Errorf("Error processing confirmations for the following VMs: %v",
-			failedConfirmations), w, r)
+		s.Error500(w, nil, "Error processing confirmations for the following VMs: %v",
+			failedConfirmations)
 		return
 	}
 	fmt.Fprintln(w, "{}")
@@ -641,12 +640,14 @@ func sendConfirmationEmail(userEmail, action string) error {
 	data := struct {
 		FirstName   string
 		LastName    string
+		Protocol    string
 		HostAddress string
 		Message     string
-	}{user.FirstName, user.LastName, config.HTTP_HOST_ADDRESS, message}
+	}{user.FirstName, user.LastName, config.HTTP_PROTOCOL, config.HTTP_HOST_ADDRESS, message}
 
 	log.Printf("Sending confirmation email to user %v.", userEmail)
-	if err := email.ConstructAndSend("vm_status.html", subject, data, "vm-update", userEmail); err != nil {
+	if err := email.ConstructAndSend("vm_status.html", subject, data, "vm-update",
+		userEmail); err != nil {
 		return err
 	}
 
@@ -658,13 +659,14 @@ func (s *SCIONLabVMController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 	_, userSession, err := middleware.GetUserSession(r)
 	if err != nil {
 		log.Printf("Error getting the user session: %v", err)
-		s.Forbidden(err, w, r)
+		s.Forbidden(w, err, "Error getting the user session")
 		return
 	}
 	vm, err := models.FindSCIONLabVMByUserEmail(userSession.Email)
 	if err != nil || vm.Status == INACTIVE || vm.Status == REMOVE {
 		log.Printf("No active configuration found for user %v\n", userSession.Email)
-		s.BadRequest(errors.New("No active configuration found"), w, r)
+		s.BadRequest(w, nil, "No active configuration found for user %v",
+			userSession.Email)
 		return
 	}
 
@@ -673,7 +675,7 @@ func (s *SCIONLabVMController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		log.Printf("Error reading the tarball. FileName: %v, %v", fileName, err)
-		s.Error500(err, w, r)
+		s.Error500(w, err, "Error reading tarball")
 		return
 	}
 	w.Header().Set("Content-Type", "application/gzip")
@@ -688,25 +690,24 @@ func (s *SCIONLabVMController) RemoveSCIONLabVM(w http.ResponseWriter, r *http.R
 	_, userSession, err := middleware.GetUserSession(r)
 	if err != nil {
 		log.Printf("Error getting the user session: %v", err)
-		s.Error500(err, w, r)
+		s.Error500(w, err, "Error getting the user session")
 	}
 	userEmail := userSession.Email
 
 	// check if there is an active VM which can be removed
 	canRemove, svm, err := s.canRemove(userEmail)
 	if err != nil {
-		log.Printf("Error checking if your VM can be removed. User: %v, %v", userEmail, err)
-		s.Error500(err, w, r)
+		log.Printf("Error checking if VM can be removed. User: %v, %v", userEmail, err)
+		s.Error500(w, err, "Error checking if VM can be removed")
 		return
 	}
 	if !canRemove {
-		s.BadRequest(fmt.Errorf("You currently do not have an active SCIONLab VM."), w, r)
+		s.BadRequest(w, nil, "You currently do not have an active SCIONLab VM.")
 		return
 	}
 	svm.Status = REMOVE
 	if err := svm.Update(); err != nil {
-		s.Error500(fmt.Errorf("Error removing entry from SCIONLabVM Table. User: %v, %v",
-			userEmail, err), w, r)
+		s.Error500(w, err, "Error removing entry from SCIONLabVM Table")
 		return
 	}
 	log.Printf("Marked removal of SCIONLabVM of user %v.", userEmail)

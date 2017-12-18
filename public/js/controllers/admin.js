@@ -15,6 +15,8 @@ angular.module('scionApp')
                         // option to allow the email template to be changed
                         // $scope.emailTemplate = data["EmailTemplate"];
                         $scope.organisation = $rootScope.user["Organisation"];
+                        $scope.emailMessage = data["EmailMessage"];
+
                         $scope.redirectIfNotAdmin();
                         $scope.defaultInvitation = function () {
                             return {

@@ -1,26 +1,31 @@
-<!-- Site wrapper -->
 <div class="wrapper" ng-show="user">
 
-  <br/>
-  <br/>
-  <p>Welcome to SCIONLab! Your account credentials are the following:</p>
+  <div class="spacer"></div>
+  <h3>Welcome to SCIONLab!</h3>
 
-  <p><strong>AccountId:</strong> {{user.AccountID}}</p>
-  <p><strong>Secret:</strong> {{user.Secret}}</p>
   <div class="alert alert-info">
-    <p>{{vmInfo.VMText}} <span
-        ng-if="vmInfo.ShowIP">Your registered IP address is <strong>{{vmInfo.VMIP}}</strong>.</span>
+    <p>{{vmInfo.VMText}}
+      <span ng-if="vmInfo.IA">
+        You have been assigned the AS number <strong>{{vmInfo.IA}}</strong>.
+      </span>
+      <span ng-if="vmInfo.ShowIP">
+        Your registered IP address is <strong>{{vmInfo.VMIP}}</strong>.
+      </span>
       <span ng-if="vmInfo.ShowVPN">You have chosen a <strong>VPN-based</strong> setup.</span>
     </p>
   </div>
-  <div style="color:red">
-    <p>When you fill out and submit the form below, your SCIONLab VM configuration
-      for connecting to the designated SCIONLab AS will be packaged and downloaded.
+  <div>
+    <p>
+      You can create, update, and download a SCIONLab AS configuration using the form below.
       Please extract the downloaded tarball in a desired location and refer to the
-      README file inside for instructions.</p>
-    <p>If you have a static public IP address and can receive traffic at port 50000, the border
-      router listens on the public IP address. Otherwise, a vpn-based setup is set up for you,
-      such that you do not need to apply any further configuration.</p>
+      README.md file inside or the <a href="https://netsec-ethz.github.io/scion-tutorials/">
+      SCION tutorials</a> for instructions.
+    </p>
+    <p>
+      If you have a static public IP address and can receive traffic at port 50000, please select
+      that option below. Otherwise, a VPN-based setup is set up for you, such that you do not need
+      to apply any further configuration.
+    </p>
   </div>
   <br/>
 
@@ -44,7 +49,6 @@
       <div class="col-xs-12">
         <div id="buttongroup" ng-class="{true:'btn-group-vertical btn-block',
         false:'btn-group btn-group-justified'}[isSmall]">
-          <!--<div ng-repeat="button in buttonConfig">-->
           <div ng-repeat="button in buttonConfig" class="btn-group" role="group"
                ng-if="button.Hide == false">
             <button ng-click="submitForm(button.Action, user)" ng-disabled="button.Disable"
@@ -68,6 +72,4 @@
     </button>
     {{message}}
   </div>
-
 </div>
-<!-- ./wrapper -->

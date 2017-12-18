@@ -76,11 +76,61 @@ func (r *registrationRequest) isValid() error {
 	// check if any of this is empty
 	if r.Email == "" || r.Password == "" || r.PasswordConfirmation == "" ||
 		r.First == "" || r.Last == "" {
-		return fmt.Errorf("%s\n", "You entered incomplete data. First and last name, email and password are mandatory fields.")
+		return fmt.Errorf("%s\n", "You entered incomplete data. First and last name, email and "+
+			"password are mandatory fields.")
 	}
 
 	// check if the password match and that the length is at least 8 chars
 	return passwordsAreValid(r.Password, r.PasswordConfirmation)
+}
+
+// Method used to reset password and send user an email
+func (c *RegistrationController) ResetPassword(w http.ResponseWriter, r *http.Request) {
+
+	// parse the form value
+	if err := r.ParseForm(); err != nil {
+		log.Println(err)
+		c.Error500(w, err, "Parsing form values failed.")
+		return
+	}
+
+	userEmail := r.FormValue("userEmail")
+	u, err := models.FindUserByEmail(userEmail)
+	if err != nil {
+		log.Println(err)
+		c.BadRequest(w, err, "User not found")
+		return
+	}
+
+	if err = u.ResetUUID(); err != nil {
+		log.Printf("Error resetting UUID for user %v: %v", u.Email, err)
+		c.BadRequest(w, err, "Error resetting UUID")
+		return
+	}
+	if err = u.UpdatePassword(""); err != nil {
+		log.Printf("Error resetting password for user %v: %v", u.Email, err)
+		c.BadRequest(w, err, "Error resetting password")
+		return
+	}
+	data := email.EmailData{
+		FirstName:        u.FirstName,
+		LastName:         u.LastName,
+		HostAddress:      config.HTTP_HOST_ADDRESS,
+		VerificationUUID: u.VerificationUUID,
+		Protocol:         config.HTTP_PROTOCOL,
+	}
+	if err = email.ConstructAndSend(
+		"password_reset.html",
+		"[SCIONLab] Password reset",
+		data,
+		"password-reset",
+		userEmail); err != nil {
+		log.Printf("Error sending password-reset email to user %v: %v", u.Email, err)
+		c.BadRequest(w, err, "Error sending email")
+		return
+	}
+
+	return
 }
 
 // Method used to set password after pre-approved registration or password reset
@@ -89,7 +139,7 @@ func (c *RegistrationController) SetPassword(w http.ResponseWriter, r *http.Requ
 	// parse the form value
 	if err := r.ParseForm(); err != nil {
 		log.Println(err)
-		c.Error500(fmt.Errorf("Parsing form values failed."), w, r)
+		c.Error500(w, err, "Parsing form values failed")
 		return
 	}
 
@@ -100,13 +150,13 @@ func (c *RegistrationController) SetPassword(w http.ResponseWriter, r *http.Requ
 	// check if the parsing succeeded
 	if err := decoder.Decode(&passRequest); err != nil {
 		log.Println(err)
-		c.Error500(fmt.Errorf("Parsing form values failed."), w, r)
+		c.Error500(w, err, "Error parsing form values failed")
 		return
 	}
 
 	if err := passwordsAreValid(passRequest.Password, passRequest.PasswordConfirmation); err != nil {
 		log.Println(err)
-		c.Error500(err, w, r)
+		c.Error500(w, err, "Password invalid")
 		return
 	}
 
@@ -114,19 +164,19 @@ func (c *RegistrationController) SetPassword(w http.ResponseWriter, r *http.Requ
 	user, err := models.FindUserByVerificationUUID(passRequest.UUID)
 
 	if err != nil {
-		log.Printf("Error setting password. %v is not a valid UUID.", passRequest.UUID)
-		c.BadRequest(fmt.Errorf("Error verifying email address. %v is not a valid user identifier.", passRequest.UUID), w, r)
+		log.Printf("Error setting password: %v is not a valid UUID", passRequest.UUID)
+		c.BadRequest(w, nil, "Error verifying email address: %v is not a valid user identifier", passRequest.UUID)
 		return
 	}
 
 	if !user.PasswordInvalid {
-		c.Error500(fmt.Errorf("Password is already set."), w, r)
+		c.Error500(w, nil, "Password is already set")
 		return
 	}
 
 	if err := user.UpdatePassword(passRequest.Password); err != nil {
 		log.Printf("Error updating the password in the database: %v", err)
-		c.Error500(fmt.Errorf("Error updating the password in the database"), w, r)
+		c.Error500(w, err, "Error updating the password in the database")
 		return
 	}
 
@@ -144,8 +194,8 @@ func (c *RegistrationController) VerifyEmail(w http.ResponseWriter, r *http.Requ
 	u, err := models.FindUserByVerificationUUID(uuid)
 
 	if err != nil {
-		log.Printf("Error verifying email address. %v is not a valid UUID.", uuid)
-		c.BadRequest(fmt.Errorf("Error verifying email address. %v is not a valid user identifier.", uuid), w, r)
+		log.Printf("Error verifying email address: %v is not a valid UUID.", uuid)
+		c.BadRequest(w, nil, "Error verifying email address: %v is not a valid user identifier", uuid)
 		return
 	}
 
@@ -156,16 +206,17 @@ func (c *RegistrationController) VerifyEmail(w http.ResponseWriter, r *http.Requ
 		if err := u.UpdateVerified(true); err != nil {
 			log.Printf("Error verifying email address for user %v: %v.", u.Email, err)
 			// TODO: Pass the user a unique error ID which links to the specific error and allows for debugging
-			c.Error500(fmt.Errorf("Error verifying email address for user %v.", u.Email), w, r)
+			c.Error500(w, nil, "Error verifying email address for user %v", u.Email)
 			return
 		}
 	}
 
+	// TODO (mlegner): Make verification page consistent with the rest of the website
 	// load validation page
 	t, err := template.ParseFiles("templates/layout.html", "templates/verified.html")
 	if err != nil {
 		log.Printf("Error parsing HTML files: %v", err)
-		c.Error500(err, w, r)
+		c.Error500(w, err, "Error parsing HTML files")
 		return
 	}
 	c.Render(t, u, w, r)
@@ -178,7 +229,7 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 	// parse the form value
 	if err := r.ParseForm(); err != nil {
 		log.Println(err)
-		http.Error(w, "{}", http.StatusInternalServerError)
+		c.Error500(w, err, "Error parsing form values")
 		return
 	}
 
@@ -189,14 +240,14 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 	// check if the parsing succeeded
 	if err := decoder.Decode(&regRequest); err != nil {
 		log.Println(err)
-		c.Error500(err, w, r)
+		c.Error500(w, err, "Error decoding JSON")
 		return
 	}
 
 	// validate the data
 	if err := regRequest.isValid(); err != nil {
 		log.Println(err)
-		c.Error500(err, w, r)
+		c.Error500(w, err, "Invalid form data")
 		return
 	}
 
@@ -207,7 +258,7 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 
 	if err != nil {
 		log.Printf("Error registering the user: %v", err)
-		c.Error500(err, w, r)
+		c.Error500(w, err, "Error registering the user")
 		return
 	} else {
 		c.JSON(&user, w, r)
@@ -216,7 +267,7 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 	// Send email address confirmation link
 	if err := sendVerificationEmail(user.Id); err != nil {
 		log.Printf("Error sending verification email: %v", err)
-		c.Error500(err, w, r)
+		c.Error500(w, err, "Error sending verification email")
 	}
 
 }
@@ -229,18 +280,18 @@ func (c *RegistrationController) ResendActivationLink(w http.ResponseWriter, r *
 
 	user, err := models.FindUserByEmail(r.PostFormValue("email"))
 	if err != nil {
-		c.Error500(fmt.Errorf("User %v was not found", r.PostFormValue("email")), w, r)
+		c.Error500(w, err, "User %v was not found", r.PostFormValue("email"))
 		return
 	}
 
 	if user.Verified {
-		c.Error500(fmt.Errorf("User %v is already verified", user.Email), w, r)
+		c.Error500(w, nil, "User %v is already verified", user.Email)
 		return
 	}
 
 	if err := sendVerificationEmail(user.Id); err != nil {
 		log.Printf("Error sending verification email: %v", err)
-		c.Error500(fmt.Errorf("Error sending verification email: %v", err), w, r)
+		c.Error500(w, err, "Error sending verification email")
 		return
 	}
 
@@ -256,12 +307,13 @@ func sendVerificationEmail(userID uint64) error {
 		return err
 	}
 
-	data := struct {
-		FirstName        string
-		LastName         string
-		HostAddress      string
-		VerificationUUID string
-	}{user.FirstName, user.LastName, config.HTTP_HOST_ADDRESS, user.VerificationUUID}
+	data := email.EmailData{
+		FirstName:        user.FirstName,
+		LastName:         user.LastName,
+		Protocol:         config.HTTP_PROTOCOL,
+		HostAddress:      config.HTTP_HOST_ADDRESS,
+		VerificationUUID: user.VerificationUUID,
+	}
 
 	if err := email.ConstructAndSend(
 		"verification.html",

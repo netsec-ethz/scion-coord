@@ -332,3 +332,10 @@ func (u *user) UpdatePassword(password string) (err error) {
 	_, err = o.Update(u, "Password", "PasswordInvalid", "Updated")
 	return
 }
+
+func (u *user) ResetUUID() error {
+	u.VerificationUUID = uuid.New()
+	u.Updated = time.Now().UTC()
+	_, err := o.Update(u, "VerificationUUID", "Updated")
+	return err
+}

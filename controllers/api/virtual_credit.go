@@ -50,7 +50,7 @@ var systemDisabledError error = errors.New("VirtualCredit system disabled. This 
 
 func (c *ASController) ListASesConnectionsWithCredits(w http.ResponseWriter, r *http.Request) {
 	if config.VIRTUAL_CREDIT_ENABLE == false {
-		c.NotFound(systemDisabledError, w, r)
+		c.NotFound(w, nil, systemDisabledError.Error())
 		return
 	}
 
@@ -64,13 +64,13 @@ func (c *ASController) ListASesConnectionsWithCredits(w http.ResponseWriter, r *
 	vars := mux.Vars(r)
 	isdas, ok := vars["isdas"]
 	if !ok {
-		c.BadRequest(errors.New("missing isdas parameter"), w, r)
+		c.BadRequest(w, nil, "missing isdas parameter")
 		return
 	}
 
 	requestingAS, err := models.FindAsByIsdAs(isdas)
 	if err != nil {
-		c.NotFound(errors.New(isdas+" not found"), w, r)
+		c.NotFound(w, err, isdas+" not found")
 		return
 	}
 	response.ISD = requestingAS.Isd
@@ -80,7 +80,7 @@ func (c *ASController) ListASesConnectionsWithCredits(w http.ResponseWriter, r *
 	connections, err := requestingAS.ListConnections()
 	if err != nil {
 		log.Printf("Error while retrieving list of ASes. ISD-AS: %v", requestingAS)
-		c.BadRequest(err, w, r)
+		c.BadRequest(w, err, "Error while retrieving list of ASes. ISD-As: %v", requestingAS)
 		return
 	}
 	response.Connections = connections
@@ -88,7 +88,7 @@ func (c *ASController) ListASesConnectionsWithCredits(w http.ResponseWriter, r *
 	b, err := json.Marshal(response)
 	if err != nil {
 		log.Printf("Error during JSON Marshaling. ISD-AS: %v, %v", requestingAS, err)
-		c.Error500(err, w, r)
+		c.Error500(w, err, "Error during JSON Marshaling. ISD-AS: %v", requestingAS)
 		return
 	}
 	fmt.Fprintln(w, string(b))
@@ -112,23 +112,23 @@ func (c *ASController) checkAndUpdateCredits(w http.ResponseWriter, r *http.Requ
 	as, err := models.FindAsByIsdAs(cr.RequestIA)
 	if err != nil {
 		log.Printf("Error: Unkown AS: %v, %v", r.Body, err)
-		c.BadRequest(err, w, r)
+		c.BadRequest(w, err, "Error: Unkown AS: %v", r.Body)
 		return err
 	}
 
 	var creditsNeeded = models.BandwidthToCredits(cr.Bandwidth)
 	if (as.Credits - creditsNeeded) <= 0 {
-		err = errors.New(fmt.Sprintf("Error: Not enough credits to create a connection request! "+
-			"You need %v, but have only %v", creditsNeeded, as.Credits))
+		err = fmt.Errorf("Error: Not enough credits to create a connection request! "+
+			"You need %v, but have only %v", creditsNeeded, as.Credits)
 		log.Printf("Info: Not enough credits! AS: %v, Request: %v, Error: %v", as, r.Body, err)
-		c.BadRequest(err, w, r)
+		c.BadRequest(w, err, "Info: Not enough credits! AS: %v, Request: %v", as, r.Body)
 		return err
 	}
 
 	// Subtracting credits from AS
 	if err := as.UpdateCurrency(-1 * creditsNeeded); err != nil {
 		log.Printf("Error: Subtracting credits! AS: %v, Request: %v, Error: %v", as, r.Body, err)
-		c.Error500(err, w, r)
+		c.Error500(w, err, "Error: Subtracting credits! AS: %v, Request: %v", as, r.Body)
 		return err
 	}
 	return nil
@@ -156,19 +156,20 @@ func (c *ASController) checkAndUpdateCreditsAtResponse(w http.ResponseWriter, r 
 		if err != nil {
 			log.Printf("Error finding the RespondIA. Request ID: %v RequestIA: %v, RespondIA: %v, %v",
 				reply.RequestId, reply.RequestIA, reply.RespondIA, err)
-			c.Error500(err, w, r)
+			c.Error500(w, err, "Error finding the RespondIA. Request ID: %v RequestIA: %v, RespondIA: %v",
+				reply.RequestId, reply.RequestIA, reply.RespondIA)
 			return err
 		}
 		if err := otherAs.UpdateCurrency(credits); err != nil {
 			log.Printf("Error: Adding credits! OtherAS: %v, Request: %v, Error: %v", otherAs, r.Body, err)
-			c.Error500(err, w, r)
+			c.Error500(w, err, "Error: Adding credits! OtherAS: %v, Request: %v", otherAs, r.Body)
 			return err
 		}
 		// If the connection request is denied, release the reserved credits for the connection
 	} else if cr.Status != models.PENDING {
 		if err := as.UpdateCurrency(credits); err != nil {
 			log.Printf("Error: Readding credits! ThisAS: %v, Request: %v, Error: %v", as, r.Body, err)
-			c.Error500(err, w, r)
+			c.Error500(w, err, "Error: Readding credits! ThisAS: %v, Request: %v", as, r.Body)
 			return err
 		}
 	}
@@ -189,7 +190,7 @@ func (c *ASController) rollBackCreditUpdate(w http.ResponseWriter, r *http.Reque
 	as, err := models.FindAsByIsdAs(cr.RequestIA)
 	if err != nil {
 		log.Printf("Error: Unkown AS: %v, %v", r.Body, err)
-		c.BadRequest(err, w, r)
+		c.BadRequest(w, err, "Error: Unkown AS: %v", r.Body)
 		return
 	}
 
