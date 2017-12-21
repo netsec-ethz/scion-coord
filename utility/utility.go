@@ -18,13 +18,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"html/template"
 	"io"
 	"net"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
+	"text/template"
 )
 
 // Simple utility function to copy a file.
