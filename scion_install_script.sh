@@ -96,7 +96,6 @@ cd scion
 if  [[ ( ! -z ${patch_dir+x} ) && -d ${patch_dir} ]]
 then
     echo "Applying patches:"
-    
     patch_files="$patch_dir/*.patch"
 
     for f in $patch_files;
