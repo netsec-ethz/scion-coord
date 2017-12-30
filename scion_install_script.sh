@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 shopt -s nullglob
 
 usage="$(basename "$0") [-p PATCH_DIR] [-g GEN_DIR] [-v VPN_CONF_PATH] \
@@ -94,7 +96,7 @@ cd scion
 if  [[ ( ! -z ${patch_dir+x} ) && -d ${patch_dir} ]]
 then
     echo "Applying patches:"
-
+    
     patch_files="$patch_dir/*.patch"
 
     for f in $patch_files;
@@ -103,7 +105,7 @@ then
         git apply "$f"
     done
 
-    git_username=$(git config user.name)
+    git_username=$(git config user.name || true)
 
     # We need to have git user in order to commit
     if [ -z "$git_username" ]
