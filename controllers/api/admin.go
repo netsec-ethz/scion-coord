@@ -32,8 +32,9 @@ type AdminController struct {
 }
 
 type adminPageData struct {
-	User         user
-	EmailMessage string
+	User           user
+	EmailMessage   string
+	UserActivation bool
 }
 
 type invitationInfo struct {
@@ -69,8 +70,9 @@ func (c AdminController) AdminInformation(w http.ResponseWriter, r *http.Request
 	text, err := ioutil.ReadFile(email.EmailTemplatePath(invitationsTemplate))
 
 	adminData := adminPageData{
-		User:         user,
-		EmailMessage: string(text),
+		User:           user,
+		EmailMessage:   string(text),
+		UserActivation: config.USER_ACTIVATION,
 	}
 
 	c.JSON(&adminData, w, r)
@@ -157,4 +159,85 @@ func (c AdminController) SendInvitationEmails(w http.ResponseWriter, r *http.Req
 		c.JSON(map[string][]string{"messages": errors, "emails": errorEmails}, w, r)
 		return
 	}
+}
+
+// LoadUnactivatedUsers loads all users from db that are verified but not yet activated and passes it to the front end
+func (c AdminController) LoadUnactivatedUsers(w http.ResponseWriter, r *http.Request) {
+
+	if !config.USER_ACTIVATION {
+		log.Printf("Error loading inactive users: User activation feature is turned off")
+		c.Error500(w, nil, "Error loading inactive users: User activation feature is turned off")
+		return
+	}
+
+	// load the users from the database
+	users, err := models.GetVerifiedUnactivatedUsers()
+	if err != nil {
+		log.Printf("Error loading inactive users: %v", err)
+		c.Error500(w, err, "Error loading inactive users")
+		return
+	}
+
+	// strip away unneeded data
+	// NOTE: due to a limitation with the database driver this can not be done via the database query yet
+	for i := range *users {
+		account := new(models.Account)
+		account.Organisation = (*users)[i].Account.Organisation
+		(*users)[i].Account = account
+	}
+
+	// admin will be notified again once a new user registers
+	notifyAdmin = true
+
+	c.JSON(users, w, r)
+}
+
+func (c AdminController) ActivateUser(w http.ResponseWriter, r *http.Request) {
+
+	if !config.USER_ACTIVATION {
+		log.Printf("Error loading inactive users: User activation feature is turned off")
+		c.Error500(w, nil, "Error loading inactive users: User activation feature is turned off")
+		return
+	}
+
+	// read email from request form
+	userEmail := r.PostFormValue("email")
+	if userEmail == "" {
+		log.Printf("Error activating user: email is empty")
+		c.Error500(w, nil, "Error activating user: email is empty")
+		return
+	}
+
+	// find user by email and activate
+	user, err := models.FindUserByEmail(userEmail)
+	if err != nil {
+		log.Printf("Error: User with email %v not found: %v", userEmail, err)
+		c.Error500(w, err, "User with email %v not found", userEmail)
+		return
+	}
+
+	if err := user.UpdateActivated(true); err != nil {
+		log.Printf("Error activating user %v: %v", userEmail, err)
+		c.Error500(w, err, "Error activating user %v", userEmail)
+		return
+	}
+
+	// send notification email to user
+	data := email.EmailData{
+		FirstName:   user.FirstName,
+		LastName:    user.LastName,
+		Protocol:    config.HTTP_PROTOCOL,
+		HostAddress: config.HTTP_HOST_ADDRESS,
+	}
+
+	email.ConstructAndSend(
+		"activation.html",
+		"[SCIONLab] Activation of your account",
+		data,
+		"scion-activation",
+		user.Email)
+
+	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
+	w.WriteHeader(http.StatusNoContent)
+
 }

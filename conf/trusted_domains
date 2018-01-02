@@ -1,0 +1,5 @@
+# Accounts with email addresses from domains in this list are automatically activated and do not need 
+# manual activation by an administrator 
+# Inlcude domains of the following form: 'example.com', 'sub1.sub2...example.com' or whole addresses like 'user@example.com'
+
+test.domain.ch

@@ -77,7 +77,7 @@ func Send(mail *Email) error {
 // their userEmail by filling in the specified template with the given subject
 // and information in the data object
 func ConstructAndSend(emailTemplate string, subject string, data interface{},
-	tag string, userEmail string) (err error) {
+	tag string, userEmails ...string) (err error) {
 
 	tmpl, err := template.ParseFiles(EmailTemplatePath(emailTemplate))
 	if err != nil {
@@ -91,13 +91,13 @@ func ConstructAndSend(emailTemplate string, subject string, data interface{},
 
 	mail := new(Email)
 	mail.From = config.EMAIL_FROM
-	mail.To = []string{userEmail}
+	mail.To = userEmails
 	mail.Subject = subject
 	mail.Body = body
 	mail.Tag = tag
 
 	if err = Send(mail); err != nil {
-		log.Printf("Sending email to %v failed: %v", userEmail, err)
+		log.Printf("Sending email to %v failed: %v", userEmails, err)
 		return err
 	}
 

@@ -15,14 +15,14 @@
 package api
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
-	"github.com/gorilla/mux"
 	"github.com/haisum/recaptcha"
 	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/controllers"
@@ -50,6 +50,14 @@ type passwordRequest struct {
 	Password             string `json:"password"`
 	PasswordConfirmation string `json:"password_confirmation"`
 }
+
+type verificationResponse struct {
+	Activated bool
+	FirstName string
+	LastName  string
+}
+
+var notifyAdmin bool = true
 
 // check if the password match and that the length is at least 8 chars
 func passwordsAreValid(password, passwordConfirmation string) error {
@@ -184,43 +192,74 @@ func (c *RegistrationController) SetPassword(w http.ResponseWriter, r *http.Requ
 	return
 }
 
-// Method used to validate email address
+// VerifyEmail verifies a user's email address and sets the user to activated if trusted
 func (c *RegistrationController) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 
-	//retrieve submitted uuid
-	uuid := mux.Vars(r)["uuid"]
+	// retrieve submitted uuid
+	uuid := r.PostFormValue("uuid")
 
-	//validate link
+	// validate link
 	u, err := models.FindUserByVerificationUUID(uuid)
-
 	if err != nil {
 		log.Printf("Error verifying email address: %v is not a valid UUID.", uuid)
 		c.BadRequest(w, nil, "Error verifying email address: %v is not a valid user identifier", uuid)
 		return
 	}
 
+	// check if user is already verified
 	if u.Verified {
 		log.Printf("User %v is already verified.", u.Email)
 	} else {
 		// update user
 		if err := u.UpdateVerified(true); err != nil {
 			log.Printf("Error verifying email address for user %v: %v.", u.Email, err)
-			// TODO: Pass the user a unique error ID which links to the specific error and allows for debugging
 			c.Error500(w, nil, "Error verifying email address for user %v", u.Email)
 			return
 		}
 	}
 
-	// TODO (mlegner): Make verification page consistent with the rest of the website
-	// load validation page
-	t, err := template.ParseFiles("templates/layout.html", "templates/verified.html")
-	if err != nil {
-		log.Printf("Error parsing HTML files: %v", err)
-		c.Error500(w, err, "Error parsing HTML files")
+	// if user activation feature is turned on and the user is trusted set it to activated
+	// if the feature is off, also set it to activated
+	if trusted, err := trustedDomain(u.Email); err != nil { // error checking against trusted domains
+		log.Printf("Error checking %v against trusted domains: %v", u.Email, err)
+		c.Error500(w, err, "Error checking %v against trusted domains", u.Email)
 		return
-	}
-	c.Render(t, u, w, r)
+	} else if !config.USER_ACTIVATION || trusted { // email domain is whitelisted or activation feature is turned off
+		if err := u.UpdateActivated(true); err != nil {
+			log.Printf("Error activating user %v: %v", u.Email, err)
+			c.Error500(w, err, "Error activating user %v", u.Email)
+			return
+		}
+	} else if notifyAdmin { // email domain is not whitelisted and feature is turned on, needs manual activation
+		// notify admins
+		admins, err := loadAdmins()
+		if err != nil {
+			log.Printf("Error sending notification to administrators: %v", err)
+		} else {
+			data := email.EmailData{
+				Protocol:    config.HTTP_PROTOCOL,
+				HostAddress: config.HTTP_HOST_ADDRESS,
+			}
 
+			email.ConstructAndSend(
+				"pending_activations.html",
+				"[SCIONLab] Pending user activations",
+				data,
+				"scion-pending",
+				admins...)
+
+			// disable admin notifications for subsequent users
+			notifyAdmin = false
+		}
+	}
+
+	data := verificationResponse{
+		Activated: u.Activated,
+		FirstName: u.FirstName,
+		LastName:  u.LastName,
+	}
+
+	c.JSON(&data, w, r)
 }
 
 // This method is used to register a new account via the standard form
@@ -325,4 +364,34 @@ func sendVerificationEmail(userID uint64) error {
 	}
 
 	return nil
+}
+
+// Helper function that checks if a given email address is from a trusted domain
+func trustedDomain(email string) (bool, error) {
+	file, _ := os.Open("conf/trusted_domains")
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	b := false
+	for scanner.Scan() {
+		ref := scanner.Text()
+		if strings.HasSuffix(email, "."+ref) || strings.HasSuffix(email, "@"+ref) || email == ref {
+			b = true
+			break
+		}
+	}
+
+	return b, scanner.Err()
+}
+
+func loadAdmins() ([]string, error) {
+	var ids []string
+	u, err := models.FindUsersByRole(true)
+	if err != nil {
+		log.Printf("Loading admins failed: %v", err)
+		return nil, err
+	}
+	for _, user := range *u {
+		ids = append(ids, user.Email)
+	}
+	return ids, nil
 }

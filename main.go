@@ -178,8 +178,12 @@ func main() {
 	router.Handle("/api/userPageData", apiChain.ThenFunc(loginController.UserInformation))
 
 	// email validation
-	router.Handle("/api/verifyEmail/{uuid}", loggingChain.ThenFunc(
+	router.Handle("/api/verifyEmail", loggingChain.ThenFunc(
 		registrationController.VerifyEmail))
+
+	// user activation
+	router.Handle("/api/activateUser", adminChain.ThenFunc(adminController.ActivateUser)).Methods(http.MethodPost)
+	router.Handle("/api/loadUnactivatedUsers", adminChain.ThenFunc(adminController.LoadUnactivatedUsers))
 
 	// set password after pre-approved registration or password reset
 	router.Handle("/api/setPassword", loggingChain.ThenFunc(

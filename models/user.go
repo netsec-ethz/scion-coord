@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/astaxie/beego/orm"
+	"github.com/netsec-ethz/scion-coord/config"
 	uuid "github.com/pborman/uuid"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/crypto/scrypt"
@@ -57,6 +58,7 @@ type user struct {
 	FirstName        string
 	LastName         string
 	Verified         bool     // whether the user verified the email
+	Activated        bool     // wheter the user is activated, implies Verified
 	IsAdmin          bool     // whether the user is marked as admin
 	VerificationUUID string   // uuid sent to user to verify email
 	Account          *Account `orm:"rel(fk);index"`
@@ -211,6 +213,12 @@ func FindUserByAccountIdSecret(acc_id, secret string) (*Account, error) {
 	return u, err
 }
 
+func FindUsersByRole(isAdmin bool) (*[]user, error) {
+	var u []user
+	_, err := o.QueryTable("user").Filter("IsAdmin", isAdmin).All(&u)
+	return &u, err
+}
+
 func FindAccountByAccountId(acc_id string) (*Account, error) {
 	u := new(Account)
 	err := o.QueryTable(u).Filter("AccountId", acc_id).One(u)
@@ -235,12 +243,21 @@ func (u *user) Authenticate(password string) error {
 
 	// the user did less than N login attempts
 	//if u.FailedAttempts <= MAX_LOGIN_ATTEMPTS {
+
+	if u.PasswordInvalid {
+		return errors.New("Password is invalid")
+	}
+
 	if err := u.checkPassword(password); err != nil {
 		return err
 	}
 
-	if err := u.CheckVerified(); err != nil {
-		return err
+	if !u.Verified {
+		return errors.New("Email is not verified")
+	}
+
+	if config.USER_ACTIVATION && !u.Activated {
+		return errors.New("User is not activated")
 	}
 
 	return nil
@@ -276,13 +293,6 @@ func (u *user) checkPassword(password string) error {
 	return errors.New("Password invalid")
 }
 
-func (u *user) CheckVerified() error {
-	if !u.Verified {
-		return errors.New("Email is not verified")
-	}
-	return nil
-}
-
 func validUserPassword(storedPassHex, storedSaltHex, password string) bool {
 
 	// decode the salt from HEX to bytes
@@ -315,6 +325,13 @@ func (u *user) UpdateVerified(value bool) error {
 	return err
 }
 
+func (u *user) UpdateActivated(value bool) error {
+	u.Activated = value
+	u.Updated = time.Now().UTC()
+	_, err := o.Update(u, "Activated", "Updated")
+	return err
+}
+
 func (u *user) UpdatePassword(password string) (err error) {
 	storedSalt, err := hex.DecodeString(u.Salt)
 	if err != nil {
@@ -338,4 +355,10 @@ func (u *user) ResetUUID() error {
 	u.Updated = time.Now().UTC()
 	_, err := o.Update(u, "VerificationUUID", "Updated")
 	return err
+}
+
+func GetVerifiedUnactivatedUsers() (*[]user, error) {
+	var u []user
+	_, err := o.QueryTable("user").Filter("Verified", 1).Filter("Activated", 0).RelatedSel("Account").All(&u, "Email", "FirstName", "LastName")
+	return &u, err
 }

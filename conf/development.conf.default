@@ -77,3 +77,6 @@ server.vpn.end_ip = "10.0.8.254"
 virtualCredit.enable = false
 # 1 Credit = 10 MegaBits/s worth of bandwidth
 virtualCredit.startCredit = 100
+
+#User activation feature
+user_activation = 0

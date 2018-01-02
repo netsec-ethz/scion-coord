@@ -269,4 +269,30 @@ func Test(t *testing.T) {
 	for _, cn := range cns3 {
 		t.Log("Connection s3: %v", cn)
 	}
+
+	// clean up
+
+	if err := u1.Account.Delete(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := u2.Account.Delete(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := u3.Account.Delete(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := u1.Delete(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := u2.Delete(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := u3.Delete(); err != nil {
+		t.Fatal(err)
+	}
 }

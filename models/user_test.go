@@ -16,11 +16,13 @@ package models
 
 import (
 	"testing"
+
+	"github.com/netsec-ethz/scion-coord/config"
 )
 
 func TestCreateUser(t *testing.T) {
 	email := "sebastian.cogno@swisscom.com"
-	password := "this is my password nobidy should copy it"
+	password := "this is my password nobody should copy it"
 
 	_, err := RegisterUser("scion", "Scion Test-Bed", email, password, "Jon", "Doe")
 	if err != nil {
@@ -69,13 +71,22 @@ func TestCreateUser(t *testing.T) {
 		t.Error("Empty account secret")
 	}
 
+	// switch on user activation for testing
+	config.USER_ACTIVATION = true
+
 	// check authentication
 	if err := user.Authenticate(password); err.Error() != "Email is not verified" {
 		t.Error(err)
 	}
 
-	//verify user and authenticate again
+	// verify user and authenticate again
 	user.UpdateVerified(true)
+	if err := user.Authenticate(password); err.Error() != "User is not activated" {
+		t.Error(err)
+	}
+
+	// Activate user and authenticate again
+	user.UpdateActivated(true)
 	if err := user.Authenticate(password); err != nil {
 		t.Error("Could not authenticate")
 	}
