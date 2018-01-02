@@ -25,7 +25,11 @@ scionApp
                                 break;
                             case "902":
                                 err = "You have not set a valid password. Please check your " +
-                                    "email and follow the link to set a new password";
+                                    "email and follow the link to set a new password.";
+                                break;
+                            case "903":
+                                err = "Your account is not yet activated. You " +
+                                    "receive an email as soon as your account is approved.";
                                 break;
                             default:
                                 err = "Failed to log you in: Make sure your email address and " +

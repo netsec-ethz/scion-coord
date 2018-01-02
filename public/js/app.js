@@ -33,6 +33,10 @@ const scionApp = angular.module('scionApp', [
             templateUrl: '/public/partials/admin.html',
             controller: 'adminCtrl'
         })
+        .when('/verifyEmail/:uuid', {
+            templateUrl: '/public/partials/email_verification.html',
+            controller: 'verificationCtrl'
+        })
         .otherwise({
             redirectTo: '/login'
         });
