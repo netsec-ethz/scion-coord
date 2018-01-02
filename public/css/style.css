@@ -12,6 +12,18 @@ input.ng-dirty.ng-invalid{
 .footer {
   padding-top: 10px;
 }
-td {
-  vertical-align:top;
+table {
+  font-family: arial, sans-serif;
+  border-collapse: collapse;
+  width: 100%;
 }
+td, th {
+  vertical-align:top;
+  border: 1px solid #dddddd;
+  text-align: left;
+  padding: 8px;
+}
+tr:nth-child(even) {
+  background-color: #dddddd;
+}
+

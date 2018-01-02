@@ -1,0 +1,9 @@
+<div style="max-width: 800px; margin: 10% auto 5% auto; padding: 50px 50px; background: #cccccc">
+    <h1>Congratulations {{firstName}} {{lastName}}!</h1>
+    <p> You have successfully verified your email address.</p>
+    <p ng-hide="activated"> You will receive an email as soon as your account is approved by an administrator.</p>
+    <p ng-show="activated"> Start using SCION Coordination Service now by logging in.</p>
+</div>
+<div style="max-width: 400px; margin: 5% auto">
+    <p><a href="/#/login"> <input type="submit" value="Go to the front page" class="btn btn-primary btn-block" ></a></p>
+</div>

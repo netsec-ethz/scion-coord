@@ -16,8 +16,10 @@ angular.module('scionApp')
                         // $scope.emailTemplate = data["EmailTemplate"];
                         $scope.organisation = $rootScope.user["Organisation"];
                         $scope.emailMessage = data["EmailMessage"];
+                        $scope.userActivation = data["UserActivation"]
 
                         $scope.redirectIfNotAdmin();
+                        $scope.loadPendingUsers();
                         $scope.defaultInvitation = function () {
                             return {
                                 Organisation: $scope.organisation,
@@ -53,8 +55,8 @@ angular.module('scionApp')
                 $scope.message = "";
             };
 
-            $scope.dismissError = function () {
-                $scope.error = "";
+            $scope.dismissError = function (model) {
+                $scope[model] = "";
             };
 
             $scope.sendInvitations = function (invitations) {
@@ -86,6 +88,32 @@ angular.module('scionApp')
                         $scope.message = "";
                         console.log(response);
                     });
+            };
+
+            
+            $scope.activate = function (index) {
+            var promise = adminService.activateUser($scope.users[index].Email);
+            promise.then(
+                function (response) {
+                    $scope.users[index].disabled = "true"; // on success, mark user as activated
+                },
+                function(response){
+                    $scope.activationError = "There was an error activating user " +
+                        $scope.users[index].Email + ".";
+                });
+            };
+
+            $scope.loadPendingUsers = function(){
+                if ($scope.userActivation){
+                    var promise = adminService.loadUsers()
+                    promise.then(
+                        function (response) {
+                            $scope.users = response.data;
+                        },
+                        function (response){
+                            $scope.activationError = "There was an error loading the list of pending users.";
+                        });
+                }
             };
         }
     ]);
