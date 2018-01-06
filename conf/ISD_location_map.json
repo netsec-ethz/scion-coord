@@ -17,11 +17,6 @@
   {
     "ISD": 4,
     "continent": "AS",
-    "country": ""
-  },
-  {
-    "ISD": 1,
-    "Continent": "",
-    "Country": ""
+    "country": "NONE"
   }
 ]

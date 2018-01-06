@@ -31,7 +31,12 @@ func Location2Isd(country string, continent string) (int, error) {
 			// look for isd in continent
 			result, err = models.FindISDbyContinent(continent)
 			if err != nil {
-				return -1, err
+				if err == orm.ErrNoRows {
+					// no location found return default ISD 1
+					return 1, nil
+				} else {
+					return -1, err
+				}
 			}
 		} else {
 			return -1, err
