@@ -41,7 +41,7 @@ func init() {
 	// TODO (@philippmao, mlegner) Remove As models
 	orm.RegisterModel(new(user), new(Account), new(As), new(JoinRequest), new(ConnRequest),
 		new(JoinReply), new(ConnReply), new(SCIONLabServer), new(SCIONLabVM),
-		new(SCIONLabAS), new(AttachmentPoint), new(Connection))
+		new(SCIONLabAS), new(AttachmentPoint), new(Connection), new(SCIONBox), new(IsdLocation))
 
 	// print verbose logs when generating the tables
 	verbose := true
