@@ -62,7 +62,7 @@ type APConnectionInfo struct {
 //        }
 // }
 func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Inside GetUpdatesForAP = %v", r.URL.Query())
+	log.Printf("API Call for getUpdatesForAP = %v", r.URL.Query())
 	apIA := r.URL.Query().Get("scionLabAP")
 	if len(apIA) == 0 {
 		s.BadRequest(w, nil, "scionLabAP parameter missing")
@@ -123,7 +123,7 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 // }
 // If sucessful, the API will return an empty JSON response with HTTP code 200.
 func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Inside ConfirmUpdatesFromAP")
+	log.Printf("API Call for ConfirmUpdatesFromAP")
 	var UpdateLists map[string]map[string][]string
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&UpdateLists); err != nil {
@@ -160,7 +160,12 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONLabAS, action string,
 	cns []string) []string {
 	log.Printf("action = %v, cns = %v", action, cns)
+	type emailConfirmation struct {
+		user   string
+		action string
+	}
 	failedConfirmations := []string{}
+	emails := []emailConfirmation{}
 	for _, ia := range cns {
 		// find the connection to the SCIONLabAS
 		as, err := models.FindSCIONLabASByIAString(ia)
@@ -193,11 +198,13 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 			failedConfirmations = append(failedConfirmations, ia)
 			continue
 		}
-		if err := sendConfirmationEmail(cn_db.NeighborUser, action); err != nil {
-			log.Printf("Error sending email confirmation to user %v: %v",
-				cn_db.NeighborUser, err)
-		}
+		emails = append(emails, emailConfirmation{cn_db.NeighborUser, action})
 
+	}
+	for _, e := range emails {
+		if err := sendConfirmationEmail(e.user, e.action); err != nil {
+			log.Printf("Error sending email confirmation to user %v: %v", e.user, err)
+		}
 	}
 	return failedConfirmations
 }

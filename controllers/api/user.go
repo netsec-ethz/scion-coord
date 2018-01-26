@@ -188,7 +188,7 @@ func (c *LoginController) UserInformation(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	aI, aps, err := populateASStatusButtons(user.Email)
+	asInfo, aps, err := populateASStatusButtons(user.Email)
 	if err != nil {
 		log.Printf("Error when generating AS info and button configuration for user %v: %v",
 			user.Email, err)
@@ -199,7 +199,7 @@ func (c *LoginController) UserInformation(w http.ResponseWriter, r *http.Request
 	userData := userPageData{
 		User:    user,
 		MaxASes: config.MaxASes(user.IsAdmin),
-		ASInfos: aI,
+		ASInfos: asInfo,
 		APs:     aps,
 	}
 

@@ -198,7 +198,7 @@ func (as *SCIONLabAS) GetFreeBRID() (uint16, error) {
 		brIDs[i] = int(cn.BRID)
 	}
 	minBRID := 1
-	if as.Type == INFRASTRUCTURE {
+	if as.Type != INFRASTRUCTURE {
 		minBRID += config.RESERVED_BRS_INFRASTRUCTURE
 	}
 	id, err := utility.GetFreeID(brIDs, minBRID, config.MAX_BR_ID)
