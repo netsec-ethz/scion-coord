@@ -282,6 +282,15 @@ func main() {
 	router.Handle("/api/listASConnections/{account_id}/{secret}/{isdas}",
 		apiChain.ThenFunc(asController.ListASesConnectionsWithCredits))
 
+	// ==========================================================
+	// Image building API
+
+	router.Handle("/api/imgbuild/images",
+		apiChain.ThenFunc(scionLabVMController.GetAvailableDevices))
+
+	router.Handle("/api/imgbuild/create",
+		apiChain.ThenFunc(scionLabVMController.GenerateImage))
+
 	// serve static files
 	static := http.StripPrefix("/public/", http.FileServer(http.Dir("public")))
 	router.PathPrefix("/public/").Handler(xsrfChain.Then(static))

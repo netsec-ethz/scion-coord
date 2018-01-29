@@ -67,6 +67,10 @@ var (
 	HTTP_PROTOCOL = "http"
 	HB_PERIOD, _ = goconf.AppConf.Int("heartbeat.period")
 	HB_LIMIT, _ = goconf.AppConf.Int("heartbeat.limit")
+
+	// Image building service information
+	IMG_BUILD_ADDRESS = goconf.AppConf.String("img_builder.address")
+	IMG_BUILD_SECRET_TOKEN = goconf.AppConf.String("img_builder.secret_token")
 )
 
 func init() {
