@@ -71,6 +71,7 @@ var (
 	// Image building service information
 	IMG_BUILD_ADDRESS = goconf.AppConf.String("img_builder.address")
 	IMG_BUILD_SECRET_TOKEN = goconf.AppConf.String("img_builder.secret_token")
+	IMG_BUILD_BUILD_DELAY, _ = goconf.AppConf.Int64("img_builder.build_delay")
 )
 
 func init() {

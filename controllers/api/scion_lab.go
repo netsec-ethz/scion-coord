@@ -28,8 +28,6 @@ import (
 	"strconv"
 	"text/template"
 	"time"
-	"io"
-	"mime/multipart"
 
 	"github.com/astaxie/beego/orm"
 	"github.com/netsec-ethz/scion-coord/config"
@@ -710,97 +708,4 @@ func (s *SCIONLabVMController) canRemove(userEmail string) (bool, *models.SCIONL
 		return true, svm, nil
 	}
 	return false, nil, nil
-}
-
-// ==========================================================
-// Image building controllers, should be moved to separate file
-
-func (s *SCIONLabVMController) GetAvailableDevices(w http.ResponseWriter, r *http.Request) {
-	_, _, err := middleware.GetUserSession(r)
-	if err != nil {
-		log.Printf("Error getting the user session: %v", err)
-		s.Error500(w, err, "Error getting the user session")
-	}
-
-	resp, err := http.Get(config.IMG_BUILD_ADDRESS+"/get-images")
-	if err != nil {
-		s.Error500(w, err, "Error contacting remote image building service!")
-		return
-	}
-	defer resp.Body.Close()
-
-	w.Header().Set("Content-Type", "application/json")
-	io.Copy(w, resp.Body)
-}
-
-// API end-point to serve the generated SCIONLab VM configuration tarball.
-func (s *SCIONLabVMController) GenerateImage(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Got request to generate image!")
-
-	_, userSession, err := middleware.GetUserSession(r)
-	if err != nil {
-		log.Printf("Error getting the user session: %v", err)
-		s.Forbidden(w, err, "Error getting the user session")
-		return
-	}
-	vm, err := models.FindSCIONLabVMByUserEmail(userSession.Email)
-	if err != nil || vm.Status == INACTIVE || vm.Status == REMOVE {
-		log.Printf("No active configuration found for user %v\n", userSession.Email)
-		s.BadRequest(w, nil, "No active configuration found for user %v",
-			userSession.Email)
-		return
-	}
-
-	log.Printf("Users email is: %s", userSession.Email)
-
-	fileName := userSession.Email + ".tar.gz"
-	filePath := filepath.Join(PackagePath, fileName)
-	data, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		log.Printf("Error reading the tarball. FileName: %v, %v", fileName, err)
-		s.Error500(w, err, "Error reading tarball")
-		return
-	}
-
-	body := new(bytes.Buffer)
-	writer := multipart.NewWriter(body)
-	part, err := writer.CreateFormFile("config_file", fileName)
-	if err != nil {
-		log.Printf("Error creating form file, %v", err)
-		s.Error500(w, err, "Error creating form file")
-		return
-	}
-	part.Write(data)
-
-	writer.WriteField("token", config.IMG_BUILD_SECRET_TOKEN)
-	writer.Close()
-
-	url:=config.IMG_BUILD_ADDRESS+"/create/rpi3-ubuntu"
-	log.Printf("URL: %s", url)
-	req, err := http.NewRequest(http.MethodPost, config.IMG_BUILD_ADDRESS+"/create/rpi3-ubuntu" , body)
-	req.Header.Add("Content-Type", writer.FormDataContentType())
-	if err != nil {
-		log.Printf("Error creating request: %v", err)
-		s.Error500(w, err, "Error creating request")
-		return
-	}
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	
-
-	if err != nil {
-		log.Printf("Error sending request: %v", err)
-		s.Error500(w, err, "Error sending request")
-		return
-	} else {
-		var bodyContent []byte
-		fmt.Println(resp.StatusCode)
-		fmt.Println(resp.Header)
-		resp.Body.Read(bodyContent)
-		resp.Body.Close()
-		log.Println(bodyContent)
-	}
-
-	fmt.Fprintln(w, "Done")
 }
