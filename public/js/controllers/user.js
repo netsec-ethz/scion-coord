@@ -1,9 +1,11 @@
 scionApp
-    .controller('userCtrl', ['$scope', '$rootScope', 'userService', '$location', '$window', '$http', '$interval',
-        function ($scope, $rootScope, userService, $location, $window, $http, $interval) {
+    .controller('userCtrl', ['$scope', '$rootScope', 'userService', '$location', '$window', '$http', '$timeout',
+        function ($scope, $rootScope, userService, $location, $window, $http, $timeout) {
 
             $scope.error = "";
             $scope.message = "";
+
+            $scope.isVmReady=false
 
             $scope.userPageData = function () {
 
@@ -14,6 +16,8 @@ scionApp
                         $scope.vmInfo = data["VMInfo"];
                         $scope.buttonConfig = data["UIButtons"];
                         $scope.user.isNotVPN = false;
+                        // We want to show image building options only if we have VM config ready
+                        $scope.isVmReady=$scope.vmInfo.VMStatus==1;
                     },
                     function (response) {
                         console.log(response);
@@ -23,7 +27,7 @@ scionApp
                     });
             };
 
-            $scope.userImagesData = function() {
+            $scope.userImagesData = function(done) {
                 userService.getUserBuildImages().then(
                     function (data) {
                         console.log("Received user images")
@@ -32,11 +36,19 @@ scionApp
                         })
                         console.log(data);
                         $scope.userImages=data;
+
+                        if(done!=null){
+                            done()
+                        }
                     },
                     function (response) {
                         console.log(response);
                         if (response.status === 401 || response.status === 403) {
                             $location.path('/login');
+                        }else{
+                            if(done!=null){
+                                done()
+                            }
                         }
                     });  
             }
@@ -52,11 +64,13 @@ scionApp
                         data.forEach(function(img){
                             console.log("Setting up: "+img.name+" "+img.display_name)
                             $scope.imageNames[img.name]=img.display_name    
-                        })
+                        });
 
-                        $interval(function(){
-                            $scope.userImagesData()
-                        }, 1000)
+                        (function poll() {
+                            $scope.userImagesData(function(){
+                                $timeout(poll, 15000);
+                            })
+                        })();
                     },
                     function (response) {
                         console.log(response);
@@ -116,6 +130,8 @@ scionApp
                     function (data) {
                         console.log(data);
                         $scope.message = data;
+
+                        $scope.userImagesData();
                     },
                     function (response) {
                         console.log(response);

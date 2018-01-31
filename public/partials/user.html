@@ -64,7 +64,7 @@
 
   <br/>
 
-  <div class="row">
+  <div ng-if="isVmReady==true" class="row">
     <div class="col-xs-4">
 
     <select ng-model="selectedImage" ng-options="img.name as img.display_name for img in availableImages">

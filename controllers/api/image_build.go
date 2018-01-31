@@ -82,17 +82,17 @@ type SCIONImgBuildController struct {
 
     // Keep track of users jobs
     jobsLock *sync.Mutex
-    activeJobs map[uint64]*userJobs
+    activeJobs map[string]*userJobs //FIXME! This should be integer not string, userIds are not unique check why?
 }
 
 func CreateSCIONImgBuildController()(*SCIONImgBuildController){
     return &SCIONImgBuildController{
         jobsLock:&sync.Mutex{},
-        activeJobs:make(map[uint64]*userJobs),
+        activeJobs:make(map[string]*userJobs),
     }
 }
 
-func (s *SCIONImgBuildController) getUserBuildJobs(userId uint64)(*userJobs){
+func (s *SCIONImgBuildController) getUserBuildJobs(userId string)(*userJobs){
     s.jobsLock.Lock()
     defer s.jobsLock.Unlock()
 
@@ -112,8 +112,6 @@ func (s *SCIONImgBuildController) getUserBuildJobs(userId uint64)(*userJobs){
 }
 
 func (u *userJobs) isRateLimited()(bool){
-    return false    //TODO: REMOVE! Just for testing
-
     u.userJobLock.Lock()
     defer u.userJobLock.Unlock()
 
@@ -186,7 +184,7 @@ func (s *SCIONImgBuildController) GenerateImage(w http.ResponseWriter, r *http.R
         return
     }
 
-    buildJobs := s.getUserBuildJobs(userSession.UserId)
+    buildJobs := s.getUserBuildJobs(userSession.Email)
     if buildJobs.isRateLimited() {
         s.BadRequest(w, fmt.Errorf("Rate limited request"), "You have exceeded all build jobs, please wait and try again later")
         return
@@ -283,8 +281,7 @@ func (s *SCIONImgBuildController) GetUserImages(w http.ResponseWriter, r *http.R
         return
     }
     
-    log.Printf("Looking for user with id %d", userSession.UserId)
-    buildJobs := s.getUserBuildJobs(userSession.UserId)
+    buildJobs := s.getUserBuildJobs(userSession.Email)
     userImages := buildJobs.getUserImages()
 
     for _, img := range userImages {
