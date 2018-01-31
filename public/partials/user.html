@@ -60,22 +60,29 @@
         </div>
       </div>
     </div>
+  </form>
 
-    <br/>
+  <br/>
 
-    <div class="row">
-      <div class="col-xs-12">
-        <div id="buttongroup" ng-class="btn-group-vertical btn-block">
+  <div class="row">
+    <div class="col-xs-4">
 
-          <button class="btn" data-toggle="tooltip">
-              Build image
-          </button>
-
-        </div>
-      </div>
+    <select ng-model="selectedImage" ng-options="img.name as img.display_name for img in availableImages">
+        <option value="">Select image</option>
+    </select>
+      <button ng-click="buildImage(selectedImage)">Build image</button>
     </div>
 
-  </form>
+    <div class="col-xs-8">
+      <div ng-repeat="userImg in userImages">
+        <button ng-click="downloadImage(userImg)" class="btn btn-default" data-toggle="tooltip" 
+        ng-disabled="userImg.status=='building'">
+          {{userImg.status=='building' && 'Building' || 'Download: '}} {{userImg.displayName}}
+        </button>
+      </div>
+    </div>
+  </div>
+
   <br/>
   <div ng-show="error" class="alert alert-danger alert-dismissible fade in">
     <button type="button" class="close" aria-label="Close" ng-click="dismissError()">&times;

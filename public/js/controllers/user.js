@@ -1,6 +1,6 @@
 scionApp
-    .controller('userCtrl', ['$scope', '$rootScope', 'userService', '$location', '$window', '$http',
-        function ($scope, $rootScope, userService, $location, $window, $http) {
+    .controller('userCtrl', ['$scope', '$rootScope', 'userService', '$location', '$window', '$http', '$interval',
+        function ($scope, $rootScope, userService, $location, $window, $http, $interval) {
 
             $scope.error = "";
             $scope.message = "";
@@ -22,6 +22,49 @@ scionApp
                         }
                     });
             };
+
+            $scope.userImagesData = function() {
+                userService.getUserBuildImages().then(
+                    function (data) {
+                        console.log("Received user images")
+                        data.forEach(function(userImg){
+                            userImg.displayName=$scope.imageNames[userImg.image]
+                        })
+                        console.log(data);
+                        $scope.userImages=data;
+                    },
+                    function (response) {
+                        console.log(response);
+                        if (response.status === 401 || response.status === 403) {
+                            $location.path('/login');
+                        }
+                    });  
+            }
+
+            $scope.availableImagesData = function() {
+                userService.getAvailableImages().then(
+                    function (data) {
+                        console.log("Received available images")
+                        console.log(data);
+                        $scope.availableImages=data;
+                        $scope.imageNames={}
+                        
+                        data.forEach(function(img){
+                            console.log("Setting up: "+img.name+" "+img.display_name)
+                            $scope.imageNames[img.name]=img.display_name    
+                        })
+
+                        $interval(function(){
+                            $scope.userImagesData()
+                        }, 1000)
+                    },
+                    function (response) {
+                        console.log(response);
+                        if (response.status === 401 || response.status === 403) {
+                            $location.path('/login');
+                        }
+                    });  
+            }
 
             $scope.submitForm = function (action, user) {
                 switch (action) {
@@ -65,12 +108,36 @@ scionApp
                     });
             };
 
+            $scope.buildImage = function (imageName) {
+                $scope.error = "";
+                $scope.message = "";
+
+                userService.startBuildJob(imageName).then(
+                    function (data) {
+                        console.log(data);
+                        $scope.message = data;
+                    },
+                    function (response) {
+                        console.log(response);
+                        $scope.error = response.data;
+                    });
+
+                console.log("Creating image for: "+imageName)
+            };
+
             $scope.downloadSCIONLabVM = function (user) {
                 $scope.error = "";
                 $scope.message = "";
 
                 window.location.assign(downloadlink());
             };
+
+            $scope.downloadImage= function(userImage) {
+                $scope.error = "";
+                $scope.message = "";
+                
+                window.location.assign(userImage.download_link);                  
+            }
 
             $scope.removeSCIONLabVM = function (user) {
                 $scope.error = "";
@@ -111,5 +178,7 @@ scionApp
 
             // refresh the data when the controller is loaded
             $scope.userPageData();
+            // For building images
+            $scope.availableImagesData();
         }
     ]);

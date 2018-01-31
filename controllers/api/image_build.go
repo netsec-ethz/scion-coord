@@ -41,6 +41,10 @@ const (
     READY
 )
 
+type buildRequest struct {
+    ImageName string `json:"image_name"`
+}
+
 type jobStatus struct {
     Exists bool   `json:"job_exists"`
     Finished bool   `json:"build_finished"`
@@ -108,6 +112,8 @@ func (s *SCIONImgBuildController) getUserBuildJobs(userId uint64)(*userJobs){
 }
 
 func (u *userJobs) isRateLimited()(bool){
+    return false    //TODO: REMOVE! Just for testing
+
     u.userJobLock.Lock()
     defer u.userJobLock.Unlock()
 
@@ -150,8 +156,6 @@ func (u *userJobs) removeImage(jobId string){
     }
 }
 
-
-
 func (s *SCIONImgBuildController) GetAvailableDevices(w http.ResponseWriter, r *http.Request) {
     resp, err := http.Get(config.IMG_BUILD_ADDRESS+"/get-images")
     if err != nil {
@@ -193,13 +197,17 @@ func (s *SCIONImgBuildController) GenerateImage(w http.ResponseWriter, r *http.R
         return
     }
 
-    if(len(r.Form["image_name"])==0){
-        s.BadRequest(w, fmt.Errorf("Missing argument image_name"), "Missing argument image_name")
-        return   
-    }
-    imageName := r.Form["image_name"][0]
+    var bRequest buildRequest
+    decoder := json.NewDecoder(r.Body)
 
-    log.Printf("Got request to build image: %s", imageName)
+    // check if the parsing succeeded
+    if err := decoder.Decode(&bRequest); err != nil {
+        log.Println(err)
+        s.Error500(w, err, "Error decoding JSON")
+        return
+    }
+
+    log.Printf("Got request to build image: %s", bRequest.ImageName)
 
     fileName := userSession.Email + ".tar.gz"
     filePath := filepath.Join(PackagePath, fileName)
@@ -223,7 +231,7 @@ func (s *SCIONImgBuildController) GenerateImage(w http.ResponseWriter, r *http.R
     writer.WriteField("token", config.IMG_BUILD_SECRET_TOKEN)
     writer.Close()
 
-    url:=config.IMG_BUILD_ADDRESS+"/create/"+imageName
+    url:=config.IMG_BUILD_ADDRESS+"/create/"+bRequest.ImageName
     req, err := http.NewRequest(http.MethodPost, url , body)
     req.Header.Add("Content-Type", writer.FormDataContentType())
     if err != nil {
@@ -278,7 +286,6 @@ func (s *SCIONImgBuildController) GetUserImages(w http.ResponseWriter, r *http.R
     buildJobs := s.getUserBuildJobs(userSession.UserId)
     userImages := buildJobs.getUserImages()
 
-    imagesToRemove := make([]string, 0)
     for _, img := range userImages {
         exists, finished, _ := getJobStatus(img.JobId)  //TODO: Handle error
         if(finished){
@@ -286,18 +293,11 @@ func (s *SCIONImgBuildController) GetUserImages(w http.ResponseWriter, r *http.R
         }
 
         if(!exists){
-            imagesToRemove=append(imagesToRemove, img.JobId)
+            buildJobs.removeImage(img.JobId)
         }
     }
-
-    for _, removedJob := range imagesToRemove {
-        buildJobs.removeImage(removedJob)
-    }
     
-    // List has been updated
-    if(len(imagesToRemove)!=0){
-        userImages=buildJobs.getUserImages()
-    }
+    userImages=buildJobs.getUserImages()
 
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(userImages)
