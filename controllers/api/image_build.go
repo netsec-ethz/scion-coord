@@ -25,6 +25,7 @@ import (
     "time"
     "mime/multipart"
     "sync"
+    "encoding/json"
 
     "github.com/netsec-ethz/scion-coord/config"
     "github.com/netsec-ethz/scion-coord/controllers"
@@ -32,16 +33,37 @@ import (
     "github.com/netsec-ethz/scion-coord/models"
 )
 
+var httpClient = &http.Client{Timeout: 10 * time.Second}
+
 // Image state
 const (
     BUILDING = iota // 0
     READY
 )
 
+type jobStatus struct {
+    Exists bool   `json:"job_exists"`
+    Finished bool   `json:"build_finished"`
+    JobId string    `json:"job_id"`
+}
+
 type customImage struct {
-    Device string
-    JobId string
+    Device string   `json:"image"`
+    JobId string    `json:"id"`
     Status int
+}
+
+func (c *customImage) MarshalJSON() ([]byte, error) {  
+    m := make(map[string]string)
+    m["image"] = c.Device
+    m["id"] = c.JobId
+    m["download_link"] = config.IMG_BUILD_ADDRESS+"/download/"+c.JobId
+    if(c.Status==READY){
+        m["status"]="ready"
+    }else{
+        m["status"]="building"
+    }
+    return json.Marshal(m)
 }
 
 type userJobs struct {
@@ -57,6 +79,13 @@ type SCIONImgBuildController struct {
     // Keep track of users jobs
     jobsLock *sync.Mutex
     activeJobs map[uint64]*userJobs
+}
+
+func CreateSCIONImgBuildController()(*SCIONImgBuildController){
+    return &SCIONImgBuildController{
+        jobsLock:&sync.Mutex{},
+        activeJobs:make(map[uint64]*userJobs),
+    }
 }
 
 func (s *SCIONImgBuildController) getUserBuildJobs(userId uint64)(*userJobs){
@@ -83,7 +112,7 @@ func (u *userJobs) isRateLimited()(bool){
     defer u.userJobLock.Unlock()
 
     duration := time.Since(u.LastBuildRequest)
-    return duration.Minutes()>float64(config.IMG_BUILD_BUILD_DELAY)
+    return duration.Minutes()<float64(config.IMG_BUILD_BUILD_DELAY)
 }
 
 func (u *userJobs) addImage(image *customImage){
@@ -123,8 +152,6 @@ func (u *userJobs) removeImage(jobId string){
 
 
 
-
-
 func (s *SCIONImgBuildController) GetAvailableDevices(w http.ResponseWriter, r *http.Request) {
     resp, err := http.Get(config.IMG_BUILD_ADDRESS+"/get-images")
     if err != nil {
@@ -137,6 +164,7 @@ func (s *SCIONImgBuildController) GetAvailableDevices(w http.ResponseWriter, r *
     io.Copy(w, resp.Body)
 }
 
+// TODO: Refactor!
 func (s *SCIONImgBuildController) GenerateImage(w http.ResponseWriter, r *http.Request) {
     log.Printf("Got request to generate image!")
 
@@ -163,6 +191,11 @@ func (s *SCIONImgBuildController) GenerateImage(w http.ResponseWriter, r *http.R
     if err := r.ParseForm(); err != nil {
         s.BadRequest(w, fmt.Errorf("Error parsing the form: %v", err), "Error parsing form")
         return
+    }
+
+    if(len(r.Form["image_name"])==0){
+        s.BadRequest(w, fmt.Errorf("Missing argument image_name"), "Missing argument image_name")
+        return   
     }
     imageName := r.Form["image_name"][0]
 
@@ -199,22 +232,93 @@ func (s *SCIONImgBuildController) GenerateImage(w http.ResponseWriter, r *http.R
         return
     }
 
-    client := &http.Client{}
-    resp, err := client.Do(req)
+    resp, err := httpClient.Do(req)
     
     if err != nil {
+        // Error in communication with server
         log.Printf("Error sending request: %v", err)
         s.Error500(w, err, "Error sending request")
         return
-    } else {
-        var bodyContent []byte
-        fmt.Println(resp.StatusCode)
-        fmt.Println(resp.Header)
-        resp.Body.Read(bodyContent)
-        resp.Body.Close()
-        log.Println(bodyContent)
+    } else if (resp.StatusCode!=200){
+        // Proxy the server error
+        w.WriteHeader(resp.StatusCode)
+        io.Copy(w, resp.Body)
+        return
     }
 
-    fmt.Fprintln(w, "Done")
+    responseBody, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        s.Error500(w, err, "Error reading response")
+        return
+    }
+
+    newImage := &customImage{}
+    err = json.Unmarshal(responseBody, newImage)
+    if(err != nil){
+        s.Error500(w, err, "Error parsing request from server")
+        return
+    }
+
+    newImage.Status=BUILDING
+    buildJobs.addImage(newImage)
+
+    fmt.Fprintln(w, "Done")   
 }
 
+func (s *SCIONImgBuildController) GetUserImages(w http.ResponseWriter, r *http.Request) {
+    log.Printf("Got request to generate image!")
+
+    _, userSession, err := middleware.GetUserSession(r)
+    if err != nil {
+        log.Printf("Error getting the user session: %v", err)
+        s.Forbidden(w, err, "Error getting the user session")
+        return
+    }
+    
+    buildJobs := s.getUserBuildJobs(userSession.UserId)
+    userImages := buildJobs.getUserImages()
+
+    imagesToRemove := make([]string, 0)
+    for _, img := range userImages {
+        exists, finished, _ := getJobStatus(img.JobId)  //TODO: Handle error
+        if(finished){
+            img.Status=READY
+        }
+
+        if(!exists){
+            imagesToRemove=append(imagesToRemove, img.JobId)
+        }
+    }
+
+    for _, removedJob := range imagesToRemove {
+        buildJobs.removeImage(removedJob)
+    }
+    
+    // List has been updated
+    if(len(imagesToRemove)!=0){
+        userImages=buildJobs.getUserImages()
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(userImages)
+}
+
+func getJson(url string, target interface{}) error {
+    r, err := httpClient.Get(url)
+    if err != nil {
+        return err
+    }
+    defer r.Body.Close()
+
+    return json.NewDecoder(r.Body).Decode(target)
+}
+
+func getJobStatus(id string)(bool, bool, error){
+    status := &jobStatus{}
+    err := getJson(config.IMG_BUILD_ADDRESS+"/status/"+id, status)
+    if(err!=nil){
+        return false, false, err
+    }
+    
+    return status.Exists, status.Finished, nil
+}

@@ -156,7 +156,7 @@ func main() {
 	asController := api.ASController{}
 	scionLabVMController := api.SCIONLabVMController{}
 	scionBoxController := api.SCIONBoxController{}
-	scionImageBuildController := api.SCIONImgBuildController{}
+	scionImageBuildController := api.CreateSCIONImgBuildController()
 
 	// rate limitation
 	resendLimit := tollbooth.NewLimiter(1, time.Minute*10,
@@ -290,7 +290,10 @@ func main() {
 		apiChain.ThenFunc(scionImageBuildController.GetAvailableDevices))
 
 	router.Handle("/api/imgbuild/create",
-		apiChain.ThenFunc(scionImageBuildController.GenerateImage))
+		apiChain.ThenFunc(scionImageBuildController.GenerateImage)).Methods(http.MethodPost)
+
+	router.Handle("/api/imgbuild/user-images",
+		apiChain.ThenFunc(scionImageBuildController.GetUserImages))
 
 	// serve static files
 	static := http.StripPrefix("/public/", http.FileServer(http.Dir("public")))
