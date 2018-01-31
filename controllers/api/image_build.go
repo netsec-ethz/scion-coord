@@ -283,6 +283,7 @@ func (s *SCIONImgBuildController) GetUserImages(w http.ResponseWriter, r *http.R
         return
     }
     
+    log.Printf("Looking for user with id %d", userSession.UserId)
     buildJobs := s.getUserBuildJobs(userSession.UserId)
     userImages := buildJobs.getUserImages()
 

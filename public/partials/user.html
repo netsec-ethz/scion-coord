@@ -74,11 +74,16 @@
     </div>
 
     <div class="col-xs-8">
-      <div ng-repeat="userImg in userImages">
-        <button ng-click="downloadImage(userImg)" class="btn btn-default" data-toggle="tooltip" 
-        ng-disabled="userImg.status=='building'">
-          {{userImg.status=='building' && 'Building' || 'Download: '}} {{userImg.displayName}}
-        </button>
+      <div id="buttongroup" ng-class="{true:'btn-group-vertical btn-block',
+        false:'btn-group btn-group-justified'}[isSmall]">
+
+        <div ng-repeat="userImg in userImages" class="btn-group" role="group">
+          <button ng-click="downloadImage(userImg)" class="btn btn-default" data-toggle="tooltip" 
+          ng-disabled="userImg.status=='building'">
+            {{userImg.status=='building' && 'Building' || 'Download: '}} {{userImg.displayName}}
+          </button>
+        </div>
+
       </div>
     </div>
   </div>
