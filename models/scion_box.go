@@ -26,8 +26,8 @@ type SCIONBox struct {
 	AS             int `orm:"default(0)"`
 	InternalIP     string
 	Shipping       string
-	OpenPorts      int `orm:"default(0)"` // Number of free ports UDP ports starting from StartPort
-	StartPort      int `orm:"default(50000)"`
+	OpenPorts      uint16 `orm:"default(0)"` // Number of free ports UDP ports starting from StartPort
+	StartPort      uint16 `orm:"default(50000)"`
 	UpdateRequired bool
 	Created        time.Time
 	Updated        time.Time

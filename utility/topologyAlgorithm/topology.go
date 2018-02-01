@@ -31,7 +31,7 @@ const (
 
 // number of neighbors chosen for each AS
 const (
-	CHOSEN_NEIGHBORS = 3
+	CHOSEN_NEIGHBORS uint16 = 3
 )
 
 // maximal number of neighbors chosen for each AS
@@ -48,9 +48,9 @@ type Neighbor struct {
 }
 
 // Choose up to 3 of the best potential neighbors in the array
-func ChooseNeighbors(potentialneighbors []Neighbor, freePorts int) []Neighbor {
+func ChooseNeighbors(potentialneighbors []Neighbor, freePorts uint16) []Neighbor {
 	var neighbors []Neighbor
-	counter := 0
+	var counter uint16 = 0
 	// compute number of new neighbors that will be chosen
 	newNeighbors := CHOSEN_NEIGHBORS
 	if freePorts < newNeighbors {
@@ -171,7 +171,7 @@ func (nb Neighbor) getPF() int {
 
 // Get the number of neighbors from the database
 // If an error occurs return 9999
-func (nb Neighbor) getDegree() int {
+func (nb Neighbor) getDegree() uint16 {
 	dbEntry, err := models.FindSCIONLabASByIAInt(nb.ISD, nb.AS)
 	if err != nil {
 		return 9999
@@ -180,7 +180,7 @@ func (nb Neighbor) getDegree() int {
 	if err != nil {
 		return 9999
 	}
-	return len(cns)
+	return uint16(len(cns))
 }
 
 // Remove element at index i from array
