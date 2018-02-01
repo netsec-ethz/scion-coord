@@ -26,9 +26,9 @@ import (
 )
 
 // Generates client keys and configuration necessary for a VPN-based setup
-func (s *SCIONLabVMController) generateVPNConfig(svmInfo *SCIONLabVMInfo) error {
-	log.Printf("Creating VPN config for SCIONLab VM")
-	if err := s.generateVPNKeys(svmInfo); err != nil {
+func (s *SCIONLabASController) generateVPNConfig(slasInfo *SCIONLabASInfo) error {
+	log.Printf("Creating VPN config for SCIONLab AS")
+	if err := s.generateVPNKeys(slasInfo); err != nil {
 		return err
 	}
 	t, err := template.ParseFiles("templates/client.conf.tmpl")
@@ -41,49 +41,49 @@ func (s *SCIONLabVMController) generateVPNConfig(svmInfo *SCIONLabVMInfo) error 
 	if err != nil {
 		return fmt.Errorf("Error reading CA certificate file: %v", err)
 	}
-	clientCert, err = ioutil.ReadFile(filepath.Join(RSAKeyPath, svmInfo.UserEmail+".crt"))
+	clientCert, err = ioutil.ReadFile(filepath.Join(RSAKeyPath, slasInfo.UserEmail+".crt"))
 	if err != nil {
 		return fmt.Errorf("Error reading VPN certificate file for user %v: %v",
-			svmInfo.UserEmail, err)
+			slasInfo.UserEmail, err)
 	}
 	clientCertStr := string(clientCert)
 	startCert := strings.Index(clientCertStr, "-----BEGIN CERTIFICATE-----")
-	clientKey, err = ioutil.ReadFile(filepath.Join(RSAKeyPath, svmInfo.UserEmail+".key"))
+	clientKey, err = ioutil.ReadFile(filepath.Join(RSAKeyPath, slasInfo.UserEmail+".key"))
 	if err != nil {
 		return fmt.Errorf("Error reading VPN key file for user %v: %v",
-			svmInfo.UserEmail, err)
+			slasInfo.UserEmail, err)
 	}
 
 	config := map[string]string{
-		"ServerIP":   svmInfo.VPNIP,
+		"ServerIP":   slasInfo.VPNServerIP,
 		"CACert":     string(caCert),
 		"ClientCert": clientCertStr[startCert:],
 		"ClientKey":  string(clientKey),
 	}
-	f, err := os.Create(filepath.Join(UserPackagePath(svmInfo.UserEmail), "client.conf"))
+	f, err := os.Create(filepath.Join(UserPackagePath(slasInfo.UserEmail), "client.conf"))
 	if err != nil {
-		return fmt.Errorf("Error creating VPN config file for user %v: %v", svmInfo.UserEmail, err)
+		return fmt.Errorf("Error creating VPN config file for user %v: %v", slasInfo.UserEmail, err)
 	}
 	if err = t.Execute(f, config); err != nil {
 		return fmt.Errorf("Error executing VPN template file for user %v: %v",
-			svmInfo.UserEmail, err)
+			slasInfo.UserEmail, err)
 	}
 	return nil
 }
 
 // Creates the keys for VPN setup
-func (s *SCIONLabVMController) generateVPNKeys(svmInfo *SCIONLabVMInfo) error {
+func (s *SCIONLabASController) generateVPNKeys(slasInfo *SCIONLabASInfo) error {
 	log.Printf("Generating RSA keys")
-	if _, err := os.Stat(filepath.Join(RSAKeyPath, svmInfo.UserEmail+".key")); err == nil {
+	if _, err := os.Stat(filepath.Join(RSAKeyPath, slasInfo.UserEmail+".key")); err == nil {
 		log.Printf("Previous VPN keys exist")
 	} else if os.IsNotExist(err) {
 		cmd := exec.Command("/bin/bash", "-c", "source vars; ./build-key --batch "+
-			svmInfo.UserEmail)
+			slasInfo.UserEmail)
 		cmd.Dir = EasyRSAPath
 		cmdOut, _ := cmd.StdoutPipe()
 		cmdErr, _ := cmd.StderrPipe()
 		if err := cmd.Run(); err != nil {
-			log.Printf("Error during generation of VPN keys for user %v: %v", svmInfo.UserEmail,
+			log.Printf("Error during generation of VPN keys for user %v: %v", slasInfo.UserEmail,
 				err)
 			return err
 		}
@@ -94,7 +94,7 @@ func (s *SCIONLabVMController) generateVPNKeys(svmInfo *SCIONLabVMInfo) error {
 		fmt.Printf("STDOUT generateVPNKeys: %s\n", stdOutput)
 		fmt.Printf("ERROUT generateVPNKeys: %s\n", errOutput)
 	} else {
-		log.Printf("Error checking for existence of VPN keys for user %v: %v", svmInfo.UserEmail,
+		log.Printf("Error checking for existence of VPN keys for user %v: %v", slasInfo.UserEmail,
 			err)
 		return err
 	}

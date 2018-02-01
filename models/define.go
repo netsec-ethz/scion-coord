@@ -14,7 +14,7 @@
 
 package models
 
-// States in which a scionlabAs or connection can be.
+// States in which a SCIONLabAS or connection can be.
 const (
 	INACTIVE = iota // 0
 	ACTIVE
@@ -29,12 +29,13 @@ const (
 	PARENT = iota // 0
 	CHILD
 	CORE
+	PEER
 )
 
-// Types of ScionLabAses
+// Types of SCIONLabASes
 const (
-	BOX = iota // 0
+	INFRASTRUCTURE = iota // 0
 	VM
 	DEDICATED
-	SERVER
+	BOX
 )

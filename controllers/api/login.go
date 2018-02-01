@@ -106,7 +106,6 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 			c.Forbidden(w, nil, "Email or password empty")
 			return
 		}
-
 	}
 
 	// load the user and verify email and password authentication
@@ -114,6 +113,7 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 	// otherwise redirect to the home page
 	dbUser, err := models.FindUserByEmail(email)
 	if err != nil || dbUser == nil {
+		log.Printf("User %v not found in database: %v", email, err)
 		c.BadRequest(w, err, "Error: User not found")
 		return
 	}

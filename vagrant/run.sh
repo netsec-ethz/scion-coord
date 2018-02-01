@@ -65,7 +65,7 @@ run_linux() {
         run_vagrant
     else
         echo "Currently, this script does not support your linux distribution."
-        echo "Please follow the instructions in the README file to run the SCIONLab VM."
+        echo "Please follow the instructions in the README file to run the SCIONLab AS."
     fi
 }
 
@@ -77,5 +77,5 @@ case "$OSTYPE" in
         "run_linux" ;;
   solaris*|bsd*|msys|*) 
     echo "Currently, this script does not support $OSTYPE system."
-    echo "Please follow the instructions in the README file to run the SCIONLab VM." ;;
+    echo "Please follow the instructions in the README file to run the SCIONLab AS." ;;
 esac

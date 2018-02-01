@@ -20,7 +20,7 @@
 log.debug_mode = 0
 
 # If uncommented and non-empty, this directory is used to store generated
-# VM configurations instead of "~/scionLabConfigs"
+# AS configurations instead of "~/scionLabConfigs"
 #directory.package_directory = ""
 directory.isd_location_map = "./conf/ISD_location_map.json"
 
@@ -65,14 +65,6 @@ db.pass = "development_pass"
 db.max_connections = 15
 db.max_idle = 3
 
-# SCIONLab AS configs
-server.ia = "1-7"
-server.ip = "127.0.0.1"
-server.start_port = "50050"
-server.vpn.ip = "10.0.8.1"
-server.vpn.start_ip = "10.0.8.2"
-server.vpn.end_ip = "10.0.8.254"
-
 # Virtual Credit System
 # False = Every method associated with VirtualCredit system will return immediately
 virtualCredit.enable = false
@@ -83,3 +75,8 @@ virtualCredit.startCredit = 100
 heartbeat.period = 60
 # Number of heartbeat periods that can be missed before status is set to inactive
 heartbeat.limit = 10
+
+# General settings
+ap_ia = "1-7"
+start_port = 50000
+base_as_id = 1000

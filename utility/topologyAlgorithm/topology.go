@@ -19,6 +19,26 @@ import (
 	"github.com/netsec-ethz/scion-coord/models"
 )
 
+// performance score thresholds
+const (
+	BW1  = 0.05
+	BW2  = 0.1
+	BW3  = 0.5
+	RTT1 = 10
+	RTT2 = 50
+	RTT3 = 100
+)
+
+// number of neighbors chosen for each AS
+const (
+	CHOSEN_NEIGHBORS = 3
+)
+
+// maximal number of neighbors chosen for each AS
+const (
+	MAX_NEIGHBORS = 6
+)
+
 type Neighbor struct {
 	ISD int
 	AS  int
@@ -56,11 +76,11 @@ func chooseBestNeighbor(potentialneighbors []Neighbor) (Neighbor, int) {
 	var bestNb = potentialneighbors[0]
 	var index = 0
 	for i, nb := range potentialneighbors {
-		if bestNb.getDegree() >= MAX_NEIGHBORS{
+		if bestNb.getDegree() >= MAX_NEIGHBORS {
 			bestNb = nb
 			index = i
 		}
-		if nb.getDegree() >= MAX_NEIGHBORS{
+		if nb.getDegree() >= MAX_NEIGHBORS {
 			continue
 		}
 		if bestNb.getPF() > nb.getPF() {
