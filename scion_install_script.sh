@@ -138,7 +138,6 @@ fi
 echo "Installing dependencies..."
 bash -c 'yes | GO_INSTALL=true ./env/deps' > /dev/null
 
-
 if ! areAllLinesInsideFile "$(cat docker/zoo.cfg)" "/etc/zookeeper/conf/zoo.cfg";
 then
     sudo cp docker/zoo.cfg /etc/zookeeper/conf/zoo.cfg
