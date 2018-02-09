@@ -110,7 +110,7 @@ func (as *SCIONLabAS) String() string {
 // This function determines the IP address that are used for different SCION servers (CS, BS, PS)
 func (as *SCIONLabAS) ServerIP() string {
 	switch as.Type {
-	case INFRASTRUCTURE:
+	case INFRASTRUCTURE, DEDICATED:
 		return as.PublicIP
 	case VM:
 		return config.VM_LOCAL_IP
