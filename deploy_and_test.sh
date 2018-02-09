@@ -6,17 +6,15 @@ set -e
 # set -x
 
 # check and export paths:
-if [ -z "$GOPATH" ]; then
-    GOPATH="$HOME/go"
-fi
+# export GOPATH="$HOME/go"
+# export PATH="$HOME/.local/bin:$GOPATH/bin:$PATH"
 
 MYSQLCMD="mysql -u root -pdevelopment_pass"
 NETSEC=${GOPATH:?}/src/github.com/netsec-ethz
 SCIONCOORD="$NETSEC/scion-coord"
-SCION="${GOPATH:?}/src/github.com/scionproto/scion"
-CONFDIR="$HOME/scionLabConfigs"
-EASYRSADEFAULT="$SCIONCOORD/conf/easy-rsa_vars.default"
+SCIONCOORDPID=''
 TESTTIMEOUT=8
+EXITMESSAGE=''
 
 missingOrDifferentFiles() {
     ! [[ -f "$1" ]] || ! [[ -f "$2" ]] || ! cmp "$1" "$2" >/dev/null
@@ -33,56 +31,31 @@ runSQL() {
 onExit() {
     RET=$?
     trap '' INT TERM
-    if [ ! -z $scionCoordPid ]; then
+    if [ ! -z $SCIONCOORDPID ]; then
         # maybe kill SCION Coord if it's running and wait
         kill -TERM 0
         wait
     fi
-    [[ ! -z "$exitMessage" ]] && printf "$exitMessage""\n"
+    [[ ! -z "$EXITMESSAGE" ]] && printf "$EXITMESSAGE""\n"
     exit $RET
 }
 trap onExit EXIT INT TERM
 
-scionCoordPid=''
-exitMessage=''
 CURRENTWD="$PWD"
-thisdir="$(dirname $(realpath $0))"
 mkdir -p "$NETSEC"
 cd "$NETSEC"
+SCION="$NETSEC/scion"
 
-doTest=1
-usage="$(basename $0) [-n]
-
-where:
-    -n      No test: only set up SCION + coordinator, run coordinator and wait for it to finish"
-while getopts ":n" opt; do
-case $opt in
-    h)
-        echo "$usage"
-        exit 0
-        ;;
-    n)
-        doTest=0
-        ;;
-    \?)
-        echo "Invalid option: -$OPTARG" >&2
-        echo "$usage" >&2
-        exit 1
-        ;;
-    :)
-        echo "Option -$OPTARG requires an argument." >&2
-        echo "$usage" >&2
-        exit 1
-        ;;
-esac
-done
-
+thisdir="$(dirname $(realpath $0))"
 if [ ! -f "$thisdir/scion_install_script.sh" ]; then
-    exitMessage="Could not find the SCION installation script. Aborting."
+    EXITMESSAGE="Could not find the SCION installation script. Aborting."
     exit 1
 fi
 bash "$thisdir/scion_install_script.sh"
-source ~/.profile
+
+if [ ! -d "$SCIONCOORD" ]; then
+    git clone --recursive git@github.com:netsec-ethz/scion-coord scion-coord
+fi
 
 # check go dependencies
 command -v govendor >/dev/null 2>&1 || go get github.com/kardianos/govendor
@@ -104,26 +77,8 @@ if ! dpkg-query -s mysql-server &> /dev/null ; then
     sudo apt-get install mysql-server -y
 fi
 
-if ! dpkg-query -s easy-rsa &> /dev/null ; then
-    sudo apt-get install easy-rsa -y
-fi
-
 if ! runSQL "SHOW DATABASES;" | grep "scion_coord_test" &> /dev/null; then
     runSQL "CREATE DATABASE scion_coord_test;" || (echo "Failed to create the SCION Coordinator DB" && exit 1)
-else
-    echo "Removing entries in the DB"
-    # we need the id > 0 to convince mysql that it is secure
-    runSQL "DELETE FROM scion_coord_test.connection WHERE id > 0 AND respond_ap IN (
-    SELECT id FROM scion_coord_test.attachment_point WHERE as_ID IN (
-        SELECT id from scion_coord_test.scion_lab_as WHERE user_email='netsec.test.email@gmail.com'
-        )
-    );" || true
-    runSQL "DELETE FROM scion_coord_test.attachment_point WHERE id > 0 AND as_id IN (
-    SELECT id FROM scion_coord_test.scion_lab_as WHERE user_email='netsec.test.email@gmail.com'
-    );" || true
-    runSQL "DELETE FROM scion_coord_test.scion_lab_as WHERE id > 0 AND user_email='netsec.test.email@gmail.com';" || true
-    runSQL "DELETE FROM scion_coord_test.user WHERE id > 0 AND email='netsec.test.email@gmail.com';" || true
-    runSQL "DELETE FROM scion_coord_test.account WHERE id > 0 AND name='netsec.test.email@gmail.com';" || true
 fi
 
 # now copy the three credentials files from the SCION installation to the coordinator
@@ -135,35 +90,15 @@ if missingOrDifferentFiles "$SCION/gen/ISD1/AS11/br1-11-1/keys/as-sig.key" ISD1.
    missingOrDifferentFiles "$SCION/gen/ISD1/AS11/br1-11-1/certs/ISD1-V0.trc" ISD1.trc ;
 then
     echo "Credentials in SCION Coord. Serv. seem different. Running SCION and using those"
-    pushd "$SCION" >/dev/null
+    cd "$SCION"
     ./scion.sh topology -c topology/Tiny.topo
-    popd >/dev/null
 
     cp "$SCION/gen/ISD1/AS11/br1-11-1/keys/as-sig.key" ISD1.key
     cp "$SCION/gen/ISD1/AS11/br1-11-1/certs/ISD1-AS11-V0.crt" ISD1.crt
     cp "$SCION/gen/ISD1/AS11/br1-11-1/certs/ISD1-V0.trc" ISD1.trc
 fi
 
-# VPN stuff
-if [ ! -f "$CONFDIR/easy-rsa/keys/ca.crt" ]; then
-    # generate certificate for openVPN
-    if ! dpkg-query -s easy-rsa &> /dev/null ; then
-        sudo apt-get install easy-rsa -y
-    fi
-    if ! dpkg-query -s openssl &> /dev/null ; then
-        sudo apt-get install openssl -y
-    fi
-    mkdir -p "$CONFDIR"
-    cp -r /usr/share/easy-rsa "$CONFDIR"
-    cp "$EASYRSADEFAULT" "$CONFDIR/easy-rsa/vars"
-    pushd "$CONFDIR/easy-rsa" >/dev/null
-    sed -i -- 's/export KEY_EMAIL="scion@lists.inf.ethz.ch"/export KEY_EMAIL="netsec.test.email@gmail.com"/g' ./vars
-    source ./vars
-    ./clean-all
-    # build the CA non interactively
-    ./pkitool --initca
-    popd >/dev/null
-fi
+# TODO: all regarding VPN is not yet done. We probably want to parametrize this script (e.g. VPN on/off, ...)
 
 # build and run:
 cd "$SCIONCOORD"
@@ -174,47 +109,50 @@ go build
 sql="SELECT COUNT(*) FROM scion_coord_test.account WHERE name='netsec.test.email@gmail.com';"
 out=$(runSQL "$sql") && stat=0 || stat=$?
 out=$(echo "$out" | tail -n 1)
-if [ $out -ne 0 ]; then
-    exitMessage="Inconsistent result: we deleted all data related to the test in the DB, but still have an account. Aborting."
-    exit 1
+if [ $out -eq 0 ]; then
+    sql="INSERT INTO scion_coord_test.account
+    (id, name, organisation, account_id, secret, created, updated)
+    VALUES
+    (1, 'netsec.test.email@gmail.com', 'NETSEC TEST', 'someid', 'some_secret', NOW(), NOW())
+    "
+    out=$(runSQL "$sql") && stat=0 || stat=$?
+
+    # password is "scionscion"
+    sql="INSERT INTO scion_coord_test.user
+    (id, email, password, password_invalid, salt,
+    first_name, last_name, verified, is_admin, verification_u_u_i_d,
+    account_id, created, updated)
+    VALUES
+    (1, 'netsec.test.email@gmail.com', '81c0cd129972d7f5ebda612da8c13528e80068705330170121d9b07bdc52b7f0', 0, '286301951c5da8c82dd34f6123ce05ef17fc0f0c1032067eca4a909c0f0f03e85c0123f3c8510afec0809aebfb74dafad300c4a847c787e34628a2bb5c336e94705ab076c9103452064ce448be2a416c',
+    'first name', 'last name', 1, 0, '0371c50c-511d-417f-bbee-949df9fe52c6',
+    1, NOW(), NOW()
+    )"
+    out=$(runSQL "$sql") && stat=0 || stat=$?
+
+    sql="INSERT INTO scion_coord_test.attachment_point
+    (id, v_p_n_i_p, start_v_p_n_i_p, end_v_p_n_i_p)
+    VALUES
+    (1,  '10.0.2.10', '10.0.2.16',		 '10.0.2.31')"
+    out=$(runSQL "$sql") && stat=0 || stat=$?
+
+    sql="INSERT INTO scion_coord_test.s_c_i_o_n_lab_a_s
+    (id, user_email,                   public_i_p,  start_port, label,  i_s_d, a_s_i_d, status, type, a_p_id, created, updated)
+    VALUES
+    (2, 'netsec.test.email@gmail.com', '127.0.0.5', 49991,      'AS12', 1,     12,      1,      2,    1,      now(),   now());"
+    out=$(runSQL "$sql") && stat=0 || stat=$?
+
+    sql="INSERT INTO scion_coord_test.connection
+    (id, join_a_s_id, respond_a_p_id, join_i_p, respond_i_p, join_b_r_i_d, respond_b_r_i_d, linktype, is_v_p_n, join_status,respond_status, created, updated)
+    VALUES
+    (1, 3, 1, '127.0.0.210', '127.0.0.5', 1, 1, 0, 0, 1, 3, NOW(), NOW());"
+    out=$(runSQL "$sql") && stat=0 || stat=$?
 fi
-
-sql="INSERT INTO scion_coord_test.account
-(id, name, organisation, account_id, secret, created, updated)
-VALUES
-(1, 'netsec.test.email@gmail.com', 'NETSEC TEST', 'someid', 'some_secret', NOW(), NOW())
-"
-out=$(runSQL "$sql") && stat=0 || stat=$?
-
-# password is "scionscion"
-sql="INSERT INTO scion_coord_test.user
-(id, email, password, password_invalid, salt,
-first_name, last_name, verified, is_admin, verification_uuid, account_id, created, updated)
-VALUES
-(1, 'netsec.test.email@gmail.com', '81c0cd129972d7f5ebda612da8c13528e80068705330170121d9b07bdc52b7f0', 0, '286301951c5da8c82dd34f6123ce05ef17fc0f0c1032067eca4a909c0f0f03e85c0123f3c8510afec0809aebfb74dafad300c4a847c787e34628a2bb5c336e94705ab076c9103452064ce448be2a416c',
-'first name', 'last name', 1, 0, '0371c50c-511d-417f-bbee-949df9fe52c6',
-1, NOW(), NOW()
-)"
-out=$(runSQL "$sql") && stat=0 || stat=$?
-
-sql="INSERT INTO scion_coord_test.scion_lab_as
-(id, user_email,                   public_ip,   start_port, label,  isd, as_id, status, type,  created, updated)
-VALUES
-(2, 'netsec.test.email@gmail.com', '127.0.0.5', 49991,      'AS12', 1,     12,      1,      2, now(),   now());"
-out=$(runSQL "$sql") && stat=0 || stat=$?
-
-sql="INSERT INTO scion_coord_test.attachment_point
-(vpn_ip, start_vpn_ip, end_vpn_ip, as_id)
-SELECT '10.0.2.10', '10.0.2.16',  '10.0.2.31', id
-FROM scion_coord_test.scion_lab_as WHERE user_email='netsec.test.email@gmail.com';"
-out=$(runSQL "$sql") && stat=0 || stat=$?
 
 # remove already generated configuration TGZs :
 rm -rf "$HOME/scionLabConfigs/netsec.test.email*"
-
 # run SCION Coordinator
 ./scion-coord &
-scionCoordPid=$!
+SCIONCOORDPID=$!
 
 # wait until the HTTP service is up, or 5 seconds
 timeout 5 bash -c 'until curl --output /dev/null --silent --head --fail http://localhost:8080; do
@@ -222,33 +160,29 @@ timeout 5 bash -c 'until curl --output /dev/null --silent --head --fail http://l
     sleep 1
 done'
 
-if [ "$doTest" -ne 1 ]; then
-    # only run the coordinator and wait until it finishes
-    wait $scionCoordPid
-    exit $?
-fi
-
 # TEST SCION COORDINATOR. The requests don't need to have all these headers, but hey were just copied from Chrome for convenience
 echo "Querying SCION Coordinator Service to create an AS, configure it and download its gen folder definition..."
-rm -f cookies.txt
-curl 'http://localhost:8080/' -I -c cookies.txt -s >/dev/null
-curl 'http://localhost:8080/api/login' -H 'Content-Type: application/json;charset=UTF-8' -b cookies.txt --data-binary '{"email":"netsec.test.email@gmail.com","password":"scionscion"}' --compressed -s >/dev/null
-curl 'http://localhost:8080/api/as/generateAS' -X POST -H 'Content-Length: 0' -b cookies.txt -s >/dev/null
-curl 'http://localhost:8080/api/as/configureAS' -H 'Content-Type: application/json;charset=UTF-8' -b cookies.txt --data-binary '{"asID":1001,"userEmail":"netsec.test.email@gmail.com","isVPN":false,"ip":"127.0.0.210","serverIA":"1-12","label":"Label for AS1001","type":2,"port":50050}' -s >/dev/null
+curl 'http://localhost:8080/api/login' -H 'Pragma: no-cache' -H 'Origin: http://localhost:8080' -H 'X-Xsrf-Token: 8fb9c1fabad2b8e16d17d18f532a57ee' -H 'Accept-Encoding: gzip, deflate, br' -H 'Accept-Language: en-US,en;q=0.9,es;q=0.8,de;q=0.7' -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36' -H 'Content-Type: application/json;charset=UTF-8' -H 'Accept: application/json, text/plain, */*' -H 'Cache-Control: no-cache' -H 'Referer: http://localhost:8080/' -H 'Cookie: session=MTUxODA4NDQ0M3xoZWtEdVVsNExoa2JqY2pVMmRrdHotakVxdTdIcGNqMGRRUUhsTnZrVFF5M29VYWZkb3dYUk56ZzRhbXBIUHZNR3V4YXhfbzhrdVlobU5JcGVMUWRBWjhCWDViWVkyZGl8nW3AKF7uinoYXrmoKkquOxPITTIkLUv611BSH5q2fN4=' -H 'Connection: keep-alive' --data-binary '{"email":"netsec.test.email@gmail.com","password":"scionscion"}' --compressed -s > /dev/null
+# curl 'http://localhost:8080/api/userPageData' -H 'Pragma: no-cache' -H 'X-Xsrf-Token: 8fb9c1fabad2b8e16d17d18f532a57ee' -H 'Accept-Language: en-US,en;q=0.9,es;q=0.8,de;q=0.7' -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36' -H 'Accept: application/json, text/plain, */*' -H 'Referer: http://localhost:8080/' -H 'Accept-Encoding: gzip, deflate, br' -H 'Cookie: session=MTUxODA4Njc4M3xzczI2SG5DWHE5bEU0Zy02QkVVb0xfWWZLMFg3Z252bnlwLWJRMWVxTlRfeWNiX0xzVGxuNExLdHNocFhZaHpqOEt1bnN5VzV1RWdib3hNZzQ4a2swNEMtbXgxek5SSFF8EoN5qF1RDeHmqSJxVCRw63rtz8GKW9aXlH7BY8bx634=' -H 'Connection: keep-alive' -H 'Cache-Control: no-cache' --compressed -s > /dev/null
+curl 'http://localhost:8080/api/as/generateAS' -X POST -H 'Pragma: no-cache' -H 'Origin: http://localhost:8080' -H 'X-Xsrf-Token: null' -H 'Accept-Encoding: gzip, deflate, br' -H 'Accept-Language: en-US,en;q=0.9,es;q=0.8,de;q=0.7' -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36' -H 'Accept: application/json, text/plain, */*' -H 'Cache-Control: no-cache' -H 'Referer: http://localhost:8080/' -H 'Cookie: session=MTUxODA4Njc4M3xzczI2SG5DWHE5bEU0Zy02QkVVb0xfWWZLMFg3Z252bnlwLWJRMWVxTlRfeWNiX0xzVGxuNExLdHNocFhZaHpqOEt1bnN5VzV1RWdib3hNZzQ4a2swNEMtbXgxek5SSFF8EoN5qF1RDeHmqSJxVCRw63rtz8GKW9aXlH7BY8bx634=' -H 'Connection: keep-alive' -H 'Content-Length: 0' --compressed -s > /dev/null
+# curl 'http://localhost:8080/api/userPageData' -H 'Pragma: no-cache' -H 'X-Xsrf-Token: null' -H 'Accept-Language: en-US,en;q=0.9,es;q=0.8,de;q=0.7' -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36' -H 'Accept: application/json, text/plain, */*' -H 'Referer: http://localhost:8080/' -H 'Accept-Encoding: gzip, deflate, br' -H 'Cookie: session=MTUxODA4Njc4M3xzczI2SG5DWHE5bEU0Zy02QkVVb0xfWWZLMFg3Z252bnlwLWJRMWVxTlRfeWNiX0xzVGxuNExLdHNocFhZaHpqOEt1bnN5VzV1RWdib3hNZzQ4a2swNEMtbXgxek5SSFF8EoN5qF1RDeHmqSJxVCRw63rtz8GKW9aXlH7BY8bx634=' -H 'Connection: keep-alive' -H 'Cache-Control: no-cache' --compressed -s > /dev/null
+
+curl 'http://localhost:8080/api/as/configureAS' -H 'Pragma: no-cache' -H 'Origin: http://localhost:8080' -H 'X-Xsrf-Token: null' -H 'Accept-Encoding: gzip, deflate, br' -H 'Accept-Language: en-US,en;q=0.9,es;q=0.8,de;q=0.7' -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36' -H 'Content-Type: application/json;charset=UTF-8' -H 'Accept: application/json, text/plain, */*' -H 'Cache-Control: no-cache' -H 'Referer: http://localhost:8080/' -H 'Cookie: session=MTUxODA4NjkzM3wtZXpBTm9KeWYyUVhiZ3JlbWNVc0tQNzdST2ZuYXVDZ1ZBLVg1YS1rUnlMUWUySmlaRWJUNFotWmlnSTJEdDhJVHUtOVlKcHZDX2daQWZBU0g3aEZjdzkwbnU5eDFRRWh88cWFd0k5S87M6qsyo6CpVqux2tnii-iJzn_Slb-b454=' -H 'Connection: keep-alive' --data-binary '{"asID":1001,"userEmail":"netsec.test.email@gmail.com","isVPN":false,"ip":"127.0.0.210","serverIA":"1-12","label":"Label for AS1001","type":2,"port":50050}' --compressed -s > /dev/null
+# curl 'http://localhost:8080/api/userPageData' -H 'Pragma: no-cache' -H 'X-Xsrf-Token: null' -H 'Accept-Language: en-US,en;q=0.9,es;q=0.8,de;q=0.7' -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36' -H 'Accept: application/json, text/plain, */*' -H 'Referer: http://localhost:8080/' -H 'Accept-Encoding: gzip, deflate, br' -H 'Cookie: session=MTUxODA4NjkzM3wtZXpBTm9KeWYyUVhiZ3JlbWNVc0tQNzdST2ZuYXVDZ1ZBLVg1YS1rUnlMUWUySmlaRWJUNFotWmlnSTJEdDhJVHUtOVlKcHZDX2daQWZBU0g3aEZjdzkwbnU5eDFRRWh88cWFd0k5S87M6qsyo6CpVqux2tnii-iJzn_Slb-b454=' -H 'Connection: keep-alive' -H 'Cache-Control: no-cache' --compressed -s > /dev/null
 GENFOLDERTMP=$(mktemp -d)
 rm -rf "$GENFOLDERTMP"
 mkdir -p "$GENFOLDERTMP"
-curl 'http://localhost:8080/api/as/downloadTarball/1001' -b cookies.txt --output "$GENFOLDERTMP/1001.tgz" -s >/dev/null
-rm -f cookies.txt
+curl 'http://localhost:8080/api/as/downloadTarball/1001' -H 'Cookie: session=MTUxODA4NjkzM3wtZXpBTm9KeWYyUVhiZ3JlbWNVc0tQNzdST2ZuYXVDZ1ZBLVg1YS1rUnlMUWUySmlaRWJUNFotWmlnSTJEdDhJVHUtOVlKcHZDX2daQWZBU0g3aEZjdzkwbnU5eDFRRWh88cWFd0k5S87M6qsyo6CpVqux2tnii-iJzn_Slb-b454='    -H 'Upgrade-Insecure-Requests: 1' -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36' -H 'X-DevTools-Emulate-Network-Conditions-Client-Id: (2C4A2C8C117F09E8B049BD98A86C881E)' --compressed --output "$GENFOLDERTMP/1001.tgz" -s > /dev/null
 
 if [ ! -f "$GENFOLDERTMP/1001.tgz" ]; then
-    exitMessage="Cannot find the (presumably) downloaded file $GENFOLDERTMP/1001.tgz\nFAIL"
+    EXITMESSAGE="Cannot find the (presumably) downloaded file $GENFOLDERTMP/1001.tgz\nFAIL"
     exit 101
 fi
+
 cd "$GENFOLDERTMP"
 tar xf "1001.tgz"
 if [ ! -d "netsec.test.email@gmail.com_1-1001/gen/ISD1/AS1001" ]; then
-    exitMessage="Unknown TGZ structure. Cannot continue\nABORT"
+    EXITMESSAGE="Unknown TGZ structure. Cannot continue\nABORT"
     exit 1
 fi
 # safety check:
@@ -267,8 +201,8 @@ pushd "$CURRENTWD" >/dev/null
 popd >/dev/null
 
 # we are done using SCION Coord; shut it down
-kill $scionCoordPid
-scionCoordPid=''
+kill $SCIONCOORDPID
+SCIONCOORDPID=''
 echo "SCION Coordinator service was stopped."
 
 echo "Running SCION now:"
@@ -286,16 +220,16 @@ exec 3< <(timeout $TESTTIMEOUT tail -n0 -f "$SCION/logs/bs1-1001-1.DEBUG")
 exec 2>&4 4>&-
 SSPID=$!
 while read -u 3 LINE; do
-    if echo $LINE | grep 'Successfully verified PCB' &> /dev/null; then
+    if echo $LINE | grep 'MMMM Successfully verified PCB' &> /dev/null; then
         FOUND=true
         pkill -P $SSPID "timeout" &> /dev/null || true
     fi
 done
 
 if [[ "$FOUND" = true ]]; then
-    exitMessage="SUCCESS"
+    EXITMESSAGE="SUCCESS"
     exit 0
 else
-    exitMessage="FAIL"
+    EXITMESSAGE="FAIL"
     exit 100
 fi
