@@ -95,6 +95,13 @@ func checkCredentialsDirectories() error {
 }
 
 func main() {
+	for _, v := range os.Args {
+		if v == "--help" {
+			// also used to initialize the DB schema
+			fmt.Printf("Usage: %s\n", os.Args[0])
+			return
+		}
+	}
 	if err := initializeISD(); err != nil {
 		fmt.Printf("There was an error updating"+
 			" the ISD location mapping in the database: %v", err)
