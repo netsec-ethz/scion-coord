@@ -42,7 +42,7 @@ onExit() {
     exit $RET
 }
 trap onExit EXIT INT TERM
-
+ 
 scionCoordPid=''
 exitMessage=''
 CURRENTWD="$PWD"
