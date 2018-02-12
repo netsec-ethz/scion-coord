@@ -2,3 +2,9 @@
 	path = sub/util
 	url = git@github.com:netsec-ethz/scion-utilities.git
 	branch = master
+
+[submodule "sub/scion-box"]
+	path = sub/scion-box
+	url = https://github.com/netsec-ethz/scion-box
+	branch = master
+
