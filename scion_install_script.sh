@@ -135,6 +135,7 @@ then
     echo "Finished applying patches"
 fi
 
+echo "Installing dependencies..."
 bash -c 'yes | GO_INSTALL=true ./env/deps' > /dev/null
 
 
