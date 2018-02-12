@@ -6,8 +6,9 @@ set -e
 # set -x
 
 # check and export paths:
-# export GOPATH="$HOME/go"
-# export PATH="$HOME/.local/bin:$GOPATH/bin:$PATH"
+if [ -z "$GOPATH" ]; then
+    GOPATH="$HOME/go"
+fi
 
 MYSQLCMD="mysql -u root -pdevelopment_pass"
 NETSEC=${GOPATH:?}/src/github.com/netsec-ethz
@@ -42,16 +43,17 @@ onExit() {
 trap onExit EXIT INT TERM
 
 CURRENTWD="$PWD"
+thisdir="$(dirname $(realpath $0))"
 mkdir -p "$NETSEC"
 cd "$NETSEC"
 SCION="$NETSEC/scion"
 
-thisdir="$(dirname $(realpath $0))"
 if [ ! -f "$thisdir/scion_install_script.sh" ]; then
     EXITMESSAGE="Could not find the SCION installation script. Aborting."
     exit 1
 fi
 bash "$thisdir/scion_install_script.sh"
+source ~/.profile
 
 if [ ! -d "$SCIONCOORD" ]; then
     git clone --recursive git@github.com:netsec-ethz/scion-coord scion-coord
@@ -90,8 +92,9 @@ if missingOrDifferentFiles "$SCION/gen/ISD1/AS11/br1-11-1/keys/as-sig.key" ISD1.
    missingOrDifferentFiles "$SCION/gen/ISD1/AS11/br1-11-1/certs/ISD1-V0.trc" ISD1.trc ;
 then
     echo "Credentials in SCION Coord. Serv. seem different. Running SCION and using those"
-    cd "$SCION"
+    pushd "$SCION" >/dev/null
     ./scion.sh topology -c topology/Tiny.topo
+    popd >/dev/null
 
     cp "$SCION/gen/ISD1/AS11/br1-11-1/keys/as-sig.key" ISD1.key
     cp "$SCION/gen/ISD1/AS11/br1-11-1/certs/ISD1-AS11-V0.crt" ISD1.crt
@@ -104,6 +107,8 @@ fi
 cd "$SCIONCOORD"
 go build
 ./scion-coord --help &> /dev/null
+
+# TODO: remove the data regarding netsec.test.email, so we clean it and insert the new data again
 
 # populate the SCION coord. test DB accordingly. For now with one attachment point, in ISD1 AS12
 sql="SELECT COUNT(*) FROM scion_coord_test.account WHERE name='netsec.test.email@gmail.com';"
@@ -144,12 +149,13 @@ if [ $out -eq 0 ]; then
     sql="INSERT INTO scion_coord_test.connection
     (id, join_a_s_id, respond_a_p_id, join_i_p, respond_i_p, join_b_r_i_d, respond_b_r_i_d, linktype, is_v_p_n, join_status,respond_status, created, updated)
     VALUES
-    (1, 3, 1, '127.0.0.210', '127.0.0.5', 1, 1, 0, 0, 1, 3, NOW(), NOW());"
+    (1, 3, 1, '127.0.0.210', '227.2.2.25', 1, 11, 0, 0, 1, 3, NOW(), NOW());"
     out=$(runSQL "$sql") && stat=0 || stat=$?
 fi
 
 # remove already generated configuration TGZs :
 rm -rf "$HOME/scionLabConfigs/netsec.test.email*"
+
 # run SCION Coordinator
 ./scion-coord &
 SCIONCOORDPID=$!
@@ -162,17 +168,18 @@ done'
 
 # TEST SCION COORDINATOR. The requests don't need to have all these headers, but hey were just copied from Chrome for convenience
 echo "Querying SCION Coordinator Service to create an AS, configure it and download its gen folder definition..."
-curl 'http://localhost:8080/api/login' -H 'Pragma: no-cache' -H 'Origin: http://localhost:8080' -H 'X-Xsrf-Token: 8fb9c1fabad2b8e16d17d18f532a57ee' -H 'Accept-Encoding: gzip, deflate, br' -H 'Accept-Language: en-US,en;q=0.9,es;q=0.8,de;q=0.7' -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36' -H 'Content-Type: application/json;charset=UTF-8' -H 'Accept: application/json, text/plain, */*' -H 'Cache-Control: no-cache' -H 'Referer: http://localhost:8080/' -H 'Cookie: session=MTUxODA4NDQ0M3xoZWtEdVVsNExoa2JqY2pVMmRrdHotakVxdTdIcGNqMGRRUUhsTnZrVFF5M29VYWZkb3dYUk56ZzRhbXBIUHZNR3V4YXhfbzhrdVlobU5JcGVMUWRBWjhCWDViWVkyZGl8nW3AKF7uinoYXrmoKkquOxPITTIkLUv611BSH5q2fN4=' -H 'Connection: keep-alive' --data-binary '{"email":"netsec.test.email@gmail.com","password":"scionscion"}' --compressed -s > /dev/null
-# curl 'http://localhost:8080/api/userPageData' -H 'Pragma: no-cache' -H 'X-Xsrf-Token: 8fb9c1fabad2b8e16d17d18f532a57ee' -H 'Accept-Language: en-US,en;q=0.9,es;q=0.8,de;q=0.7' -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36' -H 'Accept: application/json, text/plain, */*' -H 'Referer: http://localhost:8080/' -H 'Accept-Encoding: gzip, deflate, br' -H 'Cookie: session=MTUxODA4Njc4M3xzczI2SG5DWHE5bEU0Zy02QkVVb0xfWWZLMFg3Z252bnlwLWJRMWVxTlRfeWNiX0xzVGxuNExLdHNocFhZaHpqOEt1bnN5VzV1RWdib3hNZzQ4a2swNEMtbXgxek5SSFF8EoN5qF1RDeHmqSJxVCRw63rtz8GKW9aXlH7BY8bx634=' -H 'Connection: keep-alive' -H 'Cache-Control: no-cache' --compressed -s > /dev/null
-curl 'http://localhost:8080/api/as/generateAS' -X POST -H 'Pragma: no-cache' -H 'Origin: http://localhost:8080' -H 'X-Xsrf-Token: null' -H 'Accept-Encoding: gzip, deflate, br' -H 'Accept-Language: en-US,en;q=0.9,es;q=0.8,de;q=0.7' -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36' -H 'Accept: application/json, text/plain, */*' -H 'Cache-Control: no-cache' -H 'Referer: http://localhost:8080/' -H 'Cookie: session=MTUxODA4Njc4M3xzczI2SG5DWHE5bEU0Zy02QkVVb0xfWWZLMFg3Z252bnlwLWJRMWVxTlRfeWNiX0xzVGxuNExLdHNocFhZaHpqOEt1bnN5VzV1RWdib3hNZzQ4a2swNEMtbXgxek5SSFF8EoN5qF1RDeHmqSJxVCRw63rtz8GKW9aXlH7BY8bx634=' -H 'Connection: keep-alive' -H 'Content-Length: 0' --compressed -s > /dev/null
-# curl 'http://localhost:8080/api/userPageData' -H 'Pragma: no-cache' -H 'X-Xsrf-Token: null' -H 'Accept-Language: en-US,en;q=0.9,es;q=0.8,de;q=0.7' -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36' -H 'Accept: application/json, text/plain, */*' -H 'Referer: http://localhost:8080/' -H 'Accept-Encoding: gzip, deflate, br' -H 'Cookie: session=MTUxODA4Njc4M3xzczI2SG5DWHE5bEU0Zy02QkVVb0xfWWZLMFg3Z252bnlwLWJRMWVxTlRfeWNiX0xzVGxuNExLdHNocFhZaHpqOEt1bnN5VzV1RWdib3hNZzQ4a2swNEMtbXgxek5SSFF8EoN5qF1RDeHmqSJxVCRw63rtz8GKW9aXlH7BY8bx634=' -H 'Connection: keep-alive' -H 'Cache-Control: no-cache' --compressed -s > /dev/null
+curl 'http://localhost:8080/' -I -c cookies.txt -s >/dev/null
+curl 'http://localhost:8080/api/login' -H 'Content-Type: application/json;charset=UTF-8' -b cookies.txt --data-binary '{"email":"netsec.test.email@gmail.com","password":"scionscion"}' --compressed -s >/dev/null
+curl 'http://localhost:8080/api/as/generateAS' -X POST -H 'Content-Length: 0' -b cookies.txt -s >/dev/null
+curl 'http://localhost:8080/api/as/configureAS' -H 'Content-Type: application/json;charset=UTF-8' -b cookies.txt --data-binary '{"asID":1001,"userEmail":"netsec.test.email@gmail.com","isVPN":false,"ip":"127.0.0.210","serverIA":"1-12","label":"Label for AS1001","type":2,"port":50050}' -s >/dev/null
 
-curl 'http://localhost:8080/api/as/configureAS' -H 'Pragma: no-cache' -H 'Origin: http://localhost:8080' -H 'X-Xsrf-Token: null' -H 'Accept-Encoding: gzip, deflate, br' -H 'Accept-Language: en-US,en;q=0.9,es;q=0.8,de;q=0.7' -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36' -H 'Content-Type: application/json;charset=UTF-8' -H 'Accept: application/json, text/plain, */*' -H 'Cache-Control: no-cache' -H 'Referer: http://localhost:8080/' -H 'Cookie: session=MTUxODA4NjkzM3wtZXpBTm9KeWYyUVhiZ3JlbWNVc0tQNzdST2ZuYXVDZ1ZBLVg1YS1rUnlMUWUySmlaRWJUNFotWmlnSTJEdDhJVHUtOVlKcHZDX2daQWZBU0g3aEZjdzkwbnU5eDFRRWh88cWFd0k5S87M6qsyo6CpVqux2tnii-iJzn_Slb-b454=' -H 'Connection: keep-alive' --data-binary '{"asID":1001,"userEmail":"netsec.test.email@gmail.com","isVPN":false,"ip":"127.0.0.210","serverIA":"1-12","label":"Label for AS1001","type":2,"port":50050}' --compressed -s > /dev/null
-# curl 'http://localhost:8080/api/userPageData' -H 'Pragma: no-cache' -H 'X-Xsrf-Token: null' -H 'Accept-Language: en-US,en;q=0.9,es;q=0.8,de;q=0.7' -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36' -H 'Accept: application/json, text/plain, */*' -H 'Referer: http://localhost:8080/' -H 'Accept-Encoding: gzip, deflate, br' -H 'Cookie: session=MTUxODA4NjkzM3wtZXpBTm9KeWYyUVhiZ3JlbWNVc0tQNzdST2ZuYXVDZ1ZBLVg1YS1rUnlMUWUySmlaRWJUNFotWmlnSTJEdDhJVHUtOVlKcHZDX2daQWZBU0g3aEZjdzkwbnU5eDFRRWh88cWFd0k5S87M6qsyo6CpVqux2tnii-iJzn_Slb-b454=' -H 'Connection: keep-alive' -H 'Cache-Control: no-cache' --compressed -s > /dev/null
+
+
 GENFOLDERTMP=$(mktemp -d)
 rm -rf "$GENFOLDERTMP"
 mkdir -p "$GENFOLDERTMP"
-curl 'http://localhost:8080/api/as/downloadTarball/1001' -H 'Cookie: session=MTUxODA4NjkzM3wtZXpBTm9KeWYyUVhiZ3JlbWNVc0tQNzdST2ZuYXVDZ1ZBLVg1YS1rUnlMUWUySmlaRWJUNFotWmlnSTJEdDhJVHUtOVlKcHZDX2daQWZBU0g3aEZjdzkwbnU5eDFRRWh88cWFd0k5S87M6qsyo6CpVqux2tnii-iJzn_Slb-b454='    -H 'Upgrade-Insecure-Requests: 1' -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36' -H 'X-DevTools-Emulate-Network-Conditions-Client-Id: (2C4A2C8C117F09E8B049BD98A86C881E)' --compressed --output "$GENFOLDERTMP/1001.tgz" -s > /dev/null
+curl 'http://localhost:8080/api/as/downloadTarball/1001' -b cookies.txt --output "$GENFOLDERTMP/1001.tgz" -s >/dev/null
+
 
 if [ ! -f "$GENFOLDERTMP/1001.tgz" ]; then
     EXITMESSAGE="Cannot find the (presumably) downloaded file $GENFOLDERTMP/1001.tgz\nFAIL"
