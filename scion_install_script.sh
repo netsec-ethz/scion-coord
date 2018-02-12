@@ -2,16 +2,6 @@
 
 set -e
 
-areAllLinesInsideFile() {
-    lines=$1
-    filename="$2"
-    for line in $lines; do
-        grep "$line" "$filename" &> /dev/null || return 1
-    done
-    return 0
-}
-
-
 shopt -s nullglob
 
 UPGRADE_SCRIPT_LOCATION="/usr/bin/scionupgrade.sh"
@@ -98,26 +88,20 @@ else
     exit 1
 fi
 
-command -v git >/dev/null 2>&1 || sudo apt-get -y install git
+sudo apt-get -y update
+sudo apt-get -y install git
 
-source ~/.profile
-echo "$GOPATH" | grep "$HOME/go" &> /dev/null || echo 'export GOPATH="$HOME/go"' >> ~/.profile
-echo "$PATH" | grep "/usr/local/go/bin" &> /dev/null || echo 'export PATH="/usr/local/go/bin:$PATH"' >> ~/.profile
-echo "$PATH" | grep "$GOPATH/bin" &> /dev/null || echo 'export PATH="$GOPATH/bin:$PATH"' >> ~/.profile
-echo "$PATH" | grep "$HOME/.local/bin" &> /dev/null || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
-echo "$SC" | grep "$GOPATH/src/github.com/netsec-ethz/scion" &> /dev/null || echo 'export SC="$GOPATH/src/github.com/netsec-ethz/scion"' >> ~/.profile
-echo $PYTHONPATH | grep "$SC/python" &> /dev/null || echo 'export PYTHONPATH="$SC/python:$SC"' >> ~/.profile
-
+echo 'export GOPATH="$HOME/go"' >> ~/.profile
+echo 'export PATH="$HOME/.local/bin:$GOPATH/bin:/usr/local/go/bin:$PATH"' >> ~/.profile
+echo 'export SC="$GOPATH/src/github.com/scionproto/scion"' >> ~/.profile
+echo 'export PYTHONPATH="$SC/python:$SC"' >> ~/.profile
 source ~/.profile
 mkdir -p "$GOPATH"
 mkdir -p "$GOPATH/src/github.com/scionproto"
 cd "$GOPATH/src/github.com/scionproto"
 
 git config --global url.https://github.com/.insteadOf git@github.com:
-if [ ! -d scion ]
-then
-    git clone --recursive -b scionlab git@github.com:netsec-ethz/netsec-scion scion
-fi
+git clone --recursive -b scionlab git@github.com:netsec-ethz/netsec-scion scion
 
 cd scion
 
@@ -148,42 +132,32 @@ then
     echo "Finished applying patches"
 fi
 
-bash -c 'yes | GO_INSTALL=true ./env/deps' > /dev/null
+bash -c 'yes | GO_INSTALL=true ./env/deps'
 
-
-if ! areAllLinesInsideFile "$(cat docker/zoo.cfg)" "/etc/zookeeper/conf/zoo.cfg";
-then
-    sudo cp docker/zoo.cfg /etc/zookeeper/conf/zoo.cfg
-fi
+sudo cp docker/zoo.cfg /etc/zookeeper/conf/zoo.cfg
 
 # Add cron script which removes old zk logs
-if [ ! -f "/etc/cron.daily/zookeeper" ]
-then
-    sudo bash -c 'cat > /etc/cron.daily/zookeeper << CRON1
+sudo bash -c 'cat > /etc/cron.daily/zookeeper << CRON1
 #! /bin/sh
 /usr/share/zookeeper/bin/zkCleanup.sh -n 3
 CRON1'
-    sudo chmod 755 /etc/cron.daily/zookeeper
-fi
+sudo chmod 755 /etc/cron.daily/zookeeper
 
 # Check if gen directory exists
 if  [[ ( ! -z ${gen_dir+x} ) && -d ${gen_dir} ]]
 then
     echo "Gen directory is specified! Using content from there!"
     cp -r "$gen_dir" .
-elif [ ! -d gen ]; then
+else
     echo "Gen directory is NOT specified! Generating local (Tiny) topology!"
     ./scion.sh topology -c topology/Tiny.topo
 fi
 
 cd sub
-if [ ! -d "scion-viz" ]; then
-    git clone git@github.com:netsec-ethz/scion-viz
-    pushd scion-viz/python/web >/dev/null
-    pip3 install --user --require-hashes -r requirements.txt
-    python3 ./manage.py migrate
-    popd >/dev/null
-fi
+git clone git@github.com:netsec-ethz/scion-viz
+cd scion-viz/python/web
+pip3 install --user --require-hashes -r requirements.txt
+python3 ./manage.py migrate
 
 # Should we add aliases
 if [[ (! -z ${aliases_file} ) ]]

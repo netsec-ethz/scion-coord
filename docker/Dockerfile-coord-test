@@ -1,0 +1,42 @@
+FROM scionlab-coord:0.2
+
+ENV HOME /home/scion
+ENV GOPATH $HOME/go
+ENV PATH /usr/lib/go-1.9/bin:$GOPATH/bin:$HOME/.local/bin:$PATH
+ENV CONFDIR $HOME/scionLabConfigs
+
+USER scion
+
+
+RUN DEBIAN_FRONTEND="noninteractive" sudo apt-get install redir
+# generate some AS gen folders:
+WORKDIR $SC
+COPY --chown=scion ./docker/coord-test/Tiny.topo /tmp/
+RUN rm -rf $./gen && ./scion.sh topology -c /tmp/Tiny.topo
+
+# requirements for this container as an AP:
+COPY --chown=scion:scion ./sub/util $SCIONCOORD/sub/scion-box/sub/util/
+WORKDIR $SCIONCOORD/sub/scion-box
+RUN ./scripts/install_attachment_point.sh -d
+
+# copy needed certificates and private keys for the test:
+RUN mkdir -p "$SCIONCOORD/credentials"
+WORKDIR ${SCIONCOORD}/credentials
+RUN cp "$SC/gen/ISD1/ASff00_0_110/cs1-ff00_0_110-1/keys/as-sig.seed" ISD1.key
+RUN cp "$SC/gen/ISD1/ASff00_0_110/cs1-ff00_0_110-1/certs/ISD1-ASff00_0_110-V1.crt" ISD1.crt
+RUN cp "$SC/gen/ISD1/ASff00_0_110/cs1-ff00_0_110-1/certs/ISD1-V1.trc" ISD1.trc
+
+# VPN keys (we don't rely on the install_attachment_point.sh script for that; maybe we should?):
+RUN mkdir -p "$CONFDIR"
+RUN cp -r /usr/share/easy-rsa "$CONFDIR"
+RUN cp "$SCIONCOORD/conf/easy-rsa_vars.default" "$CONFDIR/easy-rsa/vars"
+WORKDIR "$CONFDIR/easy-rsa"
+RUN sed -i -- 's/export KEY_EMAIL="scion@lists.inf.ethz.ch"/export KEY_EMAIL="netsec.test.email@gmail.com"/g' ./vars
+# build the CA non interactively
+RUN bash -c 'source ./vars && ./clean-all && ./pkitool --initca'
+
+# copy test script and run
+WORKDIR ${SCIONCOORD}
+COPY --chown=scion ./docker/testscripts/test1.sh ${SCIONCOORD}/docker/testscripts/test1.sh
+
+ENTRYPOINT ${SCIONCOORD}/docker/testscripts/test1.sh

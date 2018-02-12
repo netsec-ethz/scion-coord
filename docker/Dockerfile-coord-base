@@ -1,0 +1,27 @@
+FROM scion:scionlab
+ENV HOME /home/scion
+ENV GOPATH $HOME/go
+ENV PATH /usr/lib/go-1.9/bin:$GOPATH/bin:$HOME/.local/bin:$PATH
+ENV SC $GOPATH/src/github.com/scionproto/scion
+ARG SCIONCOORD=$GOPATH/src/github.com/netsec-ethz/scion-coord
+ENV SCIONCOORD $SCIONCOORD
+
+WORKDIR $SCIONCOORD
+USER scion
+
+# requirements:
+RUN pip3 install --upgrade pycrypto
+RUN DEBIAN_FRONTEND="noninteractive" sudo apt-get update
+RUN DEBIAN_FRONTEND="noninteractive" sudo apt-get install easy-rsa -y
+RUN DEBIAN_FRONTEND="noninteractive" sudo apt-get install openssl -y
+RUN DEBIAN_FRONTEND="noninteractive" sudo apt-get install -y "mysql-client-5.7"
+
+# ensure SCION was recently built:
+
+WORKDIR ${SC}
+RUN ./scion.sh build
+
+WORKDIR ${SCIONCOORD}
+
+CMD []
+ENTRYPOINT ["/bin/bash", "-l"]
