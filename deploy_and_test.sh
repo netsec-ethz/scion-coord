@@ -145,12 +145,6 @@ if [ $out -eq 0 ]; then
     VALUES
     (2, 'netsec.test.email@gmail.com', '127.0.0.5', 49991,      'AS12', 1,     12,      1,      2,    1,      now(),   now());"
     out=$(runSQL "$sql") && stat=0 || stat=$?
-
-    sql="INSERT INTO scion_coord_test.connection
-    (id, join_a_s_id, respond_a_p_id, join_i_p, respond_i_p, join_b_r_i_d, respond_b_r_i_d, linktype, is_v_p_n, join_status,respond_status, created, updated)
-    VALUES
-    (1, 3, 1, '127.0.0.210', '227.2.2.25', 1, 11, 0, 0, 1, 3, NOW(), NOW());"
-    out=$(runSQL "$sql") && stat=0 || stat=$?
 fi
 
 # remove already generated configuration TGZs :
@@ -168,24 +162,21 @@ done'
 
 # TEST SCION COORDINATOR. The requests don't need to have all these headers, but hey were just copied from Chrome for convenience
 echo "Querying SCION Coordinator Service to create an AS, configure it and download its gen folder definition..."
+rm -f cookies.txt
 curl 'http://localhost:8080/' -I -c cookies.txt -s >/dev/null
 curl 'http://localhost:8080/api/login' -H 'Content-Type: application/json;charset=UTF-8' -b cookies.txt --data-binary '{"email":"netsec.test.email@gmail.com","password":"scionscion"}' --compressed -s >/dev/null
 curl 'http://localhost:8080/api/as/generateAS' -X POST -H 'Content-Length: 0' -b cookies.txt -s >/dev/null
 curl 'http://localhost:8080/api/as/configureAS' -H 'Content-Type: application/json;charset=UTF-8' -b cookies.txt --data-binary '{"asID":1001,"userEmail":"netsec.test.email@gmail.com","isVPN":false,"ip":"127.0.0.210","serverIA":"1-12","label":"Label for AS1001","type":2,"port":50050}' -s >/dev/null
-
-
-
 GENFOLDERTMP=$(mktemp -d)
 rm -rf "$GENFOLDERTMP"
 mkdir -p "$GENFOLDERTMP"
 curl 'http://localhost:8080/api/as/downloadTarball/1001' -b cookies.txt --output "$GENFOLDERTMP/1001.tgz" -s >/dev/null
-
+rm -f cookies.txt
 
 if [ ! -f "$GENFOLDERTMP/1001.tgz" ]; then
     EXITMESSAGE="Cannot find the (presumably) downloaded file $GENFOLDERTMP/1001.tgz\nFAIL"
     exit 101
 fi
-
 cd "$GENFOLDERTMP"
 tar xf "1001.tgz"
 if [ ! -d "netsec.test.email@gmail.com_1-1001/gen/ISD1/AS1001" ]; then
@@ -227,7 +218,7 @@ exec 3< <(timeout $TESTTIMEOUT tail -n0 -f "$SCION/logs/bs1-1001-1.DEBUG")
 exec 2>&4 4>&-
 SSPID=$!
 while read -u 3 LINE; do
-    if echo $LINE | grep 'MMMM Successfully verified PCB' &> /dev/null; then
+    if echo $LINE | grep 'Successfully verified PCB' &> /dev/null; then
         FOUND=true
         pkill -P $SSPID "timeout" &> /dev/null || true
     fi
