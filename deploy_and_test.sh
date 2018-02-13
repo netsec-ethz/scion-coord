@@ -81,6 +81,18 @@ fi
 
 if ! runSQL "SHOW DATABASES;" | grep "scion_coord_test" &> /dev/null; then
     runSQL "CREATE DATABASE scion_coord_test;" || (echo "Failed to create the SCION Coordinator DB" && exit 1)
+else
+    echo "Removing entries in the DB"
+    # we need the id > 0 to convince mysql that it is secure
+    runSQL "DELETE FROM scion_coord_test.attachment_point WHERE id > 0 AND id IN (
+    SELECT a_p_id FROM scion_coord_test.s_c_i_o_n_lab_a_s WHERE user_email='netsec.test.email@gmail.com'
+    );" || true
+    runSQL "DELETE FROM scion_coord_test.connection WHERE id > 0 AND respond_a_p_id IN (
+    SELECT a_p_id FROM scion_coord_test.s_c_i_o_n_lab_a_s WHERE user_email='netsec.test.email@gmail.com' 
+    );" || true
+    runSQL "DELETE FROM scion_coord_test.s_c_i_o_n_lab_a_s WHERE id > 0 AND user_email='netsec.test.email@gmail.com';" || true
+    runSQL "DELETE FROM scion_coord_test.user WHERE id > 0 AND email='netsec.test.email@gmail.com';" || true
+    runSQL "DELETE FROM scion_coord_test.account WHERE id > 0 AND name='netsec.test.email@gmail.com';" || true
 fi
 
 # now copy the three credentials files from the SCION installation to the coordinator
@@ -107,8 +119,6 @@ fi
 cd "$SCIONCOORD"
 go build
 ./scion-coord --help &> /dev/null
-
-# TODO: remove the data regarding netsec.test.email, so we clean it and insert the new data again
 
 # populate the SCION coord. test DB accordingly. For now with one attachment point, in ISD1 AS12
 sql="SELECT COUNT(*) FROM scion_coord_test.account WHERE name='netsec.test.email@gmail.com';"
