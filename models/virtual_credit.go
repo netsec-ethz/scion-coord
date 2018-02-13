@@ -16,7 +16,7 @@ package models
 
 import (
 	"github.com/netsec-ethz/scion-coord/utility"
-	"github.com/netsec-ethz/scion/go/lib/addr"
+	"github.com/scionproto/scion/go/lib/addr"
 )
 
 // Converts a bandwidth into credits (10 MegaBits/s=1 Credit)

@@ -37,7 +37,7 @@ import (
 	"github.com/netsec-ethz/scion-coord/utility"
 	"github.com/netsec-ethz/scion-coord/utility/geolocation"
 	"github.com/netsec-ethz/scion-coord/utility/topologyAlgorithm"
-	"github.com/netsec-ethz/scion/go/lib/addr"
+	"github.com/scionproto/scion/go/lib/addr"
 )
 
 type SCIONBoxController struct {
@@ -650,7 +650,7 @@ func (s *SCIONBoxController) generateGenFolder(slas *models.SCIONLabAS) error {
 		"--core_cert_file="+getCoreCertPath(CoreCredentialsPath, isdID),
 		"--trc_file="+getCoreTrcFilePath(CoreCredentialsPath, isdID),
 		"--package_path="+BoxPackagePath)
-	os.Setenv("PYTHONPATH", pythonPath+":"+scionPath+":"+scionWebPath)
+	os.Setenv("PYTHONPATH", pythonPath+":"+scionPath+":"+scionUtilPath)
 	cmd.Env = os.Environ()
 	cmdOut, _ := cmd.StdoutPipe()
 	cmdErr, _ := cmd.StderrPipe()
