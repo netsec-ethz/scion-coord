@@ -13,9 +13,7 @@ fi
 MYSQLCMD="mysql -u root -pdevelopment_pass"
 NETSEC=${GOPATH:?}/src/github.com/netsec-ethz
 SCIONCOORD="$NETSEC/scion-coord"
-SCIONCOORDPID=''
 TESTTIMEOUT=8
-EXITMESSAGE=''
 
 missingOrDifferentFiles() {
     ! [[ -f "$1" ]] || ! [[ -f "$2" ]] || ! cmp "$1" "$2" >/dev/null
@@ -32,16 +30,18 @@ runSQL() {
 onExit() {
     RET=$?
     trap '' INT TERM
-    if [ ! -z $SCIONCOORDPID ]; then
+    if [ ! -z $scionCoordPid ]; then
         # maybe kill SCION Coord if it's running and wait
         kill -TERM 0
         wait
     fi
-    [[ ! -z "$EXITMESSAGE" ]] && printf "$EXITMESSAGE""\n"
+    [[ ! -z "$exitMessage" ]] && printf "$exitMessage""\n"
     exit $RET
 }
 trap onExit EXIT INT TERM
 
+scionCoordPid=''
+exitMessage=''
 CURRENTWD="$PWD"
 thisdir="$(dirname $(realpath $0))"
 mkdir -p "$NETSEC"
@@ -79,7 +79,7 @@ done
 timeout 5 sleep 10 &
 
 if [ ! -f "$thisdir/scion_install_script.sh" ]; then
-    EXITMESSAGE="Could not find the SCION installation script. Aborting."
+    exitMessage="Could not find the SCION installation script. Aborting."
     exit 1
 fi
 bash "$thisdir/scion_install_script.sh"
@@ -155,7 +155,7 @@ sql="SELECT COUNT(*) FROM scion_coord_test.account WHERE name='netsec.test.email
 out=$(runSQL "$sql") && stat=0 || stat=$?
 out=$(echo "$out" | tail -n 1)
 if [ $out -ne 0 ]; then
-    EXITMESSAGE="Inconsistent result: we deleted all data related to the test in the DB, but still have an account. Aborting."
+    exitMessage="Inconsistent result: we deleted all data related to the test in the DB, but still have an account. Aborting."
     exit 1
 fi
 
@@ -195,7 +195,7 @@ rm -rf "$HOME/scionLabConfigs/netsec.test.email*"
 
 # run SCION Coordinator
 ./scion-coord &
-SCIONCOORDPID=$!
+scionCoordPid=$!
 
 # wait until the HTTP service is up, or 5 seconds
 timeout 5 bash -c 'until curl --output /dev/null --silent --head --fail http://localhost:8080; do
@@ -205,7 +205,7 @@ done'
 
 if [ "$doTest" -ne 1 ]; then
     # only run the coordinator and wait until it finishes
-    wait $SCIONCOORDPID
+    wait $scionCoordPid
     exit $?
 fi
 
@@ -223,13 +223,13 @@ curl 'http://localhost:8080/api/as/downloadTarball/1001' -b cookies.txt --output
 rm -f cookies.txt
 
 if [ ! -f "$GENFOLDERTMP/1001.tgz" ]; then
-    EXITMESSAGE="Cannot find the (presumably) downloaded file $GENFOLDERTMP/1001.tgz\nFAIL"
+    exitMessage="Cannot find the (presumably) downloaded file $GENFOLDERTMP/1001.tgz\nFAIL"
     exit 101
 fi
 cd "$GENFOLDERTMP"
 tar xf "1001.tgz"
 if [ ! -d "netsec.test.email@gmail.com_1-1001/gen/ISD1/AS1001" ]; then
-    EXITMESSAGE="Unknown TGZ structure. Cannot continue\nABORT"
+    exitMessage="Unknown TGZ structure. Cannot continue\nABORT"
     exit 1
 fi
 # safety check:
@@ -248,8 +248,8 @@ pushd "$CURRENTWD" >/dev/null
 popd >/dev/null
 
 # we are done using SCION Coord; shut it down
-kill $SCIONCOORDPID
-SCIONCOORDPID=''
+kill $scionCoordPid
+scionCoordPid=''
 echo "SCION Coordinator service was stopped."
 
 echo "Running SCION now:"
@@ -274,9 +274,9 @@ while read -u 3 LINE; do
 done
 
 if [[ "$FOUND" = true ]]; then
-    EXITMESSAGE="SUCCESS"
+    exitMessage="SUCCESS"
     exit 0
 else
-    EXITMESSAGE="FAIL"
+    exitMessage="FAIL"
     exit 100
 fi
