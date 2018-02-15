@@ -108,6 +108,10 @@ echo "$PATH" | grep "$HOME/.local/bin" &> /dev/null || echo 'export PATH="$HOME/
 echo "$SC" | grep "$GOPATH/src/github.com/netsec-ethz/scion" &> /dev/null || echo 'export SC="$GOPATH/src/github.com/netsec-ethz/scion"' >> ~/.profile
 echo $PYTHONPATH | grep "$SC/python" &> /dev/null || echo 'export PYTHONPATH="$SC/python:$SC"' >> ~/.profile
 
+echo 'export GOPATH="$HOME/go"' >> ~/.profile
+echo 'export PATH="$HOME/.local/bin:$GOPATH/bin:/usr/local/go/bin:$PATH"' >> ~/.profile
+echo 'export SC="$GOPATH/src/github.com/scionproto/scion"' >> ~/.profile
+echo 'export PYTHONPATH="$SC/python:$SC"' >> ~/.profile
 source ~/.profile
 mkdir -p "$GOPATH"
 mkdir -p "$GOPATH/src/github.com/scionproto"
