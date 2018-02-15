@@ -26,6 +26,18 @@ var (
 	o orm.Ormer
 )
 
+func (u *SCIONLabAS) TableName() string {
+	return "scion_lab_as"
+}
+
+func (u *SCIONBox) TableName() string {
+	return "scion_box"
+}
+
+func (u *ISDLocation) TableName() string {
+	return "isd_location"
+}
+
 func init() {
 	orm.RegisterDriver("mysql", orm.DRMySQL)
 	orm.RegisterDataBase("default", "mysql",
