@@ -129,18 +129,6 @@
 			"revisionTime": "2017-03-22T23:44:13Z"
 		},
 		{
-			"checksumSHA1": "dCGjjrVZJoiKUQmaICLhV2PdV40=",
-			"path": "github.com/netsec-ethz/scion/go/lib/addr",
-			"revision": "f5066acf929241869b3b614de506d02c27c3b6b1",
-			"revisionTime": "2017-09-27T15:21:54Z"
-		},
-		{
-			"checksumSHA1": "xfkgazGxUH3P9yYobXakYXEgDSA=",
-			"path": "github.com/netsec-ethz/scion/go/lib/common",
-			"revision": "f5066acf929241869b3b614de506d02c27c3b6b1",
-			"revisionTime": "2017-09-27T15:21:54Z"
-		},
-		{
 			"checksumSHA1": "um5Gw7FZwz/GoxIXVIlSL1NigXk=",
 			"path": "github.com/oschwald/geoip2-golang",
 			"revision": "5b1dc16861f81d05d9836bb21c2d0d65282fc0b8",
@@ -169,6 +157,24 @@
 			"path": "github.com/pmezard/go-difflib/difflib",
 			"revision": "792786c7400a136282c1664665ae0a8db921c6c2",
 			"revisionTime": "2016-01-10T10:55:54Z"
+		},
+		{
+			"checksumSHA1": "IuMioGLKf8DMBhq/xS8DhnySZdM=",
+			"path": "github.com/scionproto/scion/go/lib/addr",
+			"revision": "7e45df65c1450928190a2fb3fbe56432c9cb66a8",
+			"revisionTime": "2018-02-10T14:27:06Z"
+		},
+		{
+			"checksumSHA1": "sWlwbRcBj5NFJS1b4VGwUOIJsOw=",
+			"path": "github.com/scionproto/scion/go/lib/assert",
+			"revision": "7e45df65c1450928190a2fb3fbe56432c9cb66a8",
+			"revisionTime": "2018-02-10T14:27:06Z"
+		},
+		{
+			"checksumSHA1": "gcZn/QEtXQXdydouJCIOzlial4w=",
+			"path": "github.com/scionproto/scion/go/lib/common",
+			"revision": "7e45df65c1450928190a2fb3fbe56432c9cb66a8",
+			"revisionTime": "2018-02-10T14:27:06Z"
 		},
 		{
 			"checksumSHA1": "fM3cI8mK8m7fVQx83Ntk6izHmeA=",

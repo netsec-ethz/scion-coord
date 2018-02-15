@@ -22,8 +22,8 @@ mkdir -p "$GOPATH"
 Then, check out the `scionlab` branch of `netsec-scion` into the appropriate directory inside your go workspace:
 
 ```
-mkdir -p "$GOPATH/src/github.com/netsec-ethz"
-cd "$GOPATH/src/github.com/netsec-ethz"
+mkdir -p "$GOPATH/src/github.com/scionproto"
+cd "$GOPATH/src/github.com/scionproto"
 git clone --recursive -b scionlab git@github.com:netsec-ethz/netsec-scion scion
 cd scion
 ```

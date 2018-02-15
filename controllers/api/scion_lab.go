@@ -37,7 +37,7 @@ import (
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/models"
 	"github.com/netsec-ethz/scion-coord/utility"
-	"github.com/netsec-ethz/scion/go/lib/addr"
+	"github.com/scionproto/scion/go/lib/addr"
 )
 
 var (
@@ -46,8 +46,9 @@ var (
 	scionCoordPath  = filepath.Dir(filepath.Dir(currentPath))
 	localGenPath    = filepath.Join(scionCoordPath, "python", "local_gen.py")
 	TempPath        = filepath.Join(scionCoordPath, "temp")
-	scionPath       = filepath.Join(filepath.Dir(scionCoordPath), "scion")
-	scionWebPath    = filepath.Join(filepath.Dir(scionCoordPath), "scion-web")
+	githubPath      = filepath.Dir(filepath.Dir(scionCoordPath))
+	scionPath       = filepath.Join(githubPath, "scionproto", "scion")
+	scionUtilPath   = filepath.Join(scionCoordPath, "sub", "util")
 	pythonPath      = filepath.Join(scionPath, "python")
 	vagrantPath     = filepath.Join(scionCoordPath, "vagrant")
 	PackagePath     = config.PACKAGE_DIRECTORY
@@ -521,7 +522,7 @@ func (s *SCIONLabASController) generateLocalGen(asInfo *SCIONLabASInfo) error {
 		"--core_cert_file="+CoreCertFile(isd),
 		"--trc_file="+TrcFile(isd),
 		"--package_path="+PackagePath)
-	os.Setenv("PYTHONPATH", pythonPath+":"+scionPath+":"+scionWebPath)
+	os.Setenv("PYTHONPATH", pythonPath+":"+scionPath+":"+scionUtilPath)
 	cmd.Env = os.Environ()
 	cmdOut, _ := cmd.StdoutPipe()
 	cmdErr, _ := cmd.StderrPipe()
