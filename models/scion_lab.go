@@ -34,7 +34,7 @@ type AttachmentPoint struct {
 	VPNIP       string
 	StartVPNIP  string
 	EndVPNIP    string
-	AS          *SCIONLabAS   `orm:"reverse(one)"`
+	AS          *SCIONLabAS   `orm:"column(as_id);rel(one);on_delete(cascade)"`
 	Connections []*Connection `orm:"reverse(many);index"` // List of Connections
 }
 
@@ -51,7 +51,7 @@ type SCIONLabAS struct {
 	Label       string           // Optional label for this AS (can be chosen by the user)
 	Status      uint8            `orm:"default(0)"` // Status of the AS: ACTIVE, CREATE, ...
 	Type        uint8            `orm:"default(0)"` // Type of the AS: BOX, VM, DEDICATED, ...
-	AP          *AttachmentPoint `orm:"null;rel(one);on_delete(set_null)"`
+	AP          *AttachmentPoint `orm:"null;reverse(one)"`
 	Credits     int64
 	Created     time.Time
 	Updated     time.Time
