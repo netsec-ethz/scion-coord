@@ -140,6 +140,11 @@ func populateASStatusButtons(userEmail string) ([]asInfo, []string, error) {
 			asI.ASText = "Your SCIONLab AS configuration is currently scheduled for removal."
 			buttons.Download.Disable = true
 		}
+		if asI.Type == models.INFRASTRUCTURE {
+			buttons.Configure.Hide = true
+			buttons.Download.Hide = true
+			buttons.Disconnect.Hide = true
+		}
 		asI.Buttons = buttons
 
 		asInfos = append(asInfos, asI)

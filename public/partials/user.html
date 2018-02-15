@@ -68,42 +68,47 @@
     <div class="form-group has-feedback">
       <label>Attachment point to connect to</label>
         <select class="form-control dropdown-toggle" ng-model="asInfo.AP"
-                ng-options="x for x in aps">
+                ng-options="x for x in aps" ng-disabled="asInfo.Type == 0">
         </select>
       <span class="glyphicon glyphicon-cloud form-control-feedback"></span>
     </div>
     <div class="form-group has-feedback">
       <label>Label for this AS (optional)</label>
       <input type="text" class="form-control" ng-model="asInfo.Label" name="Label"
-             placeholder="Label for this AS">
+             placeholder="Label for this AS" ng-disabled="asInfo.Type == 0">
       <span class="glyphicon glyphicon-pencil form-control-feedback"></span>
     </div>
     <div class="form-group">
       <div class="radio">
-        <label><input type="radio" ng-model="asInfo.Type" value="1" >
+        <label><input type="radio" ng-model="asInfo.Type" value="1" ng-disabled="asInfo.Type == 0">
           Install inside a virtual machine
         </label>
       </div>
       <div class="radio">
-        <label><input type="radio" ng-model="asInfo.Type" value="2" >
+        <label><input type="radio" ng-model="asInfo.Type" value="2" ng-disabled="asInfo.Type == 0">
           Install on a dedicated SCION system
         </label>
       </div>
     </div>
     <div class="form-group checkbox">
-        <label><input type="checkbox" ng-model="asInfo.IsVPN" name="IsVPN">Use an OpenVPN connection for this AS</label>
+        <label>
+          <input type="checkbox" ng-model="asInfo.IsVPN" name="IsVPN" ng-disabled="asInfo.Type == 0">
+          Use an OpenVPN connection for this AS
+        </label>
     </div>
     <div class="form-group has-feedback" ng-show="!asInfo.IsVPN">
       <label>My host's public IP address</label>
       <input type="text" class="form-control" ng-model="asInfo.IP" name="IP"
-           placeholder="My host's public IP address" ng-required="!asInfo.IsVPN"
-           ng-pattern="/^(?!.*\.$)((1?\d?\d|25[0-5]|2[0-4]\d)(\.|$)){4}$/">
+             placeholder="My host's public IP address" ng-required="!asInfo.IsVPN"
+             ng-pattern="/^(?!.*\.$)((1?\d?\d|25[0-5]|2[0-4]\d)(\.|$)){4}$/"
+             ng-disabled="asInfo.Type == 0">
       <span class="glyphicon glyphicon-home form-control-feedback"></span>
     </div>
     <div class="form-group has-feedback">
       <label>Port where this AS accepts traffic</label>
       <input type="number" class="form-control" min="1024" max="65535" required
-             ng-model="asInfo.Port" name="Port" placeholder="Port (default: 50000)">
+             ng-model="asInfo.Port" name="Port" placeholder="Port (default: 50000)"
+             ng-disabled="asInfo.Type == 0">
       <span class="glyphicon glyphicon-log-in form-control-feedback"></span>
     </div>
 
