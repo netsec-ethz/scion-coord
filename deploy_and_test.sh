@@ -13,6 +13,8 @@ fi
 MYSQLCMD="mysql -u root -pdevelopment_pass"
 NETSEC=${GOPATH:?}/src/github.com/netsec-ethz
 SCIONCOORD="$NETSEC/scion-coord"
+CONFDIR="$HOME/scionLabConfigs"
+EASYRSADEFAULT="$SCIONCOORD/conf/easy-rsa_vars.default"
 TESTTIMEOUT=8
 
 missingOrDifferentFiles() {
@@ -143,7 +145,26 @@ then
     cp "$SCION/gen/ISD1/AS11/br1-11-1/certs/ISD1-V0.trc" ISD1.trc
 fi
 
-# TODO: all regarding VPN is not yet done. We probably want to parametrize this script (e.g. VPN on/off, ...)
+# VPN stuff
+if [ ! -f "$CONFDIR/easy-rsa/keys/ca.crt" ]; then
+    # generate certificate for openVPN
+    if ! dpkg-query -s easy-rsa &> /dev/null ; then
+        sudo apt-get install easy-rsa
+    fi
+    if ! dpkg-query -s openssl &> /dev/null ; then
+        sudo apt-get install openssl
+    fi
+    mkdir -p "$CONFDIR"
+    cp -r /usr/share/easy-rsa "$CONFDIR"
+    cp "$EASYRSADEFAULT" "$CONFDIR/easy-rsa/vars"
+    pushd "$CONFDIR/easy-rsa" >/dev/null
+    sed -i -- 's/export KEY_EMAIL="scion@lists.inf.ethz.ch"/export KEY_EMAIL="netsec.test.email@gmail.com"/g' ./vars
+    source ./vars
+    ./clean-all
+    # build the CA non interactively
+    ./pkitool --initca
+    popd >/dev/null
+fi
 
 # build and run:
 cd "$SCIONCOORD"
