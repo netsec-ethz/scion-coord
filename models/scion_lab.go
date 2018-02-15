@@ -439,15 +439,25 @@ func (as *SCIONLabAS) UpdateASAndConnection(cnInfo *ConnectionInfo) error {
 
 // Returns all Attachment Point ASes
 func GetAllAPs() ([]*SCIONLabAS, error) {
+	var aps []*AttachmentPoint
 	var ases []*SCIONLabAS
-	_, err := o.QueryTable(new(SCIONLabAS)).Exclude("AP", nil).RelatedSel().All(&ases)
+	_, err := o.QueryTable(new(AttachmentPoint)).RelatedSel().All(&aps)
+	for _, ap := range aps {
+		ases = append(ases, ap.AS)
+	}
 	return ases, err
 }
 
 // Returns all Attachment Point ASes in the given ISD
 func FindAllAPsByISD(isd int) ([]*SCIONLabAS, error) {
+	var aps []*AttachmentPoint
 	var ases []*SCIONLabAS
-	_, err := o.QueryTable(new(SCIONLabAS)).Filter("ISD", isd).Exclude("AP", nil).RelatedSel().All(&ases)
+	_, err := o.QueryTable(new(AttachmentPoint)).RelatedSel().All(&aps)
+	for _, ap := range aps {
+		if ap.AS.ISD == isd {
+			ases = append(ases, ap.AS)
+		}
+	}
 	return ases, err
 }
 
