@@ -48,6 +48,36 @@ mkdir -p "$NETSEC"
 cd "$NETSEC"
 SCION="$NETSEC/scion"
 
+doTest=1
+usage="$(basename $0) [-n]
+
+where:
+    -n      No test: only set up SCION + coordinator, run coordinator and wait for it to finish"
+while getopts ":n" opt; do
+case $opt in
+    h)
+        echo "$usage"
+        exit 0
+        ;;
+    n)
+        doTest=0
+        ;;
+    \?)
+        echo "Invalid option: -$OPTARG" >&2
+        echo "$usage" >&2
+        exit 1
+        ;;
+    :)
+        echo "Option -$OPTARG requires an argument." >&2
+        echo "$usage" >&2
+        exit 1
+        ;;
+esac
+done
+
+
+timeout 5 sleep 10 &
+
 if [ ! -f "$thisdir/scion_install_script.sh" ]; then
     EXITMESSAGE="Could not find the SCION installation script. Aborting."
     exit 1
@@ -124,38 +154,41 @@ go build
 sql="SELECT COUNT(*) FROM scion_coord_test.account WHERE name='netsec.test.email@gmail.com';"
 out=$(runSQL "$sql") && stat=0 || stat=$?
 out=$(echo "$out" | tail -n 1)
-if [ $out -eq 0 ]; then
-    sql="INSERT INTO scion_coord_test.account
-    (id, name, organisation, account_id, secret, created, updated)
-    VALUES
-    (1, 'netsec.test.email@gmail.com', 'NETSEC TEST', 'someid', 'some_secret', NOW(), NOW())
-    "
-    out=$(runSQL "$sql") && stat=0 || stat=$?
-
-    # password is "scionscion"
-    sql="INSERT INTO scion_coord_test.user
-    (id, email, password, password_invalid, salt,
-    first_name, last_name, verified, is_admin, verification_u_u_i_d,
-    account_id, created, updated)
-    VALUES
-    (1, 'netsec.test.email@gmail.com', '81c0cd129972d7f5ebda612da8c13528e80068705330170121d9b07bdc52b7f0', 0, '286301951c5da8c82dd34f6123ce05ef17fc0f0c1032067eca4a909c0f0f03e85c0123f3c8510afec0809aebfb74dafad300c4a847c787e34628a2bb5c336e94705ab076c9103452064ce448be2a416c',
-    'first name', 'last name', 1, 0, '0371c50c-511d-417f-bbee-949df9fe52c6',
-    1, NOW(), NOW()
-    )"
-    out=$(runSQL "$sql") && stat=0 || stat=$?
-
-    sql="INSERT INTO scion_coord_test.attachment_point
-    (id, v_p_n_i_p, start_v_p_n_i_p, end_v_p_n_i_p)
-    VALUES
-    (1,  '10.0.2.10', '10.0.2.16',		 '10.0.2.31')"
-    out=$(runSQL "$sql") && stat=0 || stat=$?
-
-    sql="INSERT INTO scion_coord_test.s_c_i_o_n_lab_a_s
-    (id, user_email,                   public_i_p,  start_port, label,  i_s_d, a_s_i_d, status, type, a_p_id, created, updated)
-    VALUES
-    (2, 'netsec.test.email@gmail.com', '127.0.0.5', 49991,      'AS12', 1,     12,      1,      2,    1,      now(),   now());"
-    out=$(runSQL "$sql") && stat=0 || stat=$?
+if [ $out -ne 0 ]; then
+    EXITMESSAGE="Inconsistent result: we deleted all data related to the test in the DB, but still have an account. Aborting."
+    exit 1
 fi
+
+sql="INSERT INTO scion_coord_test.account
+(id, name, organisation, account_id, secret, created, updated)
+VALUES
+(1, 'netsec.test.email@gmail.com', 'NETSEC TEST', 'someid', 'some_secret', NOW(), NOW())
+"
+out=$(runSQL "$sql") && stat=0 || stat=$?
+
+# password is "scionscion"
+sql="INSERT INTO scion_coord_test.user
+(id, email, password, password_invalid, salt,
+first_name, last_name, verified, is_admin, verification_u_u_i_d,
+account_id, created, updated)
+VALUES
+(1, 'netsec.test.email@gmail.com', '81c0cd129972d7f5ebda612da8c13528e80068705330170121d9b07bdc52b7f0', 0, '286301951c5da8c82dd34f6123ce05ef17fc0f0c1032067eca4a909c0f0f03e85c0123f3c8510afec0809aebfb74dafad300c4a847c787e34628a2bb5c336e94705ab076c9103452064ce448be2a416c',
+'first name', 'last name', 1, 0, '0371c50c-511d-417f-bbee-949df9fe52c6',
+1, NOW(), NOW()
+)"
+out=$(runSQL "$sql") && stat=0 || stat=$?
+
+sql="INSERT INTO scion_coord_test.attachment_point
+(id, v_p_n_i_p, start_v_p_n_i_p, end_v_p_n_i_p)
+VALUES
+(1,  '10.0.2.10', '10.0.2.16',		 '10.0.2.31')"
+out=$(runSQL "$sql") && stat=0 || stat=$?
+
+sql="INSERT INTO scion_coord_test.s_c_i_o_n_lab_a_s
+(id, user_email,                   public_i_p,  start_port, label,  i_s_d, a_s_i_d, status, type, a_p_id, created, updated)
+VALUES
+(2, 'netsec.test.email@gmail.com', '127.0.0.5', 49991,      'AS12', 1,     12,      1,      2,    1,      now(),   now());"
+out=$(runSQL "$sql") && stat=0 || stat=$?
 
 # remove already generated configuration TGZs :
 rm -rf "$HOME/scionLabConfigs/netsec.test.email*"
@@ -169,6 +202,12 @@ timeout 5 bash -c 'until curl --output /dev/null --silent --head --fail http://l
     echo "Waiting for SCION Coord. Service to be up ..."
     sleep 1
 done'
+
+if [ "$doTest" -ne 1 ]; then
+    # only run the coordinator and wait until it finishes
+    wait $SCIONCOORDPID
+    exit $?
+fi
 
 # TEST SCION COORDINATOR. The requests don't need to have all these headers, but hey were just copied from Chrome for convenience
 echo "Querying SCION Coordinator Service to create an AS, configure it and download its gen folder definition..."
