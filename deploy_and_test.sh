@@ -1,5 +1,5 @@
 #!/bin/bash
-
+ 
 # Configure a coordinator service and test SCION works with it
 
 set -e
