@@ -491,6 +491,7 @@ func FindSCIONLabASByIAString(ia string) (*SCIONLabAS, error) {
 		return nil, err1
 	}
 	err := o.QueryTable(as).Filter("ISD", IA.I).Filter("ASID", IA.A).RelatedSel().One(as)
+	o.LoadRelated(as, "AP")
 	return as, err
 }
 
