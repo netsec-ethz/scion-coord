@@ -426,6 +426,7 @@ func (s *SCIONLabASController) updateDB(asInfo *SCIONLabASInfo) error {
 				userEmail, err)
 
 		}
+		cn.BRID = 1
 		cn.IsVPN = asInfo.IsVPN
 		cn.NeighborStatus = asInfo.LocalAS.Status
 		cn.Status = models.ACTIVE
