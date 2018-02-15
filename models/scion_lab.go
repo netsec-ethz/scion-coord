@@ -110,7 +110,7 @@ func (as *SCIONLabAS) String() string {
 // This function determines the IP address that are used for different SCION servers (CS, BS, PS)
 func (as *SCIONLabAS) ServerIP() string {
 	switch as.Type {
-	case INFRASTRUCTURE:
+	case INFRASTRUCTURE, DEDICATED:
 		return as.PublicIP
 	case VM:
 		return config.VM_LOCAL_IP
@@ -198,7 +198,7 @@ func (as *SCIONLabAS) GetFreeBRID() (uint16, error) {
 		brIDs[i] = int(cn.BRID)
 	}
 	minBRID := 1
-	if as.Type != INFRASTRUCTURE {
+	if as.Type == INFRASTRUCTURE {
 		minBRID += config.RESERVED_BRS_INFRASTRUCTURE
 	}
 	id, err := utility.GetFreeID(brIDs, minBRID, config.MAX_BR_ID)
