@@ -36,18 +36,22 @@ from lib.crypto.certificate import Certificate
 from lib.crypto.certificate_chain import CertificateChain
 from lib.packet.scion_addr import ISD_AS
 from lib.util import read_file
-from topology.generator import INITIAL_CERT_VERSION, INITIAL_TRC_VERSION
+from topology.generator import (
+    INITIAL_CERT_VERSION,
+    INITIAL_TRC_VERSION,
+    TopoID
+)
 
-# SCION-WEB
-from ad_manager.util.local_config_util import (
+# SCION-Utilities
+from local_config_util import (
     ASCredential,
+    generate_sciond_config,
     generate_zk_config,
     get_elem_dir,
     prep_supervisord_conf,
     write_as_conf_and_path_policy,
     write_certs_trc_keys,
     write_dispatcher_config,
-    write_endhost_config,
     write_supervisord_config,
     write_topology_file,
     write_zlog_file,
@@ -90,27 +94,10 @@ def create_scionlab_as_local_gen(args, tp):
             write_supervisord_config(config, instance_path)
             write_topology_file(tp, type_key, instance_path)
             write_zlog_file(service_type, instance_name, instance_path)
-    write_endhost_config(tp, new_ia, as_obj, local_gen_path)
     generate_zk_config(tp, new_ia, local_gen_path, simple_conf_mode=True)
-    generate_sciond_config(tp, new_ia, local_gen_path, as_obj)
-
-
-def generate_sciond_config(tp, ia, local_gen_path, as_obj):
-    executable_name = "sciond"
-    instance_name = "sd%s" % str(ia)
-    service_type = "sciond"
-    processes = []
-    for svc_type in ["BorderRouters", "BeaconService", "CertificateService",
-                     "HiddenPathService", "PathService"]:
-        if svc_type not in tp:
-            continue
-        for elem_id, elem in tp[svc_type].items():
-            processes.append(elem_id)
-    processes.append(instance_name)
-    config = prep_supervisord_conf(None, executable_name, service_type, instance_name, ia)
-    config['group:'  "as%s" % str(ia)] = {'programs': ",".join(processes)}
-    sciond_conf_path = get_elem_dir(local_gen_path, ia, "")
-    write_supervisord_config(config, sciond_conf_path)
+    generate_sciond_config(TopoID(args.joining_ia), as_obj, tp, local_gen_path)
+    # We don't initiate the prometheous service for user ASes.
+    # generate_prom_config(ia, tp, gen_path)
 
 
 def generate_certificate(joining_ia, core_ia, core_sign_priv_key_file, core_cert_file, trc_file):

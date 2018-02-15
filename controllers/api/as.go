@@ -25,7 +25,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/models"
-	"github.com/netsec-ethz/scion/go/lib/addr"
+	"github.com/scionproto/scion/go/lib/addr"
 )
 
 // TODO(mlegner): Almost the same struct definitions in `models/events.go`

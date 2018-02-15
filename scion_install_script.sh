@@ -80,12 +80,12 @@ sudo apt-get -y install git
 
 echo 'export GOPATH="$HOME/go"' >> ~/.profile
 echo 'export PATH="$HOME/.local/bin:$GOPATH/bin:/usr/local/go/bin:$PATH"' >> ~/.profile
-echo 'export SC="$GOPATH/src/github.com/netsec-ethz/scion"' >> ~/.profile
+echo 'export SC="$GOPATH/src/github.com/scionproto/scion"' >> ~/.profile
 echo 'export PYTHONPATH="$SC/python:$SC"' >> ~/.profile
 source ~/.profile
 mkdir -p "$GOPATH"
-mkdir -p "$GOPATH/src/github.com/netsec-ethz"
-cd "$GOPATH/src/github.com/netsec-ethz"
+mkdir -p "$GOPATH/src/github.com/scionproto"
+cd "$GOPATH/src/github.com/scionproto"
 
 git config --global url.https://github.com/.insteadOf git@github.com:
 git clone --recursive -b scionlab git@github.com:netsec-ethz/netsec-scion scion

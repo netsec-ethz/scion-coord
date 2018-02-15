@@ -5,9 +5,9 @@ Wants=network-online.target
 
 [Service]
 User=_USER_
-WorkingDirectory=/home/_USER_/go/src/github.com/netsec-ethz/scion/sub/scion-viz/python/web
-Environment="PYTHONPATH=/home/_USER_/go/src/github.com/netsec-ethz/scion/python:/home/_USER_/go/src/github.com/netsec-ethz/scion"
-ExecStart=/usr/bin/python3 /home/_USER_/go/src/github.com/netsec-ethz/scion/sub/scion-viz/python/web/manage.py runserver 10.0.2.15:8000
+WorkingDirectory=/home/_USER_/go/src/github.com/scionproto/scion/sub/scion-viz/python/web
+Environment="PYTHONPATH=/home/_USER_/go/src/github.com/scionproto/scion/python:/home/_USER_/go/src/github.com/scionproto/scion"
+ExecStart=/usr/bin/python3 /home/_USER_/go/src/github.com/scionproto/scion/sub/scion-viz/python/web/manage.py runserver 10.0.2.15:8000
 
 [Install]
 WantedBy=multi-user.target
