@@ -57,7 +57,8 @@
   <div class="spacer"></div>
 
   <select class="form-control btn btn-primary dropdown-toggle" ng-model="asInfo"
-          ng-options="'AS ' + x.IALabel for x in asInfos" ng-show="asInfos.length">
+          ng-options="'AS ' + x.IALabel group by x.StatusStr for x in asInfos | orderBy:
+          ['StatusStr', 'IALabel']" ng-show="asInfos.length">
   </select>
 
   <strong>
@@ -67,8 +68,9 @@
   <form ng-show="asInfo" name="scionLabASForm">
     <div class="form-group has-feedback">
       <label>Attachment point to connect to</label>
-        <select class="form-control dropdown-toggle" ng-model="asInfo.AP"
-                ng-options="x for x in aps" ng-disabled="asInfo.Type == 0">
+        <select name="AP" class="form-control dropdown-toggle" ng-model="asInfo.AP"
+                ng-options="x.IA as x.Label group by x.ISD for x in aps"
+                ng-disabled="asInfo.Type == 0" required>
         </select>
       <span class="glyphicon glyphicon-cloud form-control-feedback"></span>
     </div>
