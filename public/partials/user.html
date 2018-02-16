@@ -69,7 +69,7 @@
     <div class="form-group has-feedback">
       <label>Attachment point to connect to</label>
         <select name="AP" class="form-control dropdown-toggle" ng-model="asInfo.AP"
-                ng-options="x.IA as x.Label group by x.ISD for x in aps"
+                ng-options="x.IA as x.Label group by x.ISD for x in aps | orderBy: ['ISD', 'IA']"
                 ng-disabled="asInfo.Type == 0" required>
         </select>
       <span class="glyphicon glyphicon-cloud form-control-feedback"></span>
