@@ -15,6 +15,7 @@
 package api
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -25,18 +26,25 @@ import (
 )
 
 type asInfo struct {
-	ASID    int       // AS ID of the user's SCIONLab AS
-	ISD     int       // Current ISD of the user's SCIONLab AS
-	Label   string    // Label of the AS
-	IALabel string    // ISD-AS string + Label of the AS
-	Status  uint8     // Current status of the AS
-	IP      string    // IP address of the AS
-	Type    uint8     // Type of the SCIONLab AS
-	IsVPN   bool      // Is this a VPN-based setup
-	AP      string    // ISD-AS of the connected Attachment Point
-	Port    uint16    // Port of BR on the user's AS
-	ASText  string    // Text to be displayed by the frontend
-	Buttons uiButtons // Buttons shown for this AS
+	ASID      int       // AS ID of the user's SCIONLab AS
+	ISD       int       // Current ISD of the user's SCIONLab AS
+	Label     string    // Label of the AS
+	IALabel   string    // ISD-AS string + Label of the AS
+	Status    uint8     // Current status of the AS
+	StatusStr string    // Status as string
+	IP        string    // IP address of the AS
+	Type      uint8     // Type of the SCIONLab AS
+	IsVPN     bool      // Is this a VPN-based setup
+	AP        string    // ISD-AS of the connected Attachment Point
+	Port      uint16    // Port of BR on the user's AS
+	ASText    string    // Text to be displayed by the frontend
+	Buttons   uiButtons // Buttons shown for this AS
+}
+
+type apInfo struct {
+	ISD   string
+	IA    string
+	Label string
 }
 
 type buttonConfiguration struct {
@@ -57,15 +65,15 @@ type uiButtons struct {
 type userPageData struct {
 	User    user
 	MaxASes int // maximal number of ASes this user can have
-	APs     []string
+	APs     []apInfo
 	ASInfos []asInfo
 }
 
 // generates the structs containing information about the user's AS and the
 // configuration of UI buttons
-func populateASStatusButtons(userEmail string) ([]asInfo, []string, error) {
+func populateASStatusButtons(userEmail string) ([]asInfo, []apInfo, error) {
 	asInfos := []asInfo{}
-	apInfos := []string{}
+	apInfos := []apInfo{}
 	ases, err := models.FindSCIONLabASesByUserEmail(userEmail)
 	if err != nil {
 		return asInfos, apInfos, err
@@ -76,7 +84,12 @@ func populateASStatusButtons(userEmail string) ([]asInfo, []string, error) {
 	}
 	for _, ap := range aps {
 		// TODO(mlegner): Add label
-		apInfos = append(apInfos, ap.IA())
+		apI := apInfo{
+			ISD:   fmt.Sprintf("ISD %v", ap.ISD),
+			IA:    ap.IA(),
+			Label: ap.String(),
+		}
+		apInfos = append(apInfos, apI)
 	}
 	for _, as := range ases {
 		buttons := uiButtons{
@@ -101,14 +114,15 @@ func populateASStatusButtons(userEmail string) ([]asInfo, []string, error) {
 		}
 
 		asI := asInfo{
-			ASID:    as.ASID,
-			ISD:     as.ISD,
-			IALabel: as.String(),
-			Label:   as.Label,
-			Status:  as.Status,
-			IP:      as.PublicIP,
-			Type:    as.Type,
-			Port:    as.StartPort,
+			ASID:      as.ASID,
+			ISD:       as.ISD,
+			IALabel:   as.String(),
+			Label:     as.Label,
+			Status:    as.Status,
+			StatusStr: "Pending Request",
+			IP:        as.PublicIP,
+			Type:      as.Type,
+			Port:      as.StartPort,
 		}
 
 		cns, err := as.GetJoinConnectionInfo()
@@ -128,10 +142,12 @@ func populateASStatusButtons(userEmail string) ([]asInfo, []string, error) {
 			buttons.Configure.Disable = false
 			buttons.Download.Hide = true
 			buttons.Disconnect.Hide = true
+			asI.StatusStr = "Inactive"
 		case models.ACTIVE:
 			asI.ASText = "This AS is currently active."
 			buttons.Configure.Disable = false
 			buttons.Disconnect.Disable = false
+			asI.StatusStr = "Active"
 		case models.CREATE:
 			asI.ASText = "You have a pending creation request for your SCIONLab AS."
 		case models.UPDATE:
@@ -139,6 +155,11 @@ func populateASStatusButtons(userEmail string) ([]asInfo, []string, error) {
 		case models.REMOVE:
 			asI.ASText = "Your SCIONLab AS configuration is currently scheduled for removal."
 			buttons.Download.Disable = true
+		}
+		if asI.Type == models.INFRASTRUCTURE {
+			buttons.Configure.Hide = true
+			buttons.Download.Hide = true
+			buttons.Disconnect.Hide = true
 		}
 		asI.Buttons = buttons
 

@@ -276,6 +276,9 @@ func (s *SCIONLabASController) canConfigure(userEmail string, asID int) error {
 		return err
 	}
 	if (as.Status == models.ACTIVE) || (as.Status == models.INACTIVE) {
+		if as.Type == models.INFRASTRUCTURE {
+			return errors.New("Cannot modify infrastructure ASes")
+		}
 		return nil
 	}
 	return errors.New("The given AS has a pending update request")
@@ -672,6 +675,9 @@ func (s *SCIONLabASController) canRemove(userEmail, asID string) (bool, *models.
 		}
 	}
 	if as.Status == models.ACTIVE {
+		if as.Type == models.INFRASTRUCTURE {
+			return false, nil, nil, errors.New("Cannot remove infrastructure ASes")
+		}
 		cns, err := as.GetJoinConnectionInfo()
 		if err != nil {
 			return false, nil, nil, fmt.Errorf("Error looking up connections: %v", err)

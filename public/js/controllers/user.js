@@ -49,10 +49,12 @@ scionApp
                 setCurrentIndex();
                 switch (action) {
                     case "update":
-                        if (asInfo.isNotVPN && !$scope.scionLabASForm.IP.$valid) {
+                        if (!asInfo.IsVPN && !$scope.scionLabASForm.IP.$valid) {
                             $scope.error2 = "Please enter a correct public IP address.";
                         } else if (!$scope.scionLabASForm.Port.$valid) {
                             $scope.error2 = "Please enter a correct port in the range 1024-65535.";
+                        } else if (!$scope.scionLabASForm.AP.$valid) {
+                            $scope.error2 = "Please select an Attachment Point.";
                         } else {
                             $scope.configureSCIONLabAS(user, asInfo);
                         }
