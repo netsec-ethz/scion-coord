@@ -54,6 +54,7 @@ func (s *SCIONLabASController) generateVPNConfig(asInfo *SCIONLabASInfo) error {
 
 	config := map[string]string{
 		"ServerIP":   asInfo.VPNServerIP,
+		"ServerPort": fmt.Sprintf("%v", asInfo.VPNServerPort),
 		"CACert":     string(caCert),
 		"ClientCert": clientCertStr[startCert:],
 		"ClientKey":  string(clientKey),

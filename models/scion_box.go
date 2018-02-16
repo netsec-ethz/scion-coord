@@ -20,11 +20,11 @@ import (
 
 type SCIONBox struct {
 	ID             uint64 `orm:"column(id);auto;pk"`
-	MAC            string
+	MAC            string `orm:"column(mac)"`
 	UserEmail      string
-	ISD            int `orm:"default(0)"`
-	AS             int `orm:"default(0)"`
-	InternalIP     string
+	ISD            int    `orm:"column(isd);default(0)"`
+	AS             int    `orm:"column(as);default(0)"`
+	InternalIP     string `orm:"column(internal_ip)"`
 	Shipping       string
 	OpenPorts      uint16 `orm:"default(0)"` // Number of free ports UDP ports starting from StartPort
 	StartPort      uint16 `orm:"default(50000)"`
@@ -70,8 +70,8 @@ func (sb *SCIONBox) Remove() error {
 }
 
 type ISDLocation struct {
-	Id        uint64 `orm:"column(id);auto;pk"`
-	ISD       int
+	ID        uint64 `orm:"column(id);auto;pk"`
+	ISD       int    `orm:"column(isd)"`
 	Country   string
 	Continent string
 }
