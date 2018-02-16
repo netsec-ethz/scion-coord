@@ -15,11 +15,9 @@
 package models
 
 import (
-	"time"
-
-	"fmt"
-
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/astaxie/beego/orm"
 	"github.com/netsec-ethz/scion-coord/config"
@@ -30,10 +28,12 @@ import (
 // TODO(mlegner): Some of the functions here may not be optimally efficient
 
 type AttachmentPoint struct {
-	ID          uint64 `orm:"column(id);auto;pk"`
-	VPNIP       string
-	StartVPNIP  string
-	EndVPNIP    string
+	ID          uint64        `orm:"column(id);auto;pk"`
+	HasVPN      bool          `orm:"column(has_vpn);default(1)"`
+	VPNPort     uint16        `orm:"column(vpn_port);default(1194)"`
+	VPNIP       string        `orm:"column(vpn_ip)"`
+	StartVPNIP  string        `orm:"column(start_vpn_ip)"`
+	EndVPNIP    string        `orm:"column(end_vpn_ip)"`
 	AS          *SCIONLabAS   `orm:"column(as_id);rel(one);on_delete(cascade)"`
 	Connections []*Connection `orm:"reverse(many);index"` // List of Connections
 }
@@ -41,12 +41,12 @@ type AttachmentPoint struct {
 // TODO(philippmao, mlegner): Link SCIONLabAS to user model?
 // TODO(mlegner): Maybe it would make more sense to replace the user by an account here
 type SCIONLabAS struct {
-	ID          uint64 `orm:"column(id);auto;pk"`
-	UserEmail   string // Owner of the AS
-	PublicIP    string // IP address of the SCIONLabAS; can be empty in case of VPN-based setups
-	StartPort   uint16 // First port used for border routers
-	ISD         int    `orm:"default(0)"` // 0 means no ISD is joined
-	ASID        int
+	ID          uint64           `orm:"column(id);auto;pk"`
+	UserEmail   string           // Owner of the AS
+	PublicIP    string           `orm:"column(public_ip)"` // IP address of the AS; can be empty in case of VPN-based setups
+	StartPort   uint16           // First port used for border routers
+	ISD         int              `orm:"column(isd);default(0)"` // 0 means no ISD is joined
+	ASID        int              `orm:"column(as_id)"`
 	Core        bool             `orm:"default(false)"` // Is this SCIONLabAS a core AS
 	Label       string           // Optional label for this AS (can be chosen by the user)
 	Status      uint8            `orm:"default(0)"` // Status of the AS: ACTIVE, CREATE, ...
@@ -60,14 +60,14 @@ type SCIONLabAS struct {
 
 type Connection struct {
 	ID            uint64           `orm:"column(id);auto;pk"`
-	JoinAS        *SCIONLabAS      `orm:"rel(fk)"` // AS which initiated the connection
-	RespondAP     *AttachmentPoint `orm:"rel(fk)"` // AS which accepted the connection
-	JoinIP        string           // IP address used for the joining AS
-	RespondIP     string           // IP address used for the responding AS
-	JoinBRID      uint16           // ID of the joining border router, Port = StartPort + BRID
-	RespondBRID   uint16           // ID of the responding AS's border router
+	JoinAS        *SCIONLabAS      `orm:"column(join_as);rel(fk)"`    // AS which initiated the connection
+	RespondAP     *AttachmentPoint `orm:"column(respond_ap);rel(fk)"` // AS which accepted the connection
+	JoinIP        string           `orm:"column(join_ip)"`            // IP address used for the joining AS
+	RespondIP     string           `orm:"column(respond_ip)"`         // IP address used for the responding AS
+	JoinBRID      uint16           `orm:"column(join_br_id)"`         // ID of the joining border router, Port = StartPort + BRID
+	RespondBRID   uint16           `orm:"column(respond_br_id)"`      // ID of the responding AS's border router
 	Linktype      uint8            // role of the responding AS
-	IsVPN         bool
+	IsVPN         bool             `orm:"column(is_vpn)"`
 	JoinStatus    uint8
 	RespondStatus uint8
 	Created       time.Time
