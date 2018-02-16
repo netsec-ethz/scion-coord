@@ -95,6 +95,12 @@ scionApp
                     });
             };
 
+            $scope.disableVPN = function (ap) {
+                if (!$scope.aps[ap]["HasVPN"]) {
+                    $scope.asInfo["IsVPN"] = false;
+                }
+            };
+
             $scope.downloadSCIONLabAS = function (asInfo) {
                 $scope.error2 = "";
                 $scope.message2 = "";

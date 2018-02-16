@@ -69,8 +69,8 @@
     <div class="form-group has-feedback">
       <label>Attachment point to connect to</label>
         <select name="AP" class="form-control dropdown-toggle" ng-model="asInfo.AP"
-                ng-options="x.IA as x.Label group by x.ISD for x in aps | orderBy: ['ISD', 'IA']"
-                ng-disabled="asInfo.Type == 0" required>
+                ng-options="i as x.Label group by x.ISD for (i, x) in aps | toArray | orderBy: ['ISD', 'Label']"
+                ng-disabled="asInfo.Type == 0" required ng-change="disableVPN(asInfo.AP)">
         </select>
       <span class="glyphicon glyphicon-cloud form-control-feedback"></span>
     </div>
@@ -92,9 +92,10 @@
         </label>
       </div>
     </div>
-    <div class="form-group checkbox">
+    <div class="form-group checkbox" ng-hide="!aps[asInfo.AP].HasVPN">
         <label>
-          <input type="checkbox" ng-model="asInfo.IsVPN" name="IsVPN" ng-disabled="asInfo.Type == 0">
+          <input type="checkbox" ng-model="asInfo.IsVPN" name="IsVPN"
+                 ng-disabled="asInfo.Type == 0">
           Use an OpenVPN connection for this AS
         </label>
     </div>
