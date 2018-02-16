@@ -699,3 +699,46 @@ func (s *SCIONLabASController) canRemove(userEmail, asID string) (bool, *models.
 	}
 	return false, nil, nil, nil
 }
+
+// Reads the IA parameter from the URL and returns the associated SCIONLabAS if it belongs to the
+// correct account and an error otherwise
+func (s *SCIONLabASController) getIAParameter(r *http.Request) (as *models.SCIONLabAS, err error) {
+	ia := r.URL.Query().Get("IA")
+	if len(ia) == 0 {
+		err = errors.New("IA parameter missing")
+		return
+	}
+	vars := mux.Vars(r)
+	accountID := vars["account_id"]
+	ases, err := models.FindSCIONLabASesByAccountID(accountID)
+	for _, ownedAS := range ases {
+		if ownedAS == ia {
+			as, err = models.FindSCIONLabASByIAString(ia)
+			return
+		}
+	}
+	err = fmt.Errorf("The AS %v does not belong to the specified account", ia)
+	return
+}
+
+// API for SCIONLabASes to query which git branch they should use for updates
+func (s *SCIONLabASController) QueryUpdateBranch(w http.ResponseWriter, r *http.Request) {
+	log.Printf("API Call for queryUpdateBranch = %v", r.URL.Query())
+	as, err := s.getIAParameter(r)
+	if err != nil {
+		s.BadRequest(w, err, "Incorrect IA parameter")
+		return
+	}
+	s.Plain(as.Branch, w, r)
+}
+
+// API for SCIONLabASes to report a successful update
+func (s *SCIONLabASController) ConfirmUpdate(w http.ResponseWriter, r *http.Request) {
+	log.Printf("API Call for confirmUpdate = %v", r.URL.Query())
+	as, err := s.getIAParameter(r)
+	if err != nil {
+		s.BadRequest(w, err, "Incorrect IA parameter")
+		return
+	}
+	as.Update()
+}
