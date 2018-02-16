@@ -34,7 +34,7 @@ type AttachmentPoint struct {
 	VPNIP       string
 	StartVPNIP  string
 	EndVPNIP    string
-	AS          *SCIONLabAS   `orm:"reverse(one)"`
+	AS          *SCIONLabAS   `orm:"column(as_id);rel(one);on_delete(cascade)"`
 	Connections []*Connection `orm:"reverse(many);index"` // List of Connections
 }
 
@@ -51,7 +51,7 @@ type SCIONLabAS struct {
 	Label       string           // Optional label for this AS (can be chosen by the user)
 	Status      uint8            `orm:"default(0)"` // Status of the AS: ACTIVE, CREATE, ...
 	Type        uint8            `orm:"default(0)"` // Type of the AS: BOX, VM, DEDICATED, ...
-	AP          *AttachmentPoint `orm:"null;rel(one);on_delete(set_null)"`
+	AP          *AttachmentPoint `orm:"null;reverse(one)"`
 	Credits     int64
 	Created     time.Time
 	Updated     time.Time
@@ -439,15 +439,25 @@ func (as *SCIONLabAS) UpdateASAndConnection(cnInfo *ConnectionInfo) error {
 
 // Returns all Attachment Point ASes
 func GetAllAPs() ([]*SCIONLabAS, error) {
+	var aps []*AttachmentPoint
 	var ases []*SCIONLabAS
-	_, err := o.QueryTable(new(SCIONLabAS)).Exclude("AP", nil).RelatedSel().All(&ases)
+	_, err := o.QueryTable(new(AttachmentPoint)).RelatedSel().All(&aps)
+	for _, ap := range aps {
+		ases = append(ases, ap.AS)
+	}
 	return ases, err
 }
 
 // Returns all Attachment Point ASes in the given ISD
 func FindAllAPsByISD(isd int) ([]*SCIONLabAS, error) {
+	var aps []*AttachmentPoint
 	var ases []*SCIONLabAS
-	_, err := o.QueryTable(new(SCIONLabAS)).Filter("ISD", isd).Exclude("AP", nil).RelatedSel().All(&ases)
+	_, err := o.QueryTable(new(AttachmentPoint)).RelatedSel().All(&aps)
+	for _, ap := range aps {
+		if ap.AS.ISD == isd {
+			ases = append(ases, ap.AS)
+		}
+	}
 	return ases, err
 }
 
@@ -481,6 +491,7 @@ func FindSCIONLabASByIAString(ia string) (*SCIONLabAS, error) {
 		return nil, err1
 	}
 	err := o.QueryTable(as).Filter("ISD", IA.I).Filter("ASID", IA.A).RelatedSel().One(as)
+	o.LoadRelated(as, "AP")
 	return as, err
 }
 
