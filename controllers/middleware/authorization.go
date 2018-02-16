@@ -32,11 +32,11 @@ var (
 // TODO(mlegner): We need an additional authorization handler that checks if the account is an admin
 func checkAccountSecret(r *http.Request) bool {
 	vars := mux.Vars(r)
-	account_id := vars["account_id"]
+	accountID := vars["account_id"]
 	secret := vars["secret"]
 	// In this case we are receiving a request with account_id and secret params
-	if account_id != "" && secret != "" {
-		if account, err := models.FindAccountByAccountIDAndSecret(account_id, secret); err == nil &&
+	if accountID != "" && secret != "" {
+		if account, err := models.FindAccountByAccountIDAndSecret(accountID, secret); err == nil &&
 			account != nil {
 			// proceed with the next handler
 			return true
@@ -45,11 +45,11 @@ func checkAccountSecret(r *http.Request) bool {
 	}
 
 	// try with standard Golang parameters
-	account_id = r.URL.Query().Get("account_id")
+	accountID = r.URL.Query().Get("account_id")
 	secret = r.URL.Query().Get("secret")
 
-	if account_id != "" && secret != "" {
-		if account, err := models.FindAccountByAccountIDAndSecret(account_id, secret); err == nil &&
+	if accountID != "" && secret != "" {
+		if account, err := models.FindAccountByAccountIDAndSecret(accountID, secret); err == nil &&
 			account != nil {
 			// proceed with the next handler
 			return true
