@@ -57,11 +57,13 @@ var (
 		VPNIP:      "10.0.0.1",
 		StartVPNIP: "10.0.0.2",
 		EndVPNIP:   "10.0.0.19",
+		AS:         as1,
 	}
 	ap2 = &AttachmentPoint{
 		VPNIP:      "62.0.0.1",
 		StartVPNIP: "62.0.0.2",
 		EndVPNIP:   "62.0.255.254",
+		AS:         as2,
 	}
 
 	// Connections
@@ -140,17 +142,6 @@ func TestSCIONLabAS(t *testing.T) {
 			t.Fatal(err)
 		}
 		err = ap2.Insert()
-		if err != nil {
-			t.Fatal(err)
-		}
-		// Link AP to AS
-		as1.AP = ap1
-		err = as1.Update()
-		if err != nil {
-			t.Fatal(err)
-		}
-		as3.AP = ap2
-		err = as3.Update()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -239,14 +230,14 @@ func TestSCIONLabAS(t *testing.T) {
 		for _, cn := range cns1 {
 			t.Log("Connection s1: %v", cn)
 		}
-		cns2, err := s1.GetConnectionInfo()
+		cns2, err := s2.GetConnectionInfo()
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, cn := range cns2 {
 			t.Log("Connection s2: %v", cn)
 		}
-		cns3, err := s1.GetConnectionInfo()
+		cns3, err := s3.GetConnectionInfo()
 		if err != nil {
 			t.Fatal(err)
 		}
