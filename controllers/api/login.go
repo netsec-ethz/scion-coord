@@ -41,8 +41,6 @@ type user struct {
 	IsAdmin      bool
 	Account      string
 	Organisation string
-	AccountID    string
-	Secret       string
 }
 
 func (c *LoginController) Logout(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +151,6 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 	user.FirstName = dbUser.FirstName
 	user.LastName = dbUser.LastName
 	user.IsAdmin = dbUser.IsAdmin
-	user.Account = dbUser.Account.Name
 	user.Organisation = dbUser.Account.Organisation
 
 	// clean up the password

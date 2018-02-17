@@ -12,6 +12,7 @@ angular.module('scionApp')
                     function (data) {
                         console.log(data);
                         $rootScope.user = data["User"];
+                        $scope.account = data["Account"];
                         // option to allow the email template to be changed
                         // $scope.emailTemplate = data["EmailTemplate"];
                         $scope.organisation = $rootScope.user["Organisation"];
