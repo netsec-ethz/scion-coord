@@ -483,6 +483,26 @@ func FindSCIONLabASesByUserEmailAndType(email string, Type uint8) ([]SCIONLabAS,
 	return ases, err
 }
 
+// Find SCIONLabASes by AccountID; returns a slice of IA strings
+func FindSCIONLabASesByAccountID(accountID string) (asStrings []string, err error) {
+	a, err := FindAccountByAccountID(accountID)
+	if err != nil {
+		return
+	}
+	o.LoadRelated(a, "Users")
+	for _, u := range a.Users {
+		var ases []SCIONLabAS
+		ases, err = FindSCIONLabASesByUserEmail(u.Email)
+		if err != nil {
+			return
+		}
+		for _, as := range ases {
+			asStrings = append(asStrings, as.IA())
+		}
+	}
+	return
+}
+
 // Find SCIONLabAS by the IA string
 func FindSCIONLabASByIAString(ia string) (*SCIONLabAS, error) {
 	as := new(SCIONLabAS)

@@ -169,7 +169,7 @@ func populateASStatusButtons(userEmail string) ([]asInfo, map[string]apInfo, err
 }
 
 // generates the user-information struct to be used in dynamic HTML pages
-func populateUserData(r *http.Request) (u user, err error) {
+func populateUserData(r *http.Request) (u user, a accountData, err error) {
 	// get the current user session if present.
 	// if not then, abort
 	_, userSession, err := middleware.GetUserSession(r)
@@ -191,8 +191,11 @@ func populateUserData(r *http.Request) (u user, err error) {
 		IsAdmin:      storedUser.IsAdmin,
 		Account:      storedUser.Account.Name,
 		Organisation: storedUser.Account.Organisation,
-		AccountID:    storedUser.Account.AccountID,
-		Secret:       storedUser.Account.Secret,
+	}
+
+	a = accountData{
+		AccountID:     storedUser.Account.AccountID,
+		AccountSecret: storedUser.Account.Secret,
 	}
 
 	return
@@ -201,7 +204,7 @@ func populateUserData(r *http.Request) (u user, err error) {
 // API function that generates all information necessary for displaying the user page
 func (c *LoginController) UserInformation(w http.ResponseWriter, r *http.Request) {
 
-	user, err := populateUserData(r)
+	user, _, err := populateUserData(r)
 	if err != nil {
 		log.Println(err)
 		c.Forbidden(w, err, "Error authenticating user: Not logged in")
