@@ -31,9 +31,15 @@ type AdminController struct {
 	controllers.HTTPController
 }
 
+type accountData struct {
+	AccountID     string
+	AccountSecret string
+}
+
 type adminPageData struct {
 	User         user
 	EmailMessage string
+	Account      accountData
 }
 
 type invitationInfo struct {
@@ -58,7 +64,7 @@ type invitationsData []invitationInfo
 var invitationsTemplate = "invitation.html"
 
 func (c AdminController) AdminInformation(w http.ResponseWriter, r *http.Request) {
-	user, err := populateUserData(r)
+	user, account, err := populateUserData(r)
 	if err != nil {
 		log.Printf("Error authenticating user: %v", err)
 		c.Forbidden(w, err, "Error authenticating user")
@@ -71,6 +77,7 @@ func (c AdminController) AdminInformation(w http.ResponseWriter, r *http.Request
 	adminData := adminPageData{
 		User:         user,
 		EmailMessage: string(text),
+		Account:      account,
 	}
 
 	c.JSON(&adminData, w, r)
