@@ -111,6 +111,10 @@ if ! dpkg-query -s mysql-server &> /dev/null ; then
     sudo apt-get install mysql-server -y
 fi
 
+if ! dpkg-query -s easy-rsa &> /dev/null ; then
+    sudo apt-get install easy-rsa -y
+fi
+
 if ! runSQL "SHOW DATABASES;" | grep "scion_coord_test" &> /dev/null; then
     runSQL "CREATE DATABASE scion_coord_test;" || (echo "Failed to create the SCION Coordinator DB" && exit 1)
 else
@@ -149,10 +153,10 @@ fi
 if [ ! -f "$CONFDIR/easy-rsa/keys/ca.crt" ]; then
     # generate certificate for openVPN
     if ! dpkg-query -s easy-rsa &> /dev/null ; then
-        sudo apt-get install easy-rsa
+        sudo apt-get install easy-rsa -y
     fi
     if ! dpkg-query -s openssl &> /dev/null ; then
-        sudo apt-get install openssl
+        sudo apt-get install openssl -y
     fi
     mkdir -p "$CONFDIR"
     cp -r /usr/share/easy-rsa "$CONFDIR"
