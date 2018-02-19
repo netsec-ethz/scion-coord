@@ -105,7 +105,7 @@ echo "$GOPATH" | grep "$HOME/go" &> /dev/null || echo 'export GOPATH="$HOME/go"'
 echo "$PATH" | grep "/usr/local/go/bin" &> /dev/null || echo 'export PATH="/usr/local/go/bin:$PATH"' >> ~/.profile
 echo "$PATH" | grep "$GOPATH/bin" &> /dev/null || echo 'export PATH="$GOPATH/bin:$PATH"' >> ~/.profile
 echo "$PATH" | grep "$HOME/.local/bin" &> /dev/null || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
-echo "$SC" | grep "$GOPATH/src/github.com/netsec-ethz/scion" &> /dev/null || echo 'export SC="$GOPATH/src/github.com/netsec-ethz/scion"' >> ~/.profile
+echo "$SC" | grep "$GOPATH/src/github.com/scionproto/scion" &> /dev/null || echo 'export SC="$GOPATH/src/github.com/scionproto/scion"' >> ~/.profile
 echo $PYTHONPATH | grep "$SC/python" &> /dev/null || echo 'export PYTHONPATH="$SC/python:$SC"' >> ~/.profile
 
 echo 'export GOPATH="$HOME/go"' >> ~/.profile
