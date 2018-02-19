@@ -206,8 +206,10 @@ func main() {
 
 	//SCIONBox API
 	router.Handle("/api/as/initBox", loggingChain.ThenFunc(scionBoxController.InitializeBox))
-	router.Handle("/api/as/connectBox/{account_id}/{secret}", apiChain.ThenFunc(scionBoxController.ConnectNewBox))
-	router.Handle("/api/as/heartbeat/{account_id}/{secret}", apiChain.ThenFunc(scionBoxController.HeartBeatFunction))
+	router.Handle("/api/as/connectBox/{account_id}/{secret}", apiChain.ThenFunc(
+		scionBoxController.ConnectNewBox))
+	router.Handle("/api/as/heartbeat/{account_id}/{secret}", apiChain.ThenFunc(
+		scionBoxController.HeartBeatFunction))
 
 	// ==========================================================
 	// SCION Web API
