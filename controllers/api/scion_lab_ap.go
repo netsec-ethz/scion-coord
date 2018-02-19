@@ -20,6 +20,9 @@ import (
 	"log"
 	"net/http"
 
+	"errors"
+
+	"github.com/gorilla/mux"
 	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/email"
 	"github.com/netsec-ethz/scion-coord/models"
@@ -47,6 +50,37 @@ type APConnectionInfo struct {
 	APBRID    uint16 // ID of the border router at the AP
 }
 
+// Check if the account is the owner of the specified Attachment Point
+func (s *SCIONLabASController) checkAuthorization(r *http.Request) (apIA string, err error) {
+	log.Printf("API Call for getUpdatesForAP = %v", r.URL.Query())
+	apIA = r.URL.Query().Get("scionLabAP")
+	if len(apIA) == 0 {
+		err = errors.New("scionLabAP parameter missing")
+		return
+	}
+
+	ases, err := s.ownedASes(r)
+	if err != nil {
+		return
+	}
+
+	for _, as := range ases {
+		if as == apIA {
+			return
+		}
+	}
+	err = fmt.Errorf("The Attachment Point %v does not belong to the specified account", apIA)
+	return
+}
+
+// List of all ASes belonging to the account
+func (s *SCIONLabASController) ownedASes(r *http.Request) (ases []string, err error) {
+	vars := mux.Vars(r)
+	accountID := vars["account_id"]
+	ases, err = models.FindSCIONLabASesByAccountID(accountID)
+	return
+}
+
 // API end-point for the SCIONLab APs to query actions to be done for users' SCIONLabASes.
 // An example response to this API may look like the following:
 // {"1-7":
@@ -62,11 +96,9 @@ type APConnectionInfo struct {
 //        }
 // }
 func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Request) {
-	log.Printf("API Call for getUpdatesForAP = %v", r.URL.Query())
-	apIA := r.URL.Query().Get("scionLabAP")
-	if len(apIA) == 0 {
-		s.BadRequest(w, nil, "scionLabAP parameter missing")
-		return
+	apIA, err := s.checkAuthorization(r)
+	if err != nil {
+		s.Forbidden(w, err, "The account is not authorized for this AP")
 	}
 
 	cns, err := models.FindRespondConnectionInfoByIA(apIA)
@@ -124,6 +156,7 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 // If sucessful, the API will return an empty JSON response with HTTP code 200.
 func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("API Call for ConfirmUpdatesFromAP")
+
 	var UpdateLists map[string]map[string][]string
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&UpdateLists); err != nil {
@@ -131,11 +164,28 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 		s.BadRequest(w, err, "Error decoding JSON")
 		return
 	}
+
+	ownedASes, err := s.ownedASes(r)
+	if err != nil {
+		s.BadRequest(w, err, "Error looking up owned ASes")
+	}
+
 	failedConfirmations := []string{}
 	for ia, event := range UpdateLists {
+		isAuthorized := false
+		for _, as := range ownedASes {
+			if as == ia {
+				isAuthorized = true
+			}
+		}
+		if !isAuthorized {
+			log.Printf("Unauthorized updates from AS %v", ia)
+		}
 		as, err := models.FindSCIONLabASByIAString(ia)
 		if err != nil {
 			log.Printf("Error finding AS %v when processing confirmations: %v", ia, err)
+		}
+		if !isAuthorized || err != nil {
 			for _, cns := range event {
 				for _, ia := range cns {
 					failedConfirmations = append(failedConfirmations, ia)
