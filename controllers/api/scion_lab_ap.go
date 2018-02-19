@@ -70,7 +70,6 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 	apIA, err := checkAuthorization(r, r.URL.Query().Get("scionLabAP"))
 	if err != nil {
 		s.Forbidden(w, err, "The account is not authorized for this AP")
-		return
 	}
 
 	as, err := models.FindSCIONLabASByIAInt(apIA.I, apIA.A)
