@@ -23,6 +23,7 @@ import argparse
 import base64
 import json
 import os
+import time
 
 # External packages
 from Crypto import Random
@@ -103,7 +104,9 @@ def create_scionlab_as_local_gen(args, tp):
 def generate_certificate(joining_ia, core_ia, core_sign_priv_key_file, core_cert_file, trc_file):
     """
     """
-    validity = Certificate.AS_VALIDITY_PERIOD
+    core_ia_chain = CertificateChain.from_raw(read_file(core_cert_file))
+    # AS cert is always expired one second before the expiration of the Core AS cert
+    validity = core_ia_chain.core_as_cert.expiration_time - int(time.time()) - 1
     comment = "AS Certificate"
     core_ia_sig_priv_key = base64.b64decode(read_file(core_sign_priv_key_file))
     public_key_sign, private_key_sign = generate_sign_keypair()
@@ -111,7 +114,6 @@ def generate_certificate(joining_ia, core_ia, core_sign_priv_key_file, core_cert
     cert = Certificate.from_values(
         str(joining_ia), str(core_ia), INITIAL_TRC_VERSION, INITIAL_CERT_VERSION, comment,
         False, validity, public_key_encr, public_key_sign, core_ia_sig_priv_key)
-    core_ia_chain = CertificateChain.from_raw(read_file(core_cert_file))
     sig_priv_key = base64.b64encode(private_key_sign).decode()
     enc_priv_key = base64.b64encode(private_key_encr).decode()
     joining_ia_chain = CertificateChain([cert, core_ia_chain.core_as_cert]).to_json()
