@@ -1,5 +1,5 @@
 [Unit]
-Description=Run upgrade daily and on boot
+Description=Run SCION upgrade daily
 
 [Timer]
 OnUnitActiveSec=1d
