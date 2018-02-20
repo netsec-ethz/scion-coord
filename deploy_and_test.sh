@@ -263,7 +263,10 @@ rm -rf "$GENFOLDERTMP"
 
 # update existing AS12 using the scion box update-gen script
 pushd "$CURRENTWD" >/dev/null
-"${SCIONUPDATEGENLOCATION:?}" # run update gen
+# run update gen:
+cd $(dirname "${SCIONUPDATEGENLOCATION:?}")
+torun="./$(basename ${SCIONUPDATEGENLOCATION:?})"
+"$torun"
 popd >/dev/null
 
 # we are done using SCION Coord; shut it down
