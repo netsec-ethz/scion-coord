@@ -117,20 +117,20 @@ else
     SELECT id FROM scion_coord_test.attachment_point WHERE as_ID IN (
         SELECT id from scion_coord_test.scion_lab_as WHERE user_email='netsec.test.email@gmail.com'
         )
-    );" || true
+    );" &>/dev/null || true
     runSQL "DELETE FROM scion_coord_test.attachment_point WHERE id > 0 AND as_id IN (
     SELECT id FROM scion_coord_test.scion_lab_as WHERE user_email='netsec.test.email@gmail.com'
-    );" || true
-    runSQL "DELETE FROM scion_coord_test.scion_lab_as WHERE id > 0 AND user_email='netsec.test.email@gmail.com';" || true
-    runSQL "DELETE FROM scion_coord_test.user WHERE id > 0 AND email='netsec.test.email@gmail.com';" || true
-    runSQL "DELETE FROM scion_coord_test.account WHERE id > 0 AND name='netsec.test.email@gmail.com';" || true
+    );" &>/dev/null || true
+    runSQL "DELETE FROM scion_coord_test.scion_lab_as WHERE id > 0 AND user_email='netsec.test.email@gmail.com';" &>/dev/null || true
+    runSQL "DELETE FROM scion_coord_test.user WHERE id > 0 AND email='netsec.test.email@gmail.com';" &>/dev/null || true
+    runSQL "DELETE FROM scion_coord_test.account WHERE id > 0 AND name='netsec.test.email@gmail.com';" &>/dev/null || true
 fi
 
 # now copy the three credentials files from the SCION installation to the coordinator
 # we should do this per ISD with an attachment point
 mkdir -p "$SCIONCOORD/credentials"
 cd "$SCIONCOORD/credentials"
-if missingOrDifferentFiles "$SCION/gen/ISD1/AS11/br1-11-1/keys/as-sig.key" ISD1.key ||
+if missingOrDifferentFiles "$SCION/gen/ISD1/AS11/br1-11-1/keys/as-sig.seed" ISD1.key ||
    missingOrDifferentFiles "$SCION/gen/ISD1/AS11/br1-11-1/certs/ISD1-AS11-V0.crt" ISD1.crt ||
    missingOrDifferentFiles "$SCION/gen/ISD1/AS11/br1-11-1/certs/ISD1-V0.trc" ISD1.trc ;
 then
@@ -139,7 +139,7 @@ then
     ./scion.sh topology -c topology/Tiny.topo
     popd >/dev/null
 
-    cp "$SCION/gen/ISD1/AS11/br1-11-1/keys/as-sig.key" ISD1.key
+    cp "$SCION/gen/ISD1/AS11/br1-11-1/keys/as-sig.seed" ISD1.key
     cp "$SCION/gen/ISD1/AS11/br1-11-1/certs/ISD1-AS11-V0.crt" ISD1.crt
     cp "$SCION/gen/ISD1/AS11/br1-11-1/certs/ISD1-V0.trc" ISD1.trc
 fi
