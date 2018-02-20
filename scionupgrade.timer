@@ -1,9 +1,8 @@
 [Unit]
-Description=Run upgrade weekly and on boot
+Description=Run upgrade daily and on boot
 
 [Timer]
-OnBootSec=15min
-OnUnitActiveSec=1w
+OnUnitActiveSec=1d
 
 [Install]
-WantedBy=timers.target
+WantedBy=multi-user.target

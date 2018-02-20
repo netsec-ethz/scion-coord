@@ -72,6 +72,42 @@ done
 
 echo "Starting SCION installation..."
 
+if  [[ ( ! -z ${upgrade_script+x} ) ]]
+then
+    echo "Copying scion upgrade script"
+
+    chmod +x ${upgrade_script}
+    sudo cp ${upgrade_script} ${UPGRADE_SCRIPT_LOCATION}
+else
+    echo "SCION upgrade script not specified."
+fi
+
+if  [[ ( ! -z ${upgrade_service+x} ) && -r ${upgrade_service} \
+    && ( ! -z ${upgrade_timer+x} ) && -r ${upgrade_timer} \
+    && ( ! -z ${UPGRADE_SCRIPT_LOCATION+x} ) && -r ${UPGRADE_SCRIPT_LOCATION} ]]
+then
+    echo "Registering SCION periodic upgrade service"
+
+    cp "$upgrade_service" tmp.service
+    sed -i "s/_USER_/$USER/g" tmp.service
+    sudo cp tmp.service /etc/systemd/system/scionupgrade.service
+
+    cp "$upgrade_timer" tmp.timer
+    sed -i "s/_USER_/$USER/g" tmp.timer
+    sudo cp tmp.timer /etc/systemd/system/scionupgrade.timer
+
+    sudo systemctl enable scionupgrade.timer
+    sudo systemctl start scionupgrade.timer
+
+    rm tmp.service
+    rm tmp.timer
+else
+    echo "SCION periodic upgrade service and timer files are not provided."
+fi
+
+# For testing timer stuff
+exit 0
+
 # Check if we are running on correct Ubuntu system
 if [ -f /etc/os-release ]
 then
@@ -217,34 +253,4 @@ fi
 if [[ $keep_user_context = true ]]
 then
   sudo sh -c 'echo \"RemoveIPC=no\" >> /etc/systemd/logind.conf'
-fi
-
-
-if  [[ ( ! -z ${upgrade_script+x} ) ]]
-then
-    echo "Copying scion upgrade script"
-
-    sudo cp ${upgrade_script} ${UPGRADE_SCRIPT_LOCATION}
-    chmod +x ${UPGRADE_SCRIPT_LOCATION}
-else
-    echo "SCION upgrade script not specified."
-fi
-
-if  [[ ( ! -z ${upgrade_service+x} ) && -r ${upgrade_service} \
-    && ( ! -z ${upgrade_timer+x} ) && -r ${upgrade_timer} \
-    && ( ! -z ${UPGRADE_SCRIPT_LOCATION+x} ) && -r ${UPGRADE_SCRIPT_LOCATION} ]]
-then
-    echo "Registering SCION periodic upgrade service"
-
-    cp "$scion_viz_service" tmp.service
-    # We need to replace template user with current username
-    sed -i "s/_USER_/$USER/g" tmp.service
-    sudo cp tmp.service /etc/systemd/system/scion-viz.service
-
-    sudo systemctl enable scion-viz.service
-    sudo systemctl start scion-viz.service
-
-    rm tmp.service
-else
-    echo "SCION periodic upgrade service and timer files are not provided."
 fi
