@@ -1,0 +1,9 @@
+[Unit]
+Description=Run upgrade weekly and on boot
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=1w
+
+[Install]
+WantedBy=timers.target

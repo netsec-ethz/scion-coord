@@ -4,8 +4,11 @@ set -e
 
 shopt -s nullglob
 
+UPGRADE_SCRIPT_LOCATION="/usr/bin/scionupgrade.sh"
+
 usage="$(basename "$0") [-p PATCH_DIR] [-g GEN_DIR] [-v VPN_CONF_PATH] \
-[-s SCION_SERVICE] [-z SCION_VI_SERVICE] [-a ALIASES_FILE] [-c]
+[-s SCION_SERVICE] [-z SCION_VI_SERVICE] [-a ALIASES_FILE] [-c] \
+[-u UPGRADE_SCRIPT] [-t TIMER_SERVICE]
 
 where:
     -p PATCH_DIR        apply patches from PATCH_DIR on cloned repo
@@ -14,9 +17,12 @@ where:
     -s SCION_SERVICE    path to SCION service file
     -z SCION_VI_SERVICE path to SCION-viz service file
     -a ALIASES_FILE     adds useful command aliases in specified file
-    -c                  do not destroy user context on logout"
+    -c                  do not destroy user context on logout
+    -u UPGR_SCRIPT      script used for upgrading scion, (will be copied to 
+                        path ${UPGRADE_SCRIPT_LOCATION})
+    -t TIMER_UPG_SERV   name of sysd timer and system name for upgrades"
 
-while getopts ":p:g:v:s:z:ha:c" opt; do
+while getopts ":p:g:v:s:z:ha:cu:t:" opt; do
   case $opt in
     p)
       patch_dir=$OPTARG
@@ -43,6 +49,13 @@ while getopts ":p:g:v:s:z:ha:c" opt; do
       ;;
     c)
       keep_user_context=true
+      ;;
+    u)
+      upgrade_script=$OPTARG
+      ;;
+    t)
+      upgrade_timer=${OPTARG}.timer
+      upgrade_service=${OPTARG}.service
       ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
@@ -204,4 +217,34 @@ fi
 if [[ $keep_user_context = true ]]
 then
   sudo sh -c 'echo \"RemoveIPC=no\" >> /etc/systemd/logind.conf'
+fi
+
+
+if  [[ ( ! -z ${upgrade_script+x} ) ]]
+then
+    echo "Copying scion upgrade script"
+
+    sudo cp ${upgrade_script} ${UPGRADE_SCRIPT_LOCATION}
+    chmod +x ${UPGRADE_SCRIPT_LOCATION}
+else
+    echo "SCION upgrade script not specified."
+fi
+
+if  [[ ( ! -z ${upgrade_service+x} ) && -r ${upgrade_service} \
+    && ( ! -z ${upgrade_timer+x} ) && -r ${upgrade_timer} \
+    && ( ! -z ${UPGRADE_SCRIPT_LOCATION+x} ) && -r ${UPGRADE_SCRIPT_LOCATION} ]]
+then
+    echo "Registering SCION periodic upgrade service"
+
+    cp "$scion_viz_service" tmp.service
+    # We need to replace template user with current username
+    sed -i "s/_USER_/$USER/g" tmp.service
+    sudo cp tmp.service /etc/systemd/system/scion-viz.service
+
+    sudo systemctl enable scion-viz.service
+    sudo systemctl start scion-viz.service
+
+    rm tmp.service
+else
+    echo "SCION periodic upgrade service and timer files are not provided."
 fi
