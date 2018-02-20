@@ -200,7 +200,7 @@ out=$(runSQL "$sql") && stat=0 || stat=$?
 sql="INSERT INTO scion_coord_test.scion_lab_as
 (id, user_email,                   public_ip,   start_port, label,  isd, as_id, status, type,  created, updated)
 VALUES
-(2, 'netsec.test.email@gmail.com', '127.0.0.5', 49991,      'AS12', 1,     12,      1,      2, now(),   now());"
+(2, 'netsec.test.email@gmail.com', '127.0.0.5', 50000,      'AS12', 1,     12,      1,      0, now(),   now());"
 out=$(runSQL "$sql") && stat=0 || stat=$?
 
 sql="INSERT INTO scion_coord_test.attachment_point
