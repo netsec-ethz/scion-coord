@@ -266,7 +266,8 @@ pushd "$CURRENTWD" >/dev/null
 # run update gen:
 cd $(dirname "${SCIONUPDATEGENLOCATION:?}")
 torun="./$(basename ${SCIONUPDATEGENLOCATION:?})"
-"$torun"
+params="--url http://localhost:8080/ --address 127.0.0.5 --id someid --secret some_secret"
+"$torun" "$params"
 popd >/dev/null
 
 # we are done using SCION Coord; shut it down
