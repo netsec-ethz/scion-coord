@@ -9,7 +9,8 @@ Vagrant.configure(2) do |config|
     chmod +x scion_install_script.sh
     echo "Install script downloaded, running it..."
     ./scion_install_script.sh -g /vagrant/gen/ -v /vagrant/client.conf -s /vagrant/scion.service \
-    -z /vagrant/scion-viz.service -a ~/.bash_aliases -c
+    -z /vagrant/scion-viz.service -a ~/.bash_aliases -u /vagrant/scionupgrade.sh \
+    -t /vagrant/scionupgrade -c
   SCRIPT
   config.vm.box = "scion/ubuntu-16.04-64-scion"
   # BR port forwarding not necessary for OpenVPN setup and depends on connection
