@@ -38,13 +38,32 @@ onExit() {
         kill -TERM 0
         wait
     fi
+    if [ ! -z "$restoreGen" ]; then
+        mv "$SCION/gen" "$SCION/gen-previous-coordinator-test-run"
+        mv "$restoreGen" "$SCION/gen"
+    fi
     [[ ! -z "$exitMessage" ]] && printf "$exitMessage""\n"
     exit $RET
 }
 trap onExit EXIT INT TERM
 
+cleanZookeeper() {
+    if [ -x /usr/share/zookeeper/bin/zkCli.sh ]; then
+        printf 'rmr /1-11 \nrmr /1-12 \nrmr /1-13 \nrmr /1-1001 \n' | /usr/share/zookeeper/bin/zkCli.sh &>/dev/null
+    fi
+}
+
+archiveGenFolder() {
+    if [ -d "$SCION/gen" ]; then
+        restoreGen=$(mktemp -d)
+        rmdir "$restoreGen"
+        mv "$SCION/gen" "$restoreGen"
+    fi
+}
+
 scionCoordPid=''
 exitMessage=''
+restoreGen=''
 CURRENTWD="$PWD"
 thisdir="$(dirname $(realpath $0))"
 mkdir -p "$NETSEC"
@@ -81,6 +100,8 @@ if [ ! -f "$thisdir/scion_install_script.sh" ]; then
     exitMessage="Could not find the SCION installation script. Aborting."
     exit 1
 fi
+cleanZookeeper
+archiveGenFolder
 bash "$thisdir/scion_install_script.sh"
 source ~/.profile
 
@@ -210,7 +231,7 @@ FROM scion_coord_test.scion_lab_as WHERE user_email='netsec.test.email@gmail.com
 out=$(runSQL "$sql") && stat=0 || stat=$?
 
 # remove already generated configuration TGZs :
-rm -rf "$HOME/scionLabConfigs/netsec.test.email*"
+rm -rf "$CONFDIR/netsec.test.email*"
 
 # run SCION Coordinator
 ./scion-coord &
