@@ -218,6 +218,12 @@ func (s *SCIONLabASController) ConfigureSCIONLabAS(w http.ResponseWriter, r *htt
 		s.Error500(w, err, "Error packaging SCIONLabAS configuration")
 		return
 	}
+	// Add account id and secret to gen directory
+	if err = s.createUserLoginConfiguration(asInfo); err != nil {
+		log.Printf("Error generating user credential files: %v", err)
+		s.Error500(w, err, "Error generating user credential files")
+		return
+	}
 	// Persist the relevant data into the DB
 	if err = s.updateDB(asInfo); err != nil {
 		log.Printf("Error updating DB tables: %v", err)
@@ -523,6 +529,7 @@ func (s *SCIONLabASController) generateLocalGen(asInfo *SCIONLabASInfo) error {
 	if len(config.SIGNING_ASES) < isd {
 		return fmt.Errorf("Signing AS for ISD %v not configured", isd)
 	}
+
 	cmd := exec.Command("python3", localGenPath,
 		"--topo_file="+asInfo.topologyFile(), "--user_id="+asInfo.UserPackageName(),
 		"--joining_ia="+utility.IAString(isd, asID),
@@ -596,6 +603,39 @@ func (s *SCIONLabASController) packageConfiguration(asInfo *SCIONLabASInfo) erro
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("Failed to create SCIONLabAS tarball for user %v: %v", userEmail, err)
 	}
+	return nil
+}
+
+func (s *SCIONLabASController) createUserLoginConfiguration(asInfo *SCIONLabASInfo) error {
+	log.Printf("Creating user authentication files")
+	userEmail := asInfo.LocalAS.UserEmail
+	acc, err := models.FindAccountByUserEmail(userEmail)
+	if err != nil {
+		return fmt.Errorf("Failed to find account for email: %s. %v", userEmail, err)
+	}
+
+	//TODO: maybe a better place for adding these files would be in generateLocalGen function?
+	userGenDir := filepath.Join(asInfo.UserPackagePath(), "gen")
+
+	accountId := []byte(acc.AccountID)
+    err = ioutil.WriteFile(filepath.Join(userGenDir, "account_id"), accountId, 0644)
+    if err != nil {
+		return fmt.Errorf("Failed to write account ID to file. %v", err)
+	}
+
+	accountSecret := []byte(acc.Secret)
+    err = ioutil.WriteFile(filepath.Join(userGenDir, "account_secret"), accountSecret, 0644)
+    if err != nil {
+		return fmt.Errorf("Failed to write account secret to file. %v", err)
+	}
+
+	ia := utility.IAString(asInfo.LocalAS.ISD, asInfo.LocalAS.ASID)
+	iaString := []byte(ia)
+	err = ioutil.WriteFile(filepath.Join(userGenDir, "ia"), iaString, 0644)
+    if err != nil {
+		return fmt.Errorf("Failed to write IA to file. %v", err)
+	}
+
 	return nil
 }
 
