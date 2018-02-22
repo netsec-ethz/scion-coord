@@ -18,6 +18,11 @@ CONFDIR="$HOME/scionLabConfigs"
 EASYRSADEFAULT="$SCIONCOORD/conf/easy-rsa_vars.default"
 TESTTIMEOUT=8
 
+ACC_ID="someid"
+ACC_PW="some_secret"
+INTF_ADDR="127.0.0.5"
+SCION_COORD_URL="http://localhost:8080"
+
 missingOrDifferentFiles() {
     ! [[ -f "$1" ]] || ! [[ -f "$2" ]] || ! cmp "$1" "$2" >/dev/null
 }
@@ -123,11 +128,11 @@ fi
 if ! dpkg-query -s mysql-server &> /dev/null ; then
     echo "mysql-server-5.7 mysql-server/root_password password development_pass" | sudo debconf-set-selections
     echo "mysql-server-5.7 mysql-server/root_password_again password development_pass" | sudo debconf-set-selections
-    sudo apt-get install mysql-server -y
+    DEBIAN_FRONTEND="noninteractive" sudo apt-get install mysql-server -y
 fi
 
 if ! dpkg-query -s easy-rsa &> /dev/null ; then
-    sudo apt-get install easy-rsa -y
+    DEBIAN_FRONTEND="noninteractive" sudo apt-get install easy-rsa -y
 fi
 
 if ! runSQL "SHOW DATABASES;" | grep "scion_coord_test" &> /dev/null; then
@@ -170,10 +175,10 @@ fi
 if [ ! -f "$CONFDIR/easy-rsa/keys/ca.crt" ]; then
     # generate certificate for openVPN
     if ! dpkg-query -s easy-rsa &> /dev/null ; then
-        sudo apt-get install easy-rsa -y
+        DEBIAN_FRONTEND="noninteractive" sudo apt-get install easy-rsa -y
     fi
     if ! dpkg-query -s openssl &> /dev/null ; then
-        sudo apt-get install openssl -y
+        DEBIAN_FRONTEND="noninteractive" sudo apt-get install openssl -y
     fi
     mkdir -p "$CONFDIR"
     cp -r /usr/share/easy-rsa "$CONFDIR"
@@ -204,7 +209,7 @@ fi
 sql="INSERT INTO scion_coord_test.account
 (id, name, organisation, account_id, secret, created, updated)
 VALUES
-(1, 'netsec.test.email@gmail.com', 'NETSEC TEST', 'someid', 'some_secret', NOW(), NOW())
+(1, 'netsec.test.email@gmail.com', 'NETSEC TEST', '$ACC_ID', '$ACC_PW', NOW(), NOW())
 "
 out=$(runSQL "$sql") && stat=0 || stat=$?
 
@@ -222,7 +227,7 @@ out=$(runSQL "$sql") && stat=0 || stat=$?
 sql="INSERT INTO scion_coord_test.scion_lab_as
 (id, user_email,                   public_ip,   start_port, label,  isd, as_id, status, type,  created, updated)
 VALUES
-(2, 'netsec.test.email@gmail.com', '127.0.0.5', 50000,      'AS12', 1,     12,      1,      0, now(),   now());"
+(2, 'netsec.test.email@gmail.com', '$INTF_ADDR', 50000,      'AS12', 1,     12,      1,      0, now(),   now());"
 out=$(runSQL "$sql") && stat=0 || stat=$?
 
 sql="INSERT INTO scion_coord_test.attachment_point
@@ -239,13 +244,14 @@ rm -rf "$CONFDIR/netsec.test.email*"
 scionCoordPid=$!
 
 # wait until the HTTP service is up, or 5 seconds
-timeout 5 bash -c 'until curl --output /dev/null --silent --head --fail http://localhost:8080; do
-    echo "Waiting for SCION Coord. Service to be up ..."
+timeout 5 bash -c "until curl --output /dev/null --silent --head --fail $SCION_COORD_URL; do
+    echo 'Waiting for SCION Coord. Service to be up ...'
     sleep 1
-done'
+done"
 
 if [ "$doTest" -ne 1 ]; then
     # only run the coordinator and wait until it finishes
+    echo "The Coordinator is running with PID: $scionCoordPid"
     wait $scionCoordPid
     exit $?
 fi
@@ -253,14 +259,14 @@ fi
 # TEST SCION COORDINATOR. The requests don't need to have all these headers, but hey were just copied from Chrome for convenience
 echo "Querying SCION Coordinator Service to create an AS, configure it and download its gen folder definition..."
 rm -f cookies.txt
-curl 'http://localhost:8080/' -I -c cookies.txt -s >/dev/null
-curl 'http://localhost:8080/api/login' -H 'Content-Type: application/json;charset=UTF-8' -b cookies.txt --data-binary '{"email":"netsec.test.email@gmail.com","password":"scionscion"}' --compressed -s >/dev/null
-curl 'http://localhost:8080/api/as/generateAS' -X POST -H 'Content-Length: 0' -b cookies.txt -s >/dev/null
-curl 'http://localhost:8080/api/as/configureAS' -H 'Content-Type: application/json;charset=UTF-8' -b cookies.txt --data-binary '{"asID":1001,"userEmail":"netsec.test.email@gmail.com","isVPN":false,"ip":"127.0.0.210","serverIA":"1-12","label":"Label for AS1001","type":2,"port":50050}' -s >/dev/null
+curl "$SCION_COORD_URL" -I -c cookies.txt -s >/dev/null
+curl "$SCION_COORD_URL/api/login" -H 'Content-Type: application/json;charset=UTF-8' -b cookies.txt --data-binary '{"email":"netsec.test.email@gmail.com","password":"scionscion"}' --compressed -s >/dev/null
+curl "$SCION_COORD_URL/api/as/generateAS" -X POST -H 'Content-Length: 0' -b cookies.txt -s >/dev/null
+curl "$SCION_COORD_URL/api/as/configureAS" -H 'Content-Type: application/json;charset=UTF-8' -b cookies.txt --data-binary '{"asID":1001,"userEmail":"netsec.test.email@gmail.com","isVPN":false,"ip":"127.0.0.210","serverIA":"1-12","label":"Label for AS1001","type":2,"port":50050}' -s >/dev/null
 GENFOLDERTMP=$(mktemp -d)
 rm -rf "$GENFOLDERTMP"
 mkdir -p "$GENFOLDERTMP"
-curl 'http://localhost:8080/api/as/downloadTarball/1001' -b cookies.txt --output "$GENFOLDERTMP/1001.tgz" -s >/dev/null
+curl "$SCION_COORD_URL/api/as/downloadTarball/1001" -b cookies.txt --output "$GENFOLDERTMP/1001.tgz" -s >/dev/null
 rm -f cookies.txt
 
 if [ ! -f "$GENFOLDERTMP/1001.tgz" ]; then
@@ -288,7 +294,7 @@ pushd "$CURRENTWD" >/dev/null
 # run update gen:
 cd $(dirname "${SCIONUPDATEGENLOCATION:?}")
 torun="./$(basename ${SCIONUPDATEGENLOCATION:?})"
-params="--url http://localhost:8080 --address 127.0.0.5 --accountId someid --secret some_secret --updateAS 1-12"
+params="--url $SCION_COORD_URL --address $INTF_ADDR --accountId $ACC_ID --secret $ACC_PW --updateAS 1-12"
 echo "Calling: $torun $params"
 "$torun" "$params"
 popd >/dev/null
