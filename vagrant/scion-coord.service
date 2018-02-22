@@ -1,0 +1,19 @@
+[Unit]
+Description=SCION Coordination Service
+After=network-online.target
+
+[Service]
+Type=simple
+RemainAfterExit=no
+User=scion
+WorkingDirectory=/home/scion/go/src/github.com/netsec-ethz/scion-coord
+Environment="PATH=/home/scion/.local/bin:/home/scion/go/bin:/usr/local/go/bin:/home/scion/bin:/home/scion/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" "GOPATH=/home/scion/go"
+ExecStart=/home/scion/go/src/github.com/netsec-ethz/scion-coord/scion-coord
+StandardOutput=syslog
+StandardError=syslog
+SyslogIndentifier=scion-coord
+RestartSec=1
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
