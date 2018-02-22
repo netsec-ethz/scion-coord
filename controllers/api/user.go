@@ -42,9 +42,9 @@ type asInfo struct {
 }
 
 type apInfo struct {
-	ISD   string
-	IA    string
-	Label string
+	ISD    string
+	Label  string
+	HasVPN bool // Does this AP have a running VPN server
 }
 
 type buttonConfiguration struct {
@@ -65,15 +65,15 @@ type uiButtons struct {
 type userPageData struct {
 	User    user
 	MaxASes int // maximal number of ASes this user can have
-	APs     []apInfo
+	APs     map[string]apInfo
 	ASInfos []asInfo
 }
 
 // generates the structs containing information about the user's AS and the
 // configuration of UI buttons
-func populateASStatusButtons(userEmail string) ([]asInfo, []apInfo, error) {
+func populateASStatusButtons(userEmail string) ([]asInfo, map[string]apInfo, error) {
 	asInfos := []asInfo{}
-	apInfos := []apInfo{}
+	apInfos := map[string]apInfo{}
 	ases, err := models.FindSCIONLabASesByUserEmail(userEmail)
 	if err != nil {
 		return asInfos, apInfos, err
@@ -83,13 +83,12 @@ func populateASStatusButtons(userEmail string) ([]asInfo, []apInfo, error) {
 		return asInfos, apInfos, err
 	}
 	for _, ap := range aps {
-		// TODO(mlegner): Add label
 		apI := apInfo{
-			ISD:   fmt.Sprintf("ISD %v", ap.ISD),
-			IA:    ap.IA(),
-			Label: ap.String(),
+			ISD:    fmt.Sprintf("ISD %v", ap.ISD),
+			Label:  ap.String(),
+			HasVPN: ap.AP.HasVPN,
 		}
-		apInfos = append(apInfos, apI)
+		apInfos[ap.IA()] = apI
 	}
 	for _, as := range ases {
 		buttons := uiButtons{
