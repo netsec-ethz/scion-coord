@@ -9,4 +9,3 @@ wget https://gist.githubusercontent.com/xabarass/def1f861f0fbb1f51d7479d23e239c6
 chmod +x upgrade.sh
 
 ./upgrade.sh $ACCOUNT_ID $ACCOUNT_SECRET $IA
-

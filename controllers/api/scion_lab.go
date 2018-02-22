@@ -618,21 +618,21 @@ func (s *SCIONLabASController) createUserLoginConfiguration(asInfo *SCIONLabASIn
 	userGenDir := filepath.Join(asInfo.UserPackagePath(), "gen")
 
 	accountId := []byte(acc.AccountID)
-    err = ioutil.WriteFile(filepath.Join(userGenDir, "account_id"), accountId, 0644)
-    if err != nil {
+	err = ioutil.WriteFile(filepath.Join(userGenDir, "account_id"), accountId, 0644)
+	if err != nil {
 		return fmt.Errorf("Failed to write account ID to file. %v", err)
 	}
 
 	accountSecret := []byte(acc.Secret)
-    err = ioutil.WriteFile(filepath.Join(userGenDir, "account_secret"), accountSecret, 0644)
-    if err != nil {
+	err = ioutil.WriteFile(filepath.Join(userGenDir, "account_secret"), accountSecret, 0644)
+	if err != nil {
 		return fmt.Errorf("Failed to write account secret to file. %v", err)
 	}
 
 	ia := utility.IAString(asInfo.LocalAS.ISD, asInfo.LocalAS.ASID)
 	iaString := []byte(ia)
 	err = ioutil.WriteFile(filepath.Join(userGenDir, "ia"), iaString, 0644)
-    if err != nil {
+	if err != nil {
 		return fmt.Errorf("Failed to write IA to file. %v", err)
 	}
 
