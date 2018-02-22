@@ -109,16 +109,16 @@ echo "$SC" | grep "$GOPATH/src/github.com/scionproto/scion" &> /dev/null || echo
 echo $PYTHONPATH | grep "$SC/python" &> /dev/null || echo 'export PYTHONPATH="$SC/python:$SC"' >> ~/.profile
 
 source ~/.profile
+# if you don't have a user configured, set up http to clone anonymously:
+git config -l | grep 'user.email' &>/dev/null || git config --global url.https://github.com/.insteadOf git@github.com:
+
 mkdir -p "$GOPATH"
 mkdir -p "$GOPATH/src/github.com/scionproto"
 cd "$GOPATH/src/github.com/scionproto"
-
-git config --global url.https://github.com/.insteadOf git@github.com:
 if [ ! -d scion ]
 then
     git clone --recursive -b scionlab git@github.com:netsec-ethz/netsec-scion scion
 fi
-
 cd scion
 
 # Check if there is a patch directory
