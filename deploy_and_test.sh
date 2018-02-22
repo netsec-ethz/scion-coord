@@ -39,6 +39,7 @@ onExit() {
         wait
     fi
     if [ ! -z "$restoreGen" ]; then
+        rm -rf "$SCION/gen-previous-coordinator-test-run"
         mv "$SCION/gen" "$SCION/gen-previous-coordinator-test-run"
         mv "$restoreGen" "$SCION/gen"
     fi
@@ -287,7 +288,8 @@ pushd "$CURRENTWD" >/dev/null
 # run update gen:
 cd $(dirname "${SCIONUPDATEGENLOCATION:?}")
 torun="./$(basename ${SCIONUPDATEGENLOCATION:?})"
-params="--url http://localhost:8080/ --address 127.0.0.5 --id someid --secret some_secret"
+params="--url http://localhost:8080 --address 127.0.0.5 --accountId someid --secret some_secret --updateAS 1-12"
+echo "Calling: $torun $params"
 "$torun" "$params"
 popd >/dev/null
 
