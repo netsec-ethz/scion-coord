@@ -52,10 +52,11 @@ type SCIONLabAS struct {
 	Status      uint8            `orm:"default(0)"` // Status of the AS: ACTIVE, CREATE, ...
 	Type        uint8            `orm:"default(0)"` // Type of the AS: BOX, VM, DEDICATED, ...
 	AP          *AttachmentPoint `orm:"null;reverse(one)"`
-	Credits     int64
-	Created     time.Time
-	Updated     time.Time
-	Connections []*Connection `orm:"reverse(many)"` // List of Connections
+	Credits     int64            // Credits in virtual credit system
+	Branch      string           `orm:"default(scionlab)"` // Update branch the AS is tracking ("scionlab", "scionlab_testing", "none")
+	Created     time.Time        // When the AS was first created
+	Updated     time.Time        // Last time the configuration was modified or the AS called `ConfirmUpdate`
+	Connections []*Connection    `orm:"reverse(many)"` // List of Connections
 }
 
 type Connection struct {
