@@ -65,11 +65,12 @@
     {{asInfo.ASText}}
   </strong>
   <p></p>
+  <!-- The asInfo.Type is enumerated as INFRASTRUCTURE: 0, VM: 1, DEDICATED: 2, BOX: 3 -->
   <form ng-show="asInfo" name="scionLabASForm">
     <div class="form-group has-feedback">
       <label>Attachment point to connect to</label>
         <select name="AP" class="form-control dropdown-toggle" ng-model="asInfo.AP"
-                ng-options="i as x.Label group by x.ISD for (i, x) in aps | toArray | orderBy: ['ISD', 'Label']"
+                ng-options="i as x.Label group by x.ISD for (i, x) in aps"
                 ng-disabled="asInfo.Type == 0" required ng-change="disableVPN(asInfo.AP)">
         </select>
       <span class="glyphicon glyphicon-cloud form-control-feedback"></span>
