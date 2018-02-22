@@ -264,7 +264,9 @@ func (cn *Connection) getJoinAS() *SCIONLabAS {
 
 func (cn *Connection) getRespondAS() *SCIONLabAS {
 	ap := new(AttachmentPoint)
-	o.QueryTable(ap).Filter("ID", cn.RespondAP.ID).RelatedSel().One(ap)
+	if err := o.QueryTable(ap).Filter("ID", cn.RespondAP.ID).RelatedSel().One(ap); err != nil {
+		return nil
+	}
 	o.LoadRelated(ap, "AS")
 	return ap.AS
 }
@@ -506,13 +508,15 @@ func FindSCIONLabASesByAccountID(accountID string) (asStrings []string, err erro
 // Find SCIONLabAS by the IA string
 func FindSCIONLabASByIAString(ia string) (*SCIONLabAS, error) {
 	as := new(SCIONLabAS)
-	IA, err1 := addr.IAFromString(ia)
-	if err1 != nil {
-		return nil, err1
+	IA, err := addr.IAFromString(ia)
+	if err != nil {
+		return nil, err
 	}
-	err := o.QueryTable(as).Filter("ISD", IA.I).Filter("ASID", IA.A).RelatedSel().One(as)
+	if err := o.QueryTable(as).Filter("ISD", IA.I).Filter("ASID", IA.A).RelatedSel().One(as); err != nil {
+		return nil, err
+	}
 	o.LoadRelated(as, "AP")
-	return as, err
+	return as, nil
 }
 
 // Find SCIONLabAS by the ISD AS int
