@@ -59,7 +59,7 @@ type user struct {
 	LastName         string
 	Verified         bool     // whether the user verified the email
 	IsAdmin          bool     // whether the user is marked as admin
-	VerificationUUID string   // uuid sent to user to verify email
+	VerificationUUID string   `orm:"column(verification_uuid)"` // uuid sent to user to verify email
 	Account          *Account `orm:"rel(fk);index"`
 	Created          time.Time
 	Updated          time.Time

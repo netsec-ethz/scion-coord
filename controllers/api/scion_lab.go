@@ -102,6 +102,7 @@ type SCIONLabASInfo struct {
 	IsNewConnection bool               // denotes whether this is a new user.
 	IsVPN           bool               // denotes whether this is a VPN setup
 	VPNServerIP     string             // IP of the VPN server
+	VPNServerPort   uint16             // Port of the VPN server
 	IP              string             // the public IP address of the SCIONLab AS
 	LocalPort       uint16             // The port of the border router on the user side
 	RemoteIA        string             // the SCIONLab AP the AS connects to
@@ -307,7 +308,7 @@ func (s *SCIONLabASController) checkRequest(slReq SCIONLabRequest) error {
 // to create the SCIONLab AS configuration.
 func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONLabASInfo, error) {
 	var newConnection bool
-	var brID uint16
+	var brID, vpnPort uint16
 	var ip, remoteIP, vpnIP string
 	var cn models.ConnectionInfo
 	// See if this user already has an AS
@@ -341,6 +342,9 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 
 	// Different settings depending on whether it is a VPN or standard setup
 	if slReq.IsVPN {
+		if !remoteAS.AP.HasVPN {
+			return nil, errors.New("The Attachment Point does not have an openVPN server running")
+		}
 		if !newConnection && cn.IsVPN {
 			ip = cn.LocalIP
 		} else {
@@ -352,6 +356,7 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 		}
 		remoteIP = remoteAS.AP.VPNIP
 		vpnIP = remoteAS.PublicIP
+		vpnPort = remoteAS.AP.VPNPort
 	} else {
 		ip = slReq.IP
 		remoteIP = remoteAS.PublicIP
@@ -389,6 +394,7 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 		RemoteBRID:      brID,
 		RemotePort:      remoteAS.GetPortNumberFromBRID(brID),
 		VPNServerIP:     vpnIP,
+		VPNServerPort:   vpnPort,
 		LocalAS:         as,
 		RemoteAS:        remoteAS,
 	}, nil
@@ -692,4 +698,47 @@ func (s *SCIONLabASController) canRemove(userEmail, asID string) (bool, *models.
 		return true, as, &cns[0], nil
 	}
 	return false, nil, nil, nil
+}
+
+// Reads the IA parameter from the URL and returns the associated SCIONLabAS if it belongs to the
+// correct account and an error otherwise
+func (s *SCIONLabASController) getIAParameter(r *http.Request) (as *models.SCIONLabAS, err error) {
+	ia := r.URL.Query().Get("IA")
+	if len(ia) == 0 {
+		err = errors.New("IA parameter missing")
+		return
+	}
+	vars := mux.Vars(r)
+	accountID := vars["account_id"]
+	ases, err := models.FindSCIONLabASesByAccountID(accountID)
+	for _, ownedAS := range ases {
+		if ownedAS == ia {
+			as, err = models.FindSCIONLabASByIAString(ia)
+			return
+		}
+	}
+	err = fmt.Errorf("The AS %v does not belong to the specified account", ia)
+	return
+}
+
+// API for SCIONLabASes to query which git branch they should use for updates
+func (s *SCIONLabASController) QueryUpdateBranch(w http.ResponseWriter, r *http.Request) {
+	log.Printf("API Call for queryUpdateBranch = %v", r.URL.Query())
+	as, err := s.getIAParameter(r)
+	if err != nil {
+		s.BadRequest(w, err, "Incorrect IA parameter")
+		return
+	}
+	s.Plain(as.Branch, w, r)
+}
+
+// API for SCIONLabASes to report a successful update
+func (s *SCIONLabASController) ConfirmUpdate(w http.ResponseWriter, r *http.Request) {
+	log.Printf("API Call for confirmUpdate = %v", r.URL.Query())
+	as, err := s.getIAParameter(r)
+	if err != nil {
+		s.BadRequest(w, err, "Incorrect IA parameter")
+		return
+	}
+	as.Update()
 }

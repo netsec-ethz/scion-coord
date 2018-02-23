@@ -29,10 +29,10 @@ type JoinRequest struct {
 	ID            uint64 `orm:"column(id);auto;pk"`
 	RequestID     uint64 `orm:"column(request_id)"`
 	Info          string // free form text for the reply
-	ISDToJoin     int    `orm:"column(isd_to_join)"` // the ISD that the sender wants to join
-	JoinAsACoreAS bool   // whether to join the ISD as a core AS
-	RequesterID   string `orm:"column(requester_id)"` // the key to identify which account made the request
-	RespondIA     string // the ISD-AS which should respond to the request
+	ISDToJoin     int    `orm:"column(isd_to_join)"`       // the ISD that the sender wants to join
+	JoinAsACoreAS bool   `orm:"column(join_as_a_core_as)"` // whether to join the ISD as a core AS
+	RequesterID   string `orm:"column(requester_id)"`      // the key to identify which account made the request
+	RespondIA     string `orm:"column(respond_ia)"`        // the ISD-AS which should respond to the request
 	SigPubKey     string // signing public key
 	EncPubKey     string // encryption public key
 	Status        string
@@ -84,12 +84,12 @@ type JoinReply struct {
 	Info                 string // free form text for the reply
 	RequesterID          string `orm:"column(requester_id)"` // the string to identify which account made the request
 	Status               string
-	JoiningIA            string
-	IsCore               bool // whether the new AS joins as core
-	RespondIA            string
-	JoiningIACertificate string `orm:"type(text)"` // certificate of the newly joining AS
-	RespondIACertificate string `orm:"type(text)"` // certificate of the responding AS
-	TRC                  string `orm:"type(text)"`
+	JoiningIA            string `orm:"column(joining_ia)"`
+	IsCore               bool   // whether the new AS joins as core
+	RespondIA            string `orm:"column(respond_ia)"`
+	JoiningIACertificate string `orm:"column(joining_ia_certificate);type(text)"`    // certificate of the newly joining AS
+	RespondIACertificate string `orm:"column(responding_ia_certificate);type(text)"` // certificate of the responding AS
+	TRC                  string `orm:"column(trc);type(text)"`
 }
 
 func FindJoinReply(requester string, req_id uint64) (*JoinReply, error) {
@@ -127,14 +127,14 @@ type ConnRequest struct {
 	RequestID            uint64   `orm:"column(request_id)"`
 	Account              *Account `orm:"rel(fk)"` // account sending the connection request
 	Status               string
-	RequestIA            string
-	RespondIA            string
+	RequestIA            string `orm:"column(request_ia)"`
+	RespondIA            string `orm:"column(respond_ia)"`
 	RequesterCertificate string `orm:"type(text)"`
 	Info                 string // free form text motivation for the request
 	OverlayType          string
-	IP                   string
+	IP                   string `orm:"column(ip)"`
 	Port                 uint64
-	MTU                  uint64 // bytes
+	MTU                  uint64 `orm:"column(mtu)"` // bytes
 	Bandwidth            uint64 // kbps
 	LinkType             string
 	Timestamp            string // UTC ISO 8601 format string, 1s precision
@@ -175,13 +175,13 @@ type ConnReply struct {
 	Info        string   // free form text for the reply
 	Account     *Account `orm:"rel(fk)"` // account which should receive the connection reply
 	Status      string
-	RespondIA   string
-	RequestIA   string
+	RespondIA   string `orm:"column(respond_ia)"`
+	RequestIA   string `orm:"column(request_ia)"`
 	Certificate string `orm:"type(text)"`
 	OverlayType string
-	IP          string
+	IP          string `orm:"column(ip)"`
 	Port        uint64
-	MTU         uint64 // bytes
+	MTU         uint64 `orm:"column(mtu)"` // bytes
 	Bandwidth   uint64 // kbps
 }
 

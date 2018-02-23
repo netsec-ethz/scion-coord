@@ -15,14 +15,13 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"time"
-
-	"encoding/json"
-	"io/ioutil"
 
 	"github.com/astaxie/beego/orm"
 	"github.com/didip/tollbooth"
@@ -204,6 +203,10 @@ func main() {
 		apiChain.ThenFunc(scionLabASController.GetUpdatesForAP))
 	router.Handle("/api/as/confirmUpdatesFromAP/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabASController.ConfirmUpdatesFromAP))
+	router.Handle("/api/as/queryUpdateBranch/{account_id}/{secret}",
+		apiChain.ThenFunc(scionLabASController.QueryUpdateBranch))
+	router.Handle("/api/as/confirmUpdate/{account_id}/{secret}",
+		apiChain.ThenFunc(scionLabASController.ConfirmUpdate)).Methods(http.MethodPost)
 
 	//SCIONBox API
 	router.Handle("/api/as/initBox", loggingChain.ThenFunc(scionBoxController.InitializeBox))
