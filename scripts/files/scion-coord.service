@@ -1,6 +1,7 @@
 [Unit]
 Description=SCION Coordination Service
 After=network-online.target
+OnFailure=unit-status-mail@%n.service
 
 [Service]
 Type=simple
@@ -11,7 +12,7 @@ Environment="PATH=/home/_USER_/.local/bin:/home/_USER_/go/bin:/usr/local/go/bin:
 ExecStart=/home/_USER_/go/src/github.com/netsec-ethz/scion-coord/scion-coord
 StandardOutput=syslog
 StandardError=syslog
-SyslogIndentifier=scion-coord
+SyslogIdentifier=scion-coord
 RestartSec=1
 Restart=always
 
