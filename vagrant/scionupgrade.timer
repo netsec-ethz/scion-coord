@@ -1,0 +1,8 @@
+[Unit]
+Description=Run SCION upgrade daily
+
+[Timer]
+OnUnitActiveSec=1d
+
+[Install]
+WantedBy=multi-user.target
