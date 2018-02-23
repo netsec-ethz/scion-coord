@@ -22,12 +22,19 @@ fi
 # the scionLabConfigs/easy-rsa and basically anything that we perform manually
 
 # check service file
-if [ ! -f "$basedir/scripts/scion-coord.service" ]; then
+if [ ! -f "$basedir/scripts/files/scion-coord.service" ] 
+   || [ ! -f "$basedir/scripts/files/unit-status-mail@.service" ] 
+   || [ ! -f "$basedir/scripts/files/unit-status-mail.sh" ]; then
     echo "Missing service file"
+    exit 1
 fi
 if [ ! -d "/etc/systemd/system" ]; then
     echo "Cannot find the destination directory for the service file. /etc/systemd/system not found. Abort."
     exit 1
+fi
+
+if ! dpkg-query -s sendmail &> /dev/null ; then
+    DEBIAN_FRONTEND="noninteractive" sudo apt-get install sendmail -y
 fi
 
 sudo systemctl stop "scion-coord" || true
@@ -40,7 +47,9 @@ tmpfile=$(mktemp)
 cp "$basedir/scripts/scion-coord.service" "$tmpfile"
 sed -i -- "s/_USER_/$USER/g" "$tmpfile"
 sudo cp "$tmpfile" "scion-coord.service"
+sudo cp "$basedir/scripts/files/unit-status-mail@.service" .
 popd >/dev/null
+sudo cp "$basedir/scripts/files/unit-status-mail.sh" "/usr/local/bin"
 
 sudo systemctl daemon-reload
 sudo systemctl start "scion-coord"
