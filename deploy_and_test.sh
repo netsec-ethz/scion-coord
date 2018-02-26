@@ -38,6 +38,11 @@ runSQL() {
 onExit() {
     RET=$?
     trap '' INT TERM
+    if [ "$doTest" -eq 1 ]; then
+        # this means that we have stopped and started the scion ourselves. Stop it back
+        cd "$SCION"
+        "./scion.sh" stop || true
+    fi
     if [ ! -z $scionCoordPid ]; then
         # maybe kill SCION Coord if it's running and wait
         kill -TERM 0
