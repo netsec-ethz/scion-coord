@@ -106,14 +106,12 @@ func BRString(ia string, id uint16) string {
 func GetFreeID(ids []int, min, max int) (int, error) {
 	res := min
 	sort.Ints(ids)
-	for _, i := range ids {
-		if i < res {
-			continue
+	i := sort.Search(len(ids), func(i int) bool { return ids[i] >= min })
+	for _, x := range(ids[i:]) {
+		if res < x {
+			break
 		}
-		if i == res {
-			res++
-		}
-		break
+		res = x + 1
 	}
 	if res > max {
 		return 0, errors.New("No free ID found")
