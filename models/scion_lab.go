@@ -644,6 +644,21 @@ func (asInfo *ASInfo) String() string {
 	return utility.IAString(asInfo.ISD, asInfo.ASID)
 }
 
+// Delete a connection between specified ASes
+func (as *SCIONLabAS) DeleteConnectionToAP(apIA string) error {
+	if _, err := o.LoadRelated(as, "Connections"); err != nil {
+		return err
+	}
+	for _, cn := range as.Connections {
+		o.LoadRelated(cn, "RespondAP")
+		o.LoadRelated(cn.RespondAP, "AS")
+		if apIA == cn.RespondAP.AS.IA() {
+			return cn.Delete()
+		}
+	}
+	return fmt.Errorf("Did not find a connection between AS %v and AP %v", as.IA(), apIA)
+}
+
 func (as *SCIONLabAS) Delete() error {
 	_, err := o.Delete(as)
 	return err
