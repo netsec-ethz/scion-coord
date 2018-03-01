@@ -103,10 +103,10 @@ func BRString(ia string, id uint16) string {
 }
 
 // Returns the smallest integer in the range [min, max] that is not present in the given ids
-func GetFreeID(ids []int, min, max int) (int, error) {
+func GetAvailableID(ids []int, min, max int) (int, error) {
 	res := min
 	sort.Ints(ids)
-	for _, x := range(ids) {
+	for _, x := range ids {
 		if res < x {
 			break
 		}
