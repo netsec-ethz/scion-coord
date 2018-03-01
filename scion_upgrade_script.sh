@@ -7,22 +7,22 @@ ACCOUNT_ID=$1
 ACCOUNT_SECRET=$2
 IA=$3
 
+DEFAULT_BRANCH_NAME="scionlab"
 REMOTE_REPO="origin"
 # TODO: Change me to official URL when we migrate
 SCION_COORD_URL="https://scion-ad6.inf.ethz.ch"
 
 echo "Invoking update script with $ACCOUNT_ID $ACCOUNT_SECRET $IA"
 
-UPDATE_BRANCH=$(curl "${SCION_COORD_URL}/api/as/queryUpdateBranch/${ACCOUNT_ID}/${ACCOUNT_SECRET}?IA=${IA}")
+UPDATE_BRANCH=$(curl --fail "${SCION_COORD_URL}/api/as/queryUpdateBranch/${ACCOUNT_ID}/${ACCOUNT_SECRET}?IA=${IA}" || true)
+
+if [  -z "$UPDATE_BRANCH"  ]
+then
+    echo "No branch name has been specified, using default value ${DEFAULT_BRANCH_NAME}. "
+    UPDATE_BRANCH=$DEFAULT_BRANCH_NAME
+fi
 
 echo "Update branch is: ${UPDATE_BRANCH}"
-
-if [ -z ${UPDATE_BRANCH} ]
-then
-    echo "You must specify name of a remote branch. " >&2
-    echo "$usage" >&2
-    exit 1
-fi
 
 cd $SC
 
