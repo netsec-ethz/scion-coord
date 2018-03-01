@@ -116,7 +116,7 @@ var getAvailableIDtests = []struct {
 	{1, 0, []int{}, 0, true},
 }
 
-func TestGetFreeID(t *testing.T) {
+func TestGetAvailableID(t *testing.T) {
 	for i, tt := range getAvailableIDtests {
 		actual, err := GetAvailableID(tt.used, tt.min, tt.max)
 		if (err != nil) != tt.err {
