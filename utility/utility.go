@@ -106,7 +106,7 @@ func BRString(ia string, id uint16) string {
 func GetAvailableID(ids []int, min, max int) (int, error) {
 	res := min
 	sort.Ints(ids)
-	for _, x := range(ids) {
+	for _, x := range ids {
 		if res < x {
 			break
 		}
