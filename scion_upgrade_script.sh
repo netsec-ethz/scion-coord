@@ -45,4 +45,5 @@ else
     ./scion.sh run
 fi
 
-echo "Done"
+RESULT=$(curl -X POST "${SCION_COORD_URL}/api/as/confirmUpdate/${ACCOUNT_ID}/${ACCOUNT_SECRET}?IA=${IA}")
+echo "Done, got response from server: ${RESULT}"
