@@ -33,20 +33,21 @@ func (s *SCIONLabASController) generateVPNConfig(asInfo *SCIONLabASInfo) error {
 		return err
 	}
 	userEmail := asInfo.LocalAS.UserEmail
+	userASID := asInfo.LocalAS.ASID
 
 	var caCert, clientCert, clientKey []byte
 	caCert, err := ioutil.ReadFile(CACertPath)
 	if err != nil {
 		return fmt.Errorf("Error reading CA certificate file: %v", err)
 	}
-	clientCert, err = ioutil.ReadFile(filepath.Join(RSAKeyPath, userEmail+".crt"))
+	clientCert, err = ioutil.ReadFile(s.vpnCertPath(userEmail, userASID))
 	if err != nil {
 		return fmt.Errorf("Error reading VPN certificate file for user %v: %v",
 			userEmail, err)
 	}
 	clientCertStr := string(clientCert)
 	startCert := strings.Index(clientCertStr, "-----BEGIN CERTIFICATE-----")
-	clientKey, err = ioutil.ReadFile(filepath.Join(RSAKeyPath, userEmail+".key"))
+	clientKey, err = ioutil.ReadFile(s.vpnKeyPath(userEmail, userASID))
 	if err != nil {
 		return fmt.Errorf("Error reading VPN key file for user %v: %v",
 			userEmail, err)
@@ -71,12 +72,13 @@ func (s *SCIONLabASController) generateVPNConfig(asInfo *SCIONLabASInfo) error {
 // Creates the keys for VPN setup
 func (s *SCIONLabASController) generateVPNKeys(asInfo *SCIONLabASInfo) error {
 	userEmail := asInfo.LocalAS.UserEmail
+	userASID := asInfo.LocalAS.ASID
 	log.Printf("Generating RSA keys")
-	if _, err := os.Stat(filepath.Join(RSAKeyPath, userEmail+".key")); err == nil {
+	if _, err := os.Stat(s.vpnKeyPath(userEmail, userASID)); err == nil {
 		log.Printf("Previous VPN keys exist")
 	} else if os.IsNotExist(err) {
 		cmd := exec.Command("/bin/bash", "-c", "source vars; ./build-key --batch "+
-			userEmail)
+			s.vpnUserID(userEmail, userASID))
 		cmd.Dir = EasyRSAPath
 		cmdOut, _ := cmd.StdoutPipe()
 		cmdErr, _ := cmd.StderrPipe()
@@ -98,4 +100,24 @@ func (s *SCIONLabASController) generateVPNKeys(asInfo *SCIONLabASInfo) error {
 	}
 
 	return nil
+}
+
+// Constructs the userID used as a common name for the VPN keys and certificates
+func (s *SCIONLabASController) vpnUserID(userEmail string, asID int) string {
+	return fmt.Sprintf("%v_%v", userEmail, asID)
+}
+
+// Path for client key and certificate; fileExt can be "key" or "cert"
+func (s *SCIONLabASController) vpnKeyCertPath(userEmail string, asID int, fileExt string) string {
+	return filepath.Join(RSAKeyPath, s.vpnUserID(userEmail, asID)+"."+fileExt)
+}
+
+// Path for client key
+func (s *SCIONLabASController) vpnKeyPath(userEmail string, asID int) string {
+	return s.vpnKeyCertPath(userEmail, asID, "key")
+}
+
+// Path for client certificate
+func (s *SCIONLabASController) vpnCertPath(userEmail string, asID int) string {
+	return s.vpnKeyCertPath(userEmail, asID, "crt")
 }
