@@ -430,6 +430,7 @@ func (as *SCIONLabAS) UpdateDBConnection(cnInfo *ConnectionInfo) error {
 		cn.JoinStatus = cnInfo.NeighborStatus
 		cn.RespondBRID = cnInfo.BRID
 	}
+	cn.IsVPN = cnInfo.IsVPN
 	if err := cn.Update(); err != nil {
 		return err
 	}
