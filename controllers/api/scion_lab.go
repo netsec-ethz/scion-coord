@@ -448,6 +448,8 @@ func (s *SCIONLabASController) updateDB(asInfo *SCIONLabASInfo) error {
 		}
 		cn.BRID = 1
 		cn.IsVPN = asInfo.IsVPN
+		cn.LocalIP = asInfo.IP
+		cn.NeighborIP = asInfo.RemoteIP
 		cn.NeighborStatus = asInfo.LocalAS.Status
 		cn.Status = models.ACTIVE
 		if err := asInfo.LocalAS.UpdateASAndConnection(&cn); err != nil {

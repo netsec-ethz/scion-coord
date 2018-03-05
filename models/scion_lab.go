@@ -412,25 +412,22 @@ func (as *SCIONLabAS) UpdateDBConnection(cnInfo *ConnectionInfo) error {
 	if err != nil {
 		return err
 	}
+	cn.IsVPN = cnInfo.IsVPN
+	cn.JoinIP = cnInfo.LocalIP
+	cn.RespondIP = cnInfo.NeighborIP
+
 	respondAS := cn.getRespondAS()
 	joinAS := cn.getJoinAS()
 	if joinAS.ID == as.ID {
-		if !cn.IsVPN {
-			cn.JoinIP = as.PublicIP
-		}
 		cn.JoinStatus = cnInfo.Status
 		cn.RespondStatus = cnInfo.NeighborStatus
 		cn.JoinBRID = cnInfo.BRID
 	}
 	if respondAS.ID == as.ID {
-		if !cn.IsVPN {
-			cn.RespondIP = as.PublicIP
-		}
 		cn.RespondStatus = cnInfo.Status
 		cn.JoinStatus = cnInfo.NeighborStatus
 		cn.RespondBRID = cnInfo.BRID
 	}
-	cn.IsVPN = cnInfo.IsVPN
 	if err := cn.Update(); err != nil {
 		return err
 	}
