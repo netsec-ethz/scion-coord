@@ -105,6 +105,7 @@ type SCIONLabASInfo struct {
 	VPNServerPort   uint16             // Port of the VPN server
 	IP              string             // the public IP address of the SCIONLab AS
 	LocalPort       uint16             // The port of the border router on the user side
+	OldAP           string             // the previous SCIONLab AP to which the AS was connected
 	RemoteIA        string             // the SCIONLab AP the AS connects to
 	RemoteIP        string             // the IP address of the SCIONLab AP it connects to
 	RemoteBRID      uint16             // ID of the border router in the SCIONLab AP
@@ -313,9 +314,9 @@ func (s *SCIONLabASController) checkRequest(slReq SCIONLabRequest) error {
 // Populates and returns a SCIONLabASInfo struct, which contains the necessary information
 // to create the SCIONLab AS configuration.
 func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONLabASInfo, error) {
-	var newConnection bool
+	newConnection := true
 	var brID, vpnPort uint16
-	var ip, remoteIP, vpnIP string
+	var ip, remoteIP, vpnIP, oldAP string
 	var cn models.ConnectionInfo
 	// See if this user already has an AS
 	as, err := models.FindSCIONLabASByUserEmailAndASID(slReq.UserEmail, slReq.ASID)
@@ -323,17 +324,16 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 		return nil, fmt.Errorf("Error looking up SCIONLab AS for user %v: %v",
 			slReq.UserEmail, err)
 	}
-	cn, err = as.GetJoinConnectionInfoToAS(slReq.ServerIA)
+	cns, err := as.GetJoinConnectionInfo()
 	if err != nil {
-		if err == orm.ErrNoRows {
-			newConnection = true
-		} else {
-			return nil, fmt.Errorf("Error looking up connections of SCIONLab AS for user %v: %v",
-				slReq.UserEmail, err)
+		return nil, fmt.Errorf("Error looking up connections of SCIONLab AS for user %v: %v",
+			slReq.UserEmail, err)
+	} else if len(cns) != 0 {
+		oldAP = utility.IAString(cns[0].NeighborISD, cns[0].NeighborAS)
+		if oldAP == slReq.ServerIA {
+			newConnection = false
+			brID = cn.BRID
 		}
-	} else {
-		newConnection = false
-		brID = cn.BRID
 	}
 
 	ia, err := addr.IAFromString(slReq.ServerIA)
@@ -396,6 +396,7 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 		RemoteIA:        slReq.ServerIA,
 		IP:              ip,
 		LocalPort:       as.StartPort,
+		OldAP:           oldAP,
 		RemoteIP:        remoteIP,
 		RemoteBRID:      brID,
 		RemotePort:      remoteAS.GetPortNumberFromBRID(brID),
@@ -433,13 +434,17 @@ func (s *SCIONLabASController) updateDB(asInfo *SCIONLabASInfo) error {
 			return fmt.Errorf("Error updating SCIONLabAS database table for user %v: %v",
 				userEmail, err)
 		}
+		// remove the previous connection if it exists
+		if asInfo.OldAP != "" {
+			asInfo.LocalAS.DeleteConnectionToAP(asInfo.OldAP)
+			// TODO(mlegner): Do proper error handling
+		}
 	} else {
 		// Update the Connections Table
 		cn, err := asInfo.LocalAS.GetJoinConnectionInfoToAS(asInfo.RemoteIA)
 		if err != nil {
 			return fmt.Errorf("Error finding existing connection of user %v: %v",
 				userEmail, err)
-
 		}
 		cn.BRID = 1
 		cn.IsVPN = asInfo.IsVPN

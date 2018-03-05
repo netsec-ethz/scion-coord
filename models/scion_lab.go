@@ -181,6 +181,9 @@ func (cn *Connection) Update() error {
 
 func (ap *AttachmentPoint) getConnections() ([]*Connection, error) {
 	_, err := o.LoadRelated(ap, "Connections")
+	if err == orm.ErrNoRows {
+		return []*Connection{}, nil
+	}
 	return ap.Connections, err
 }
 
@@ -202,7 +205,7 @@ func (as *SCIONLabAS) GetFreeBRID() (uint16, error) {
 	if as.Type == INFRASTRUCTURE {
 		minBRID += config.RESERVED_BRS_INFRASTRUCTURE
 	}
-	id, err := utility.GetFreeID(brIDs, minBRID, config.MAX_BR_ID)
+	id, err := utility.GetAvailableID(brIDs, minBRID, config.MAX_BR_ID)
 	return uint16(id), err
 }
 
@@ -218,17 +221,18 @@ func (as *SCIONLabAS) GetFreeVPNIP() (string, error) {
 			vpnIPs = append(vpnIPs, int(utility.IPToInt(cn.JoinIP)))
 		}
 	}
-	newIP, err := utility.GetFreeID(vpnIPs, int(utility.IPToInt(as.AP.StartVPNIP)),
+	newIP, err := utility.GetAvailableID(vpnIPs, int(utility.IPToInt(as.AP.StartVPNIP)),
 		int(utility.IPToInt(as.AP.EndVPNIP)))
 	return utility.IntToIP(uint32(newIP)), err
 }
 
 // Only returns the connections of the AS in its function as the joining AS
 func (as *SCIONLabAS) getJoinConnections() ([]*Connection, error) {
-	if _, err := o.LoadRelated(as, "Connections"); err != nil {
-		return nil, err
+	_, err := o.LoadRelated(as, "Connections")
+	if err == orm.ErrNoRows {
+		return []*Connection{}, nil
 	}
-	return as.Connections, nil
+	return as.Connections, err
 }
 
 // Only returns the connections of the AS in its function as an AP
@@ -265,7 +269,9 @@ func (cn *Connection) getJoinAS() *SCIONLabAS {
 
 func (cn *Connection) getRespondAS() *SCIONLabAS {
 	ap := new(AttachmentPoint)
-	o.QueryTable(ap).Filter("ID", cn.RespondAP.ID).RelatedSel().One(ap)
+	if err := o.QueryTable(ap).Filter("ID", cn.RespondAP.ID).RelatedSel().One(ap); err != nil {
+		return nil
+	}
 	o.LoadRelated(ap, "AS")
 	return ap.AS
 }
@@ -424,6 +430,7 @@ func (as *SCIONLabAS) UpdateDBConnection(cnInfo *ConnectionInfo) error {
 		cn.JoinStatus = cnInfo.NeighborStatus
 		cn.RespondBRID = cnInfo.BRID
 	}
+	cn.IsVPN = cnInfo.IsVPN
 	if err := cn.Update(); err != nil {
 		return err
 	}
@@ -507,13 +514,15 @@ func FindSCIONLabASesByAccountID(accountID string) (asStrings []string, err erro
 // Find SCIONLabAS by the IA string
 func FindSCIONLabASByIAString(ia string) (*SCIONLabAS, error) {
 	as := new(SCIONLabAS)
-	IA, err1 := addr.IAFromString(ia)
-	if err1 != nil {
-		return nil, err1
+	IA, err := addr.IAFromString(ia)
+	if err != nil {
+		return nil, err
 	}
-	err := o.QueryTable(as).Filter("ISD", IA.I).Filter("ASID", IA.A).RelatedSel().One(as)
+	if err := o.QueryTable(as).Filter("ISD", IA.I).Filter("ASID", IA.A).RelatedSel().One(as); err != nil {
+		return nil, err
+	}
 	o.LoadRelated(as, "AP")
-	return as, err
+	return as, nil
 }
 
 // Find SCIONLabAS by the ISD AS int
@@ -634,6 +643,21 @@ func FindSCIONLabASByASInfo(asInfo ASInfo) (*SCIONLabAS, error) {
 
 func (asInfo *ASInfo) String() string {
 	return utility.IAString(asInfo.ISD, asInfo.ASID)
+}
+
+// Delete a connection between specified ASes
+func (as *SCIONLabAS) DeleteConnectionToAP(apIA string) error {
+	if _, err := o.LoadRelated(as, "Connections"); err != nil {
+		return err
+	}
+	for _, cn := range as.Connections {
+		o.LoadRelated(cn, "RespondAP")
+		o.LoadRelated(cn.RespondAP, "AS")
+		if apIA == cn.RespondAP.AS.IA() {
+			return cn.Delete()
+		}
+	}
+	return fmt.Errorf("Did not find a connection between AS %v and AP %v", as.IA(), apIA)
 }
 
 func (as *SCIONLabAS) Delete() error {
