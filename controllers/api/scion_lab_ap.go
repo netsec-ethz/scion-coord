@@ -238,8 +238,7 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 			cn_db.Status = models.INACTIVE
 			cn_db.BRID = 0 // Set BRID to 0 for inactive connections
 		default:
-			log.Printf("Unsupported action \"%v\" for AS %v. User: %v", action, ia,
-				cn_db.NeighborUser)
+			log.Printf("Unsupported action \"%v\" for AS %v. User: %v", action, ia, as.UserEmail)
 			failedConfirmations = append(failedConfirmations, ia)
 			continue
 		}
@@ -249,7 +248,7 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 			failedConfirmations = append(failedConfirmations, ia)
 			continue
 		}
-		emails = append(emails, emailConfirmation{cn_db.NeighborUser, action})
+		emails = append(emails, emailConfirmation{as.UserEmail, action})
 
 	}
 	for _, e := range emails {
