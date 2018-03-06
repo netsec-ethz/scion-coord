@@ -205,7 +205,7 @@ func (as *SCIONLabAS) GetFreeBRID() (uint16, error) {
 	if as.Type == INFRASTRUCTURE {
 		minBRID += config.RESERVED_BRS_INFRASTRUCTURE
 	}
-	id, err := utility.GetFreeID(brIDs, minBRID, config.MAX_BR_ID)
+	id, err := utility.GetAvailableID(brIDs, minBRID, config.MAX_BR_ID)
 	return uint16(id), err
 }
 
@@ -221,7 +221,7 @@ func (as *SCIONLabAS) GetFreeVPNIP() (string, error) {
 			vpnIPs = append(vpnIPs, int(utility.IPToInt(cn.JoinIP)))
 		}
 	}
-	newIP, err := utility.GetFreeID(vpnIPs, int(utility.IPToInt(as.AP.StartVPNIP)),
+	newIP, err := utility.GetAvailableID(vpnIPs, int(utility.IPToInt(as.AP.StartVPNIP)),
 		int(utility.IPToInt(as.AP.EndVPNIP)))
 	return utility.IntToIP(uint32(newIP)), err
 }
@@ -430,6 +430,7 @@ func (as *SCIONLabAS) UpdateDBConnection(cnInfo *ConnectionInfo) error {
 		cn.JoinStatus = cnInfo.NeighborStatus
 		cn.RespondBRID = cnInfo.BRID
 	}
+	cn.IsVPN = cnInfo.IsVPN
 	if err := cn.Update(); err != nil {
 		return err
 	}

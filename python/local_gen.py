@@ -27,6 +27,7 @@ import time
 
 # External packages
 from Crypto import Random
+from nacl.signing import SigningKey
 
 # SCION
 from lib.crypto.asymcrypto import (
@@ -116,10 +117,17 @@ def generate_certificate(joining_ia, core_ia, core_sign_priv_key_file, core_cert
         False, validity, public_key_encr, public_key_sign, core_ia_sig_priv_key)
     sig_priv_key = base64.b64encode(private_key_sign).decode()
     enc_priv_key = base64.b64encode(private_key_encr).decode()
+    sig_priv_key_raw = base64.b64encode(SigningKey(private_key_sign)._signing_key).decode()
     joining_ia_chain = CertificateChain([cert, core_ia_chain.core_as_cert]).to_json()
     trc = open(trc_file).read()
     master_as_key = base64.b64encode(Random.new().read(16)).decode('utf-8')
-    as_obj = ASCredential(sig_priv_key, enc_priv_key, joining_ia_chain, trc, master_as_key)
+    key_dict = {
+        'enc_key': enc_priv_key,
+        'sig_key': sig_priv_key,
+        'sig_key_raw': sig_priv_key_raw,
+        'master_as_key': master_as_key,
+    }
+    as_obj = ASCredential(joining_ia_chain, trc, key_dict)
     return as_obj
 
 

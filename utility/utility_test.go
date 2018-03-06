@@ -96,3 +96,36 @@ func TestBRIDFromString(t *testing.T) {
 		}
 	}
 }
+
+var getAvailableIDtests = []struct {
+	min      int
+	max      int
+	used     []int
+	expected int
+	err      bool
+}{
+	{0, 10, []int{0}, 1, false},
+	{0, 10, []int{1}, 0, false},
+	{0, 10, []int{}, 0, false},
+	{0, 10, []int{0, 1}, 2, false},
+	{0, 10, []int{0, 1, 2}, 3, false},
+	{0, 10, []int{0, 2}, 1, false},
+	{0, 10, []int{0, 1, 6}, 2, false},
+	{0, 0, []int{}, 0, false},
+	{0, 0, []int{0}, 0, true},
+	{1, 0, []int{}, 0, true},
+}
+
+func TestGetAvailableID(t *testing.T) {
+	for i, tt := range getAvailableIDtests {
+		actual, err := GetAvailableID(tt.used, tt.min, tt.max)
+		if (err != nil) != tt.err {
+			t.Errorf("Expected error? %v, but error is: %v", tt.err, err)
+			t.Errorf("Test table index %d, content:\n%v", i, tt)
+		}
+		if actual != tt.expected {
+			t.Errorf("Expected %v, got %v", tt.expected, actual)
+			t.Errorf("Test table index %d, content:\n%v", i, tt)
+		}
+	}
+}
