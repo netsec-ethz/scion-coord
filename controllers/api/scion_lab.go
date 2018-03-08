@@ -411,6 +411,22 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 func (s *SCIONLabASController) updateDB(asInfo *SCIONLabASInfo) error {
 	userEmail := asInfo.LocalAS.UserEmail
 	if asInfo.IsNewConnection {
+		// flag the old connections for deletion:
+		if asInfo.OldAP != "" {
+			cns, err := asInfo.LocalAS.GetJoinConnectionInfo()
+			if err != nil {
+				return fmt.Errorf("Error looking up connections of SCIONLab AS for AS %v: %v", asInfo.LocalAS.String(), err)
+			}
+			// all connections from an AS flagged as new connection and oldAP need to end up (localST, remoteST) = (REMOVE,REMOVE)
+			for _, cn := range cns {
+				cn.Status = models.REMOVE
+				cn.NeighborStatus = models.REMOVE
+				err = asInfo.LocalAS.UpdateDBConnection(&cn)
+				if err != nil {
+					return fmt.Errorf("Error updating previous connection ID %v: %v", cn.ID, err)
+				}
+			}
+		}
 		// update the Connections table
 		newCn := models.Connection{
 			JoinIP:        asInfo.IP,
@@ -433,11 +449,6 @@ func (s *SCIONLabASController) updateDB(asInfo *SCIONLabASInfo) error {
 			newCn.Delete()
 			return fmt.Errorf("Error updating SCIONLabAS database table for user %v: %v",
 				userEmail, err)
-		}
-		// remove the previous connection if it exists
-		if asInfo.OldAP != "" {
-			asInfo.LocalAS.DeleteConnectionToAP(asInfo.OldAP)
-			// TODO(mlegner): Do proper error handling
 		}
 	} else {
 		// Update the Connections Table

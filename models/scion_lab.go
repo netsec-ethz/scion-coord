@@ -91,6 +91,7 @@ type ConnectionInfo struct {
 	Linktype       uint8  //"PARENT","CHILD"
 	IsVPN          bool
 	Status         uint8
+	OldConnection  bool   // true if this WAS a connection, but it needs to be deleted in the AP
 }
 
 func (as *SCIONLabAS) IA() string {
@@ -306,6 +307,7 @@ func (as *SCIONLabAS) GetJoinConnectionInfo() ([]ConnectionInfo, error) {
 			Linktype:       cn.Linktype,
 			IsVPN:          cn.IsVPN,
 			Status:         cn.JoinStatus,
+			OldConnection:  cn.RespondStatus == REMOVE && cn.JoinStatus == REMOVE,
 		}
 		cnInfos = append(cnInfos, cnInfo)
 	}
@@ -345,6 +347,7 @@ func (as *SCIONLabAS) GetRespondConnectionInfo() ([]ConnectionInfo, error) {
 			Linktype:       linktype,
 			IsVPN:          cn.IsVPN,
 			Status:         cn.RespondStatus,
+			OldConnection:  cn.RespondStatus == REMOVE && cn.JoinStatus == REMOVE,
 		}
 		cnInfos = append(cnInfos, cnInfo)
 	}
@@ -510,12 +513,12 @@ func FindSCIONLabASesByAccountID(accountID string) (asStrings []string, err erro
 
 // Find SCIONLabAS by the IA string
 func FindSCIONLabASByIAString(ia string) (*SCIONLabAS, error) {
-	as := new(SCIONLabAS)
 	IA, err := addr.IAFromString(ia)
 	if err != nil {
 		return nil, err
 	}
-	if err := o.QueryTable(as).Filter("ISD", IA.I).Filter("ASID", IA.A).RelatedSel().One(as); err != nil {
+	as, err := FindSCIONLabASByIAInt(IA.I, IA.A)
+	if err != nil {
 		return nil, err
 	}
 	o.LoadRelated(as, "AP")
@@ -526,6 +529,12 @@ func FindSCIONLabASByIAString(ia string) (*SCIONLabAS, error) {
 func FindSCIONLabASByIAInt(isd int, asID int) (*SCIONLabAS, error) {
 	as := new(SCIONLabAS)
 	err := o.QueryTable(as).Filter("ISD", isd).Filter("ASID", asID).RelatedSel().One(as)
+	return as, err
+}
+
+func FindSCIONLabASByASID(asID int) (*SCIONLabAS, error) {
+	as := new(SCIONLabAS)
+	err := o.QueryTable(as).Filter("ASID", asID).RelatedSel().One(as)
 	return as, err
 }
 
