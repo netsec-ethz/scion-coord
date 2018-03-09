@@ -413,19 +413,7 @@ func (s *SCIONLabASController) updateDB(asInfo *SCIONLabASInfo) error {
 	if asInfo.IsNewConnection {
 		// flag the old connections for deletion:
 		if asInfo.OldAP != "" {
-			cns, err := asInfo.LocalAS.GetJoinConnectionInfo()
-			if err != nil {
-				return fmt.Errorf("Error looking up connections of SCIONLab AS for AS %v: %v", asInfo.LocalAS.String(), err)
-			}
-			// all connections from an AS flagged as new connection and oldAP need to end up (localST, remoteST) = (REMOVE,REMOVE)
-			for _, cn := range cns {
-				cn.Status = models.REMOVE
-				cn.NeighborStatus = models.REMOVE
-				err = asInfo.LocalAS.UpdateDBConnection(&cn)
-				if err != nil {
-					return fmt.Errorf("Error updating previous connection ID %v: %v", cn.ID, err)
-				}
-			}
+			asInfo.LocalAS.DeleteConnectionToAP(asInfo.OldAP)
 		}
 		// update the Connections table
 		newCn := models.Connection{
