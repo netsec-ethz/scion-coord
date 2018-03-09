@@ -77,21 +77,21 @@ type Connection struct {
 
 // Contains all info needed to populate the topology file
 type ConnectionInfo struct {
-	ID             uint64 // Used to find the BorderRouter
-	NeighborISD    int
-	NeighborAS     int
-	NeighborIP     string
-	NeighborUser   string
-	NeighborStatus uint8
-	LocalIP        string
-	BindIP         string
-	BRID           uint16
-	NeighborPort   uint16 // port of the neighbor's border router
-	LocalPort      uint16 // port of the local border router
-	Linktype       uint8  //"PARENT","CHILD"
-	IsVPN          bool
-	Status         uint8
-	OldConnection  bool   // true if this WAS a connection, but it needs to be deleted in the AP
+	ID                   uint64 // Used to find the BorderRouter
+	NeighborISD          int
+	NeighborAS           int
+	NeighborIP           string
+	NeighborUser         string
+	NeighborStatus       uint8
+	LocalIP              string
+	BindIP               string
+	BRID                 uint16
+	NeighborPort         uint16 // port of the neighbor's border router
+	LocalPort            uint16 // port of the local border router
+	Linktype             uint8  //"PARENT","CHILD"
+	IsVPN                bool
+	Status               uint8
+	KeepASStatusOnUpdate bool // true if this WAS a connection to an AP, but it needs to be deleted in the AP
 }
 
 func (as *SCIONLabAS) IA() string {
@@ -293,21 +293,21 @@ func (as *SCIONLabAS) GetJoinConnectionInfo() ([]ConnectionInfo, error) {
 			continue
 		}
 		cnInfo = ConnectionInfo{
-			ID:             cn.ID,
-			NeighborISD:    respondAS.ISD,
-			NeighborAS:     respondAS.ASID,
-			NeighborIP:     cn.RespondIP,
-			NeighborUser:   respondAS.UserEmail,
-			NeighborStatus: respondAS.Status,
-			LocalIP:        cn.JoinIP,
-			BindIP:         cn.JoinBindIP(),
-			BRID:           cn.JoinBRID,
-			NeighborPort:   respondAS.GetPortNumberFromBRID(cn.RespondBRID),
-			LocalPort:      joinAS.GetPortNumberFromBRID(cn.JoinBRID),
-			Linktype:       cn.Linktype,
-			IsVPN:          cn.IsVPN,
-			Status:         cn.JoinStatus,
-			OldConnection:  cn.RespondStatus == REMOVE && cn.JoinStatus == REMOVE,
+			ID:                   cn.ID,
+			NeighborISD:          respondAS.ISD,
+			NeighborAS:           respondAS.ASID,
+			NeighborIP:           cn.RespondIP,
+			NeighborUser:         respondAS.UserEmail,
+			NeighborStatus:       respondAS.Status,
+			LocalIP:              cn.JoinIP,
+			BindIP:               cn.JoinBindIP(),
+			BRID:                 cn.JoinBRID,
+			NeighborPort:         respondAS.GetPortNumberFromBRID(cn.RespondBRID),
+			LocalPort:            joinAS.GetPortNumberFromBRID(cn.JoinBRID),
+			Linktype:             cn.Linktype,
+			IsVPN:                cn.IsVPN,
+			Status:               cn.JoinStatus,
+			KeepASStatusOnUpdate: cn.RespondStatus == REMOVE && cn.JoinStatus == REMOVE,
 		}
 		cnInfos = append(cnInfos, cnInfo)
 	}
@@ -333,21 +333,21 @@ func (as *SCIONLabAS) GetRespondConnectionInfo() ([]ConnectionInfo, error) {
 			linktype = CHILD
 		}
 		cnInfo = ConnectionInfo{
-			ID:             cn.ID,
-			NeighborISD:    joinAS.ISD,
-			NeighborAS:     joinAS.ASID,
-			NeighborIP:     cn.JoinIP,
-			NeighborUser:   joinAS.UserEmail,
-			NeighborStatus: joinAS.Status,
-			LocalIP:        cn.RespondIP,
-			BindIP:         cn.RespondBindIP(),
-			BRID:           cn.RespondBRID,
-			NeighborPort:   joinAS.GetPortNumberFromBRID(cn.JoinBRID),
-			LocalPort:      respondAS.GetPortNumberFromBRID(cn.RespondBRID),
-			Linktype:       linktype,
-			IsVPN:          cn.IsVPN,
-			Status:         cn.RespondStatus,
-			OldConnection:  cn.RespondStatus == REMOVE && cn.JoinStatus == REMOVE,
+			ID:                   cn.ID,
+			NeighborISD:          joinAS.ISD,
+			NeighborAS:           joinAS.ASID,
+			NeighborIP:           cn.JoinIP,
+			NeighborUser:         joinAS.UserEmail,
+			NeighborStatus:       joinAS.Status,
+			LocalIP:              cn.RespondIP,
+			BindIP:               cn.RespondBindIP(),
+			BRID:                 cn.RespondBRID,
+			NeighborPort:         joinAS.GetPortNumberFromBRID(cn.JoinBRID),
+			LocalPort:            respondAS.GetPortNumberFromBRID(cn.RespondBRID),
+			Linktype:             linktype,
+			IsVPN:                cn.IsVPN,
+			Status:               cn.RespondStatus,
+			KeepASStatusOnUpdate: cn.RespondStatus == REMOVE && cn.JoinStatus == REMOVE,
 		}
 		cnInfos = append(cnInfos, cnInfo)
 	}
@@ -653,17 +653,23 @@ func (asInfo *ASInfo) String() string {
 
 // Delete a connection between specified ASes
 func (as *SCIONLabAS) DeleteConnectionToAP(apIA string) error {
-	if _, err := o.LoadRelated(as, "Connections"); err != nil {
-		return err
+	cns, err := as.GetJoinConnectionInfo()
+	if err != nil {
+		return fmt.Errorf("Error looking up connections of SCIONLab AS for AS %v: %v", as.IA(), err)
 	}
-	for _, cn := range as.Connections {
-		o.LoadRelated(cn, "RespondAP")
-		o.LoadRelated(cn.RespondAP, "AS")
-		if apIA == cn.RespondAP.AS.IA() {
-			return cn.Delete()
+	// all connections from an AS flagged as new connection and oldAP need to end up (localST, remoteST) = (REMOVE,REMOVE)
+	for _, cn := range cns {
+		if utility.IAString(cn.NeighborISD, cn.NeighborAS) != apIA {
+			continue
+		}
+		cn.Status = REMOVE
+		cn.NeighborStatus = REMOVE
+		err = as.UpdateDBConnection(&cn)
+		if err != nil {
+			return fmt.Errorf("Error updating previous connection ID %v: %v", cn.ID, err)
 		}
 	}
-	return fmt.Errorf("Did not find a connection between AS %v and AP %v", as.IA(), apIA)
+	return nil
 }
 
 func (as *SCIONLabAS) Delete() error {

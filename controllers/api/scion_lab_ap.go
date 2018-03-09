@@ -17,7 +17,6 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/astaxie/beego/orm"
 	"log"
 	"net/http"
 
@@ -231,19 +230,14 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 		if err != nil {
 			log.Printf("Error converting IA (%v) to its components: %v", ia, err)
 			failedConfirmations = append(failedConfirmations, ia)
+			continue
 		}
-		as, err := models.FindSCIONLabASByIAInt(IA.I, IA.A)
-		if err != nil {
-			// special case: are we removing an old connection to an AP?
-			if err == orm.ErrNoRows {
-				as, err = models.FindSCIONLabASByASID(IA.A)
-			}
+		as, err := models.FindSCIONLabASByASID(IA.A)
 			if err != nil {
 				log.Printf("Error finding SCIONLabAS %v: %v", ia, err)
 				failedConfirmations = append(failedConfirmations, ia)
 				continue
 			}
-		}
 		cnInfo, err := as.GetJoinConnectionInfoToAS(apAS.IA())
 		if err != nil {
 			log.Printf("Error finding the connection to SCIONLabAS %v: %v", ia, err)
@@ -261,8 +255,8 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 			failedConfirmations = append(failedConfirmations, ia)
 			continue
 		}
-		if cnInfo.OldConnection {
-			// OldConnection means remove the connection entry and don't update the AS status
+		if cnInfo.KeepASStatusOnUpdate {
+			// KeepASStatusOnUpdate means remove the connection entry but don't update the AS status
 			apIA := utility.IAString(cnInfo.NeighborISD, cnInfo.NeighborAS)
 			err = as.DeleteConnectionToAP(apIA)
 			if err != nil {
