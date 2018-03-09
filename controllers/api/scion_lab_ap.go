@@ -43,7 +43,7 @@ const (
 type APConnectionInfo struct {
 	ASID      string // ISD-AS of the AS
 	IsVPN     bool   // is this a VPN connection
-	UserEmail string // User identifier used for VPN, currently the user's email
+	VPNUserID string // user identifier used for VPN, currently the user's email + ASID
 	IP        string // IP address of the SCIONLab AS
 	UserPort  uint16 // port number of the AS connecting to the AP
 	APPort    uint16 // port number at the AP
@@ -88,7 +88,7 @@ func (s *SCIONLabASController) ownedASes(r *http.Request) (ases []string, err er
 //         "Remove":[],
 //         "Update":[{"ASID":"1-1020",
 //                    "IsVPN":true,
-//                    "UserEmail":"user@example.com",
+//                    "VPNUserID":"user@example.com_1020",
 //                    "IP":"10.0.8.42",
 //                    "UserPort":50000,
 //                    "APPort":50053,
@@ -115,7 +115,7 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 		cnInfo := APConnectionInfo{
 			ASID:      utility.IAString(cn.NeighborISD, cn.NeighborAS),
 			IsVPN:     cn.IsVPN,
-			UserEmail: cn.NeighborUser,
+			VPNUserID: s.vpnUserID(cn.NeighborUser, cn.NeighborAS),
 			IP:        cn.NeighborIP,
 			UserPort:  cn.NeighborPort,
 			APPort:    cn.LocalPort,
