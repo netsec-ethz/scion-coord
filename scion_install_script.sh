@@ -216,7 +216,7 @@ fi
 
 if [[ $keep_user_context = true ]]
 then
-  sudo sh -c 'echo \"RemoveIPC=no\" >> /etc/systemd/logind.conf'
+  sudo sh -c 'echo RemoveIPC=no >> /etc/systemd/logind.conf'
 fi
 
 if  [[ ( ! -z ${upgrade_script+x} ) ]]
