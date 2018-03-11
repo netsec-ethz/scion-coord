@@ -4,4 +4,7 @@ After=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/unit-status-mail.sh %I "Hostname: %H" "Machine ID: %m" "Boot ID: %b"
+User=scion
+WorkingDirectory=/home/scion
+Environment="PATH=/home/scion/.local/bin:/home/scion/go/bin:/usr/local/go/bin:/home/scion/bin:/home/scion/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
+ExecStart=/usr/bin/emailer -r recipients.txt -s "Unit %I has restarted unexpectedly" -b "On host %H unit %I has been restarted. You might want to take a look at it." -c email.conf
