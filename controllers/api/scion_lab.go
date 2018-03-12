@@ -332,16 +332,8 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 		oldAP = utility.IAString(cns[0].NeighborISD, cns[0].NeighborAS)
 		if oldAP == slReq.ServerIA { // oldAP is e.g. 1-17
 			newConnection = false
-			ap, err := models.FindSCIONLabASByIAString(oldAP)
-			if err != nil {
-				return nil, fmt.Errorf("Error looking up SCIONLab AS %v: %v", oldAP, err)
-			}
-			cn, err = ap.GetRespondConnectionInfoToAS(as.IA())
-			if err != nil {
-				return nil, fmt.Errorf("Error looking up connection between %v and %v: %v", as.IA(), oldAP, err)
-			}
-			brID = cn.BRID
 			cn = cns[0]
+			brID = cn.NeighborBRID
 		}
 	}
 
