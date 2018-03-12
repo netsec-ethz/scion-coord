@@ -86,6 +86,7 @@ type ConnectionInfo struct {
 	LocalIP              string
 	BindIP               string
 	BRID                 uint16
+	NeighborBRID         uint16
 	NeighborPort         uint16 // port of the neighbor's border router
 	LocalPort            uint16 // port of the local border router
 	Linktype             uint8  //"PARENT","CHILD"
@@ -302,6 +303,7 @@ func (as *SCIONLabAS) GetJoinConnectionInfo() ([]ConnectionInfo, error) {
 			LocalIP:              cn.JoinIP,
 			BindIP:               cn.JoinBindIP(),
 			BRID:                 cn.JoinBRID,
+			NeighborBRID:         cn.RespondBRID,
 			NeighborPort:         respondAS.GetPortNumberFromBRID(cn.RespondBRID),
 			LocalPort:            joinAS.GetPortNumberFromBRID(cn.JoinBRID),
 			Linktype:             cn.Linktype,
@@ -342,6 +344,7 @@ func (as *SCIONLabAS) GetRespondConnectionInfo() ([]ConnectionInfo, error) {
 			LocalIP:              cn.RespondIP,
 			BindIP:               cn.RespondBindIP(),
 			BRID:                 cn.RespondBRID,
+			NeighborBRID:         cn.JoinBRID,
 			NeighborPort:         joinAS.GetPortNumberFromBRID(cn.JoinBRID),
 			LocalPort:            respondAS.GetPortNumberFromBRID(cn.RespondBRID),
 			Linktype:             linktype,
