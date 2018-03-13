@@ -328,12 +328,14 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 	if err != nil {
 		return nil, fmt.Errorf("Error looking up connections of SCIONLab AS for user %v: %v",
 			slReq.UserEmail, err)
-	} else if len(cns) != 0 {
-		oldAP = utility.IAString(cns[0].NeighborISD, cns[0].NeighborAS)
-		if oldAP == slReq.ServerIA { // oldAP is e.g. 1-17
+	}
+	// look for an existing connection to the same AP:
+	cns = models.OnlyCurrentlyActiveConnections(cns)
+	for _, cn = range cns {
+		if utility.IAString(cn.NeighborISD, cn.NeighborAS) == slReq.ServerIA {
 			newConnection = false
-			cn = cns[0]
 			brID = cn.NeighborBRID
+			break
 		}
 	}
 
@@ -735,6 +737,7 @@ func (s *SCIONLabASController) canRemove(userEmail, asID string) (bool, *models.
 		if err != nil {
 			return false, nil, nil, fmt.Errorf("Error looking up connections: %v", err)
 		}
+		cns = models.OnlyCurrentlyActiveConnections(cns)
 		l := len(cns)
 		if err != nil || l == 0 {
 			return false, nil, nil, err
@@ -742,6 +745,7 @@ func (s *SCIONLabASController) canRemove(userEmail, asID string) (bool, *models.
 		if l > 1 {
 			return false, nil, nil, fmt.Errorf("AS %v has currently %v connections", asID, l)
 		}
+		// TODO: we support only one active connection per AS
 		return true, as, &cns[0], nil
 	}
 	return false, nil, nil, nil
