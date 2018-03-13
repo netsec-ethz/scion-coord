@@ -332,7 +332,8 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 	// look for an existing connection to the same AP:
 	cns = models.OnlyCurrentlyActiveConnections(cns)
 	for _, cn = range cns {
-		if utility.IAString(cn.NeighborISD, cn.NeighborAS) == slReq.ServerIA {
+		oldAP = utility.IAString(cn.NeighborISD, cn.NeighborAS)
+		if oldAP == slReq.ServerIA {
 			newConnection = false
 			brID = cn.NeighborBRID
 			break
