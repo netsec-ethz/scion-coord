@@ -233,42 +233,68 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 			continue
 		}
 		as, err := models.FindSCIONLabASByASID(IA.A)
-			if err != nil {
-				log.Printf("Error finding SCIONLabAS %v: %v", ia, err)
-				failedConfirmations = append(failedConfirmations, ia)
-				continue
-			}
-		cnInfo, err := as.GetJoinConnectionInfoToAS(apAS.IA())
+		if err != nil {
+			log.Printf("Error finding SCIONLabAS %v: %v", ia, err)
+			failedConfirmations = append(failedConfirmations, ia)
+			continue
+		}
+		asCns, err := as.GetJoinConnectionInfoToAS(apAS.IA())
 		if err != nil {
 			log.Printf("Error finding the connection to SCIONLabAS %v: %v", ia, err)
 			failedConfirmations = append(failedConfirmations, ia)
 			continue
 		}
+		// for removed, the connection can be active or inactive, depending on whether this
+		// is the last AP or not. For created and updated, the connection must be active
+		activeCns := models.OnlyCurrentConnections(asCns)
+		inactiveCns := models.OnlyNotCurrentConnections(asCns)
+		var workingSet []models.ConnectionInfo
+		if action == REMOVED && len(inactiveCns) == 1 {
+			workingSet = inactiveCns
+		} else {
+			workingSet = activeCns
+		}
+		if len(workingSet) != 1 {
+			// we've failed our axiom that there's only one active connection. Complain
+			log.Printf("Error confirming updates for AS %v: we expected 1 connection to %v and found %v",
+				ia, apAS.IA(), len(workingSet))
+			failedConfirmations = append(failedConfirmations, ia)
+			continue
+		}
+		cnInfo := workingSet[0]
 		switch action {
 		case CREATED, UPDATED:
 			cnInfo.Status = models.ACTIVE
 		case REMOVED:
-			cnInfo.Status = models.INACTIVE
-			cnInfo.BRID = 0 // Set BRID to 0 for inactive connections
+			if cnInfo.IsCurrentConnection() {
+				cnInfo.Status = models.INACTIVE
+				cnInfo.BRID = 0 // Set BRID to 0 for inactive connections
+			} else {
+				// this means to remove the connection entry but don't update the AS status
+				err = as.DeleteConnectionFromDB(&cnInfo)
+				if err != nil {
+					log.Printf("Error removing connection between AS %v and AP %v: %v", ia, apAS.IA(), err)
+					continue
+				}
+			}
 		default:
 			log.Printf("Unsupported action \"%v\" for AS %v. User: %v", action, ia, as.UserEmail)
 			failedConfirmations = append(failedConfirmations, ia)
 			continue
 		}
-		if !cnInfo.IsCurrentConnection() {
-			// this means to remove the connection entry but don't update the AS status
-			apIA := utility.IAString(cnInfo.NeighborISD, cnInfo.NeighborAS)
-			err = as.DeleteConnectionToAP(apIA)
-			if err != nil {
-				log.Printf("Error removing connection between AP %v and AS %v: %v", apIA, as.IA(), err)
-				continue
-			}
-		} else {
+		if cnInfo.IsCurrentConnection() {
 			as.Status = cnInfo.Status
 			if err = as.UpdateASAndConnection(&cnInfo); err != nil {
 				log.Printf("Error updating database tables for AS %v: %v", as.IA(), err)
 				failedConfirmations = append(failedConfirmations, ia)
 				continue
+			}
+		} else {
+			// just checking for consistency
+			if action != REMOVED {
+				// logic error! print failed assertion but don't quit this update
+				log.Printf("Logic error confirming updates for AS %v to AP %v. The connection is inactive but the action %v != REMOVED",
+					ia, apAS.IA(), action)
 			}
 		}
 		emails = append(emails, emailConfirmation{as.UserEmail, action})

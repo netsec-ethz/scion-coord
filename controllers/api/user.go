@@ -128,7 +128,7 @@ func populateASStatusButtons(userEmail string) ([]asInfo, map[string]apInfo, err
 		if err != nil {
 			return asInfos, apInfos, err
 		}
-		cns = models.OnlyCurrentlyActiveConnections(cns)
+		cns = models.OnlyCurrentConnections(cns)
 		// TODO: Currently only one active connection allowed
 		if len(cns) > 0 {
 			asI.IsVPN = cns[0].IsVPN
