@@ -95,6 +95,20 @@ type ConnectionInfo struct {
 	KeepASStatusOnUpdate bool // true if this WAS a connection to an AP, but it needs to be deleted in the AP
 }
 
+func (cn *ConnectionInfo) IsCurrentConnection() bool {
+	return !cn.KeepASStatusOnUpdate
+}
+
+func OnlyCurrentlyActiveConnections(cns []ConnectionInfo) []ConnectionInfo {
+	var res []ConnectionInfo
+	for _, cn := range cns {
+		if cn.IsCurrentConnection() {
+			res = append(res, cn)
+		}
+	}
+	return res
+}
+
 func (as *SCIONLabAS) IA() string {
 	if as.ISD < 1 {
 		return fmt.Sprintf("%v", as.ASID)

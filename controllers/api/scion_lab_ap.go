@@ -255,8 +255,8 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 			failedConfirmations = append(failedConfirmations, ia)
 			continue
 		}
-		if cnInfo.KeepASStatusOnUpdate {
-			// KeepASStatusOnUpdate means remove the connection entry but don't update the AS status
+		if !cnInfo.IsCurrentConnection() {
+			// this means to remove the connection entry but don't update the AS status
 			apIA := utility.IAString(cnInfo.NeighborISD, cnInfo.NeighborAS)
 			err = as.DeleteConnectionToAP(apIA)
 			if err != nil {
