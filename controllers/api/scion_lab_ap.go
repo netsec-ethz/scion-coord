@@ -27,6 +27,7 @@ import (
 	"github.com/netsec-ethz/scion-coord/email"
 	"github.com/netsec-ethz/scion-coord/models"
 	"github.com/netsec-ethz/scion-coord/utility"
+	"github.com/scionproto/scion/go/lib/addr"
 )
 
 // TODO(mlegner): As the BR ID is now determined in coord, the `update_gen.py` must be adjusted
@@ -102,7 +103,13 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	cns, err := models.FindRespondConnectionInfoByIA(apIA)
+	as, err := models.FindSCIONLabASByIAString(apIA)
+	if err != nil {
+		log.Printf("Error looking up the AS %v: %v", apIA, err)
+		s.Error500(w, err, "Error looking up SCIONLab AS from DB")
+		return
+	}
+	cnInfos, err := as.GetRespondConnectionInfo()
 	if err != nil {
 		log.Printf("Error looking up connections for AS %v: %v", apIA, err)
 		s.Error500(w, err, "Error looking up SCIONLab ASes from DB")
@@ -111,9 +118,9 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 	cnsCreateResp := []APConnectionInfo{}
 	cnsUpdateResp := []APConnectionInfo{}
 	cnsRemoveResp := []APConnectionInfo{}
-	for _, cn := range cns {
+	for _, cn := range cnInfos {
 		cnInfo := APConnectionInfo{
-			ASID:      utility.IAString(cn.NeighborISD, cn.NeighborAS),
+			ASID:      utility.IAString(as.ISD, cn.NeighborAS),
 			IsVPN:     cn.IsVPN,
 			VPNUserID: s.vpnUserID(cn.NeighborUser, cn.NeighborAS),
 			IP:        cn.NeighborIP,
@@ -218,14 +225,20 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 	failedConfirmations := []string{}
 	emails := []emailConfirmation{}
 	for _, ia := range cns {
-		// find the connection to the SCIONLabAS
-		as, err := models.FindSCIONLabASByIAString(ia)
+		// find the connection to the SCIONLabAS. e.g. ia=1-1001
+		IA, err := addr.IAFromString(ia)
 		if err != nil {
-			log.Printf("Error finding SCIONLabAS %v: %v", ia, err)
+			log.Printf("Error converting IA (%v) to its components: %v", ia, err)
 			failedConfirmations = append(failedConfirmations, ia)
 			continue
 		}
-		cn_db, err := as.GetJoinConnectionInfoToAS(apAS.IA())
+		as, err := models.FindSCIONLabASByASID(IA.A)
+			if err != nil {
+				log.Printf("Error finding SCIONLabAS %v: %v", ia, err)
+				failedConfirmations = append(failedConfirmations, ia)
+				continue
+			}
+		cnInfo, err := as.GetJoinConnectionInfoToAS(apAS.IA())
 		if err != nil {
 			log.Printf("Error finding the connection to SCIONLabAS %v: %v", ia, err)
 			failedConfirmations = append(failedConfirmations, ia)
@@ -233,23 +246,32 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 		}
 		switch action {
 		case CREATED, UPDATED:
-			cn_db.Status = models.ACTIVE
+			cnInfo.Status = models.ACTIVE
 		case REMOVED:
-			cn_db.Status = models.INACTIVE
-			cn_db.BRID = 0 // Set BRID to 0 for inactive connections
+			cnInfo.Status = models.INACTIVE
+			cnInfo.BRID = 0 // Set BRID to 0 for inactive connections
 		default:
 			log.Printf("Unsupported action \"%v\" for AS %v. User: %v", action, ia, as.UserEmail)
 			failedConfirmations = append(failedConfirmations, ia)
 			continue
 		}
-		as.Status = cn_db.Status
-		if err = as.UpdateASAndConnection(&cn_db); err != nil {
-			log.Printf("Error updating database tables for AS %v: %v", as.IA(), err)
-			failedConfirmations = append(failedConfirmations, ia)
-			continue
+		if cnInfo.KeepASStatusOnUpdate {
+			// KeepASStatusOnUpdate means remove the connection entry but don't update the AS status
+			apIA := utility.IAString(cnInfo.NeighborISD, cnInfo.NeighborAS)
+			err = as.DeleteConnectionToAP(apIA)
+			if err != nil {
+				log.Printf("Error removing connection between AP %v and AS %v: %v", apIA, as.IA(), err)
+				continue
+			}
+		} else {
+			as.Status = cnInfo.Status
+			if err = as.UpdateASAndConnection(&cnInfo); err != nil {
+				log.Printf("Error updating database tables for AS %v: %v", as.IA(), err)
+				failedConfirmations = append(failedConfirmations, ia)
+				continue
+			}
 		}
 		emails = append(emails, emailConfirmation{as.UserEmail, action})
-
 	}
 	for _, e := range emails {
 		if err := sendConfirmationEmail(e.user, e.action); err != nil {
