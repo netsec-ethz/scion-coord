@@ -545,6 +545,7 @@ func (s *SCIONBoxController) generateTopologyFile(slas *models.SCIONLabAS) error
 		return fmt.Errorf("Error retrivieng border routers for AS. User: %v, %v", slas.UserEmail,
 			err)
 	}
+	brs = models.OnlyCurrentConnections(brs)
 	for i, br := range brs {
 		log.Printf("adding BR objects in topology generation")
 		ia := addr.ISD_AS{
@@ -685,6 +686,7 @@ func (s *SCIONBoxController) disconnectBox(sb *models.SCIONBox, slas *models.SCI
 	if err != nil {
 		return err
 	}
+	cns = models.OnlyCurrentConnections(cns)
 	for _, cn := range cns {
 		cn.Status = models.REMOVE
 		err := slas.UpdateDBConnection(&cn)
@@ -841,7 +843,7 @@ func (s *SCIONBoxController) HeartBeatFunction(w http.ResponseWriter, r *http.Re
 			ia := ResponseIA{
 				ISD:         slas.ISD,
 				AS:          slas.ASID,
-				Connections: cns,
+				Connections: models.OnlyCurrentConnections(cns),
 			}
 			iaList = append(iaList, ia)
 		}
@@ -889,6 +891,7 @@ func (s *SCIONBoxController) HBChangedIP(slas *models.SCIONLabAS, ip string) err
 		return fmt.Errorf("Error retrieving Box Connections: %v",
 			err)
 	}
+	cns = models.OnlyCurrentConnections(cns)
 	// Update the connections
 	for _, cn := range cns {
 		cn.Status = models.UPDATE
@@ -909,6 +912,7 @@ func (s *SCIONBoxController) updateDBConnections(slas *models.SCIONLabAS,
 	if err != nil {
 		return err
 	}
+	cns = models.OnlyCurrentConnections(cns)
 	for _, cn := range cns {
 		if cn.Status == models.CREATE {
 			found := findCnInNbs(cn, neighbors)

@@ -86,12 +86,34 @@ type ConnectionInfo struct {
 	LocalIP              string
 	BindIP               string
 	BRID                 uint16
+	NeighborBRID         uint16
 	NeighborPort         uint16 // port of the neighbor's border router
 	LocalPort            uint16 // port of the local border router
 	Linktype             uint8  //"PARENT","CHILD"
 	IsVPN                bool
 	Status               uint8
 	KeepASStatusOnUpdate bool // true if this WAS a connection to an AP, but it needs to be deleted in the AP
+}
+
+func (cn *ConnectionInfo) IsCurrentConnection() bool {
+	return !cn.KeepASStatusOnUpdate
+}
+
+func filterConnectionsByBeingCurrentStatus(cns []ConnectionInfo, active bool) []ConnectionInfo {
+	var res []ConnectionInfo
+	for _, cn := range cns {
+		if cn.IsCurrentConnection() == active {
+			res = append(res, cn)
+		}
+	}
+	return res
+}
+
+func OnlyCurrentConnections(cns []ConnectionInfo) []ConnectionInfo {
+	return filterConnectionsByBeingCurrentStatus(cns, true)
+}
+func OnlyNotCurrentConnections(cns []ConnectionInfo) []ConnectionInfo {
+	return filterConnectionsByBeingCurrentStatus(cns, false)
 }
 
 func (as *SCIONLabAS) IA() string {
@@ -302,6 +324,7 @@ func (as *SCIONLabAS) GetJoinConnectionInfo() ([]ConnectionInfo, error) {
 			LocalIP:              cn.JoinIP,
 			BindIP:               cn.JoinBindIP(),
 			BRID:                 cn.JoinBRID,
+			NeighborBRID:         cn.RespondBRID,
 			NeighborPort:         respondAS.GetPortNumberFromBRID(cn.RespondBRID),
 			LocalPort:            joinAS.GetPortNumberFromBRID(cn.JoinBRID),
 			Linktype:             cn.Linktype,
@@ -342,6 +365,7 @@ func (as *SCIONLabAS) GetRespondConnectionInfo() ([]ConnectionInfo, error) {
 			LocalIP:              cn.RespondIP,
 			BindIP:               cn.RespondBindIP(),
 			BRID:                 cn.RespondBRID,
+			NeighborBRID:         cn.JoinBRID,
 			NeighborPort:         joinAS.GetPortNumberFromBRID(cn.JoinBRID),
 			LocalPort:            respondAS.GetPortNumberFromBRID(cn.RespondBRID),
 			Linktype:             linktype,
@@ -369,34 +393,18 @@ func (as *SCIONLabAS) GetConnectionInfo() ([]ConnectionInfo, error) {
 
 // Returns the connection of an AP to the specified AS
 // TODO(mlegner): This function assumes that there can only be one connection between an AS/AP pair
-func (as *SCIONLabAS) GetRespondConnectionInfoToAS(asIA string) (cn ConnectionInfo, err error) {
-	cns, err := as.GetRespondConnectionInfo()
-	if err != nil {
-		return
-	}
-	for _, cn = range cns {
-		if utility.IAString(cn.NeighborISD, cn.NeighborAS) == asIA {
-			return
-		}
-	}
-	err = fmt.Errorf("No connection found for the AS/AP pair %v/%v", asIA, as.IA())
-	return
-}
-
-// Returns the connection of an AP to the specified AS
-// TODO(mlegner): This function assumes that there can only be one connection between an AS/AP pair
-func (as *SCIONLabAS) GetJoinConnectionInfoToAS(apIA string) (cn ConnectionInfo, err error) {
+func (as *SCIONLabAS) GetJoinConnectionInfoToAS(apIA string) ([]ConnectionInfo, error) {
 	cns, err := as.GetJoinConnectionInfo()
 	if err != nil {
-		return
+		return nil, err
 	}
-	for _, cn = range cns {
+	var res []ConnectionInfo
+	for _, cn := range cns {
 		if utility.IAString(cn.NeighborISD, cn.NeighborAS) == apIA {
-			return
+			res = append(res, cn)
 		}
 	}
-	err = orm.ErrNoRows
-	return
+	return res, err
 }
 
 // Takes the IA string as an input and returns all ConnectionInfos where the AS is the AP
@@ -652,7 +660,17 @@ func (asInfo *ASInfo) String() string {
 }
 
 // Delete a connection between specified ASes
-func (as *SCIONLabAS) DeleteConnectionToAP(apIA string) error {
+func (as *SCIONLabAS) DeleteConnectionFromDB(cnInfo *ConnectionInfo) error {
+	cn := new(Connection)
+	err := o.QueryTable(new(Connection)).Filter("ID", cnInfo.ID).One(cn)
+	if err != nil {
+		return err
+	}
+	return cn.Delete()
+}
+
+
+func (as *SCIONLabAS) FlagAllConnectionsToApToBeDeleted(apIA string) error {
 	cns, err := as.GetJoinConnectionInfo()
 	if err != nil {
 		return fmt.Errorf("Error looking up connections of SCIONLab AS for AS %v: %v", as.IA(), err)
