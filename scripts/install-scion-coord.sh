@@ -43,9 +43,11 @@ tmpfile=$(mktemp)
 cp "$basedir/scripts/scion-coord.service" "$tmpfile"
 sed -i -- "s/_USER_/$USER/g" "$tmpfile"
 sudo cp "$tmpfile" "scion-coord.service"
-sudo cp "$basedir/scripts/files/unit-status-mail@.service" .
+cp "$basedir/scripts/files/unit-status-mail@.service" "$tmpfile"
+sed -i -- "s/_USER_/$USER/g" "$tmpfile"
+sudo cp "$tmpfile" "unit-status-mail@.service"
 popd >/dev/null
-sudo cp "$basedir/scripts/files/emailer.py" "/usr/bin/emailer"
+sudo cp "$basedir/scripts/files/emailer.py" "/usr/local/bin/emailer"
 
 sudo systemctl daemon-reload
 sudo systemctl start "scion-coord"
