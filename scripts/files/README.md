@@ -4,7 +4,7 @@ This readme explains necessary steps required for setting up scion coordinator.
 
 ## Configuring emailer:
 
-SCION-coord systemd service is configured to send emails on every failure. To do so it uses python scipt `emailer.py`, which is being copied to `/usr/bin` as part of installation procedure. Few additional steps are required to make this work:
+SCION-coord systemd service is configured to send emails on every failure. To do so it uses python script `emailer.py`, which is being copied to `/usr/local/bin` as part of installation procedure. Few additional steps are required to make this work:
 
 ### Configuring email credentials
 
