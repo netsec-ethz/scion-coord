@@ -180,19 +180,20 @@ then
     sudo systemctl enable openvpn@client
 fi
 
+tempfile=$(mktemp)
 if  [[ ( ! -z ${scion_service_path+x} ) && -r ${scion_service_path} ]]
 then
     echo "Registering SCION as startup service"
 
-    cp "$scion_service_path" tmp.service
+    cp "$scion_service_path" "$tempfile"
     # We need to replace template user with current username
-    sed -i "s/_USER_/$USER/g" tmp.service
-    sudo cp tmp.service /etc/systemd/system/scion.service
+    sed -i "s/_USER_/$USER/g" "$tempfile"
+    sudo cp "$tempfile" /etc/systemd/system/scion.service
 
     sudo systemctl enable scion.service
     sudo systemctl start scion.service
 
-    rm tmp.service
+    rm "$tempfile"
 else
     echo "SCION systemd service file not specified! SCION won't run automatically on startup."
 fi
@@ -201,15 +202,15 @@ if  [[ ( ! -z ${scion_viz_service+x} ) && -r ${scion_viz_service} ]]
 then
     echo "Registering SCION-viz as startup service"
 
-    cp "$scion_viz_service" tmp.service
+    cp "$scion_viz_service" "$tempfile"
     # We need to replace template user with current username
-    sed -i "s/_USER_/$USER/g" tmp.service
-    sudo cp tmp.service /etc/systemd/system/scion-viz.service
+    sed -i "s/_USER_/$USER/g" "$tempfile"
+    sudo cp "$tempfile" /etc/systemd/system/scion-viz.service
 
     sudo systemctl enable scion-viz.service
     sudo systemctl start scion-viz.service
 
-    rm tmp.service
+    rm "$tempfile"
 else
     echo "SCION-viz systemd service file not specified! SCION-viz won't run automatically on startup."
 fi
@@ -235,22 +236,21 @@ if  [[ ( ! -z ${upgrade_service+x} ) && -r ${upgrade_service} \
 then
     echo "Registering SCION periodic upgrade service"
 
-    cp "$upgrade_service" tmp.service
-    sed -i "s/_USER_/$USER/g" tmp.service
-    sudo cp tmp.service /etc/systemd/system/scionupgrade.service
+    cp "$upgrade_service" "$tempfile"
+    sed -i "s/_USER_/$USER/g" "$tempfile"
+    sudo cp "$tempfile" /etc/systemd/system/scionupgrade.service
+    rm "$tempfile"
 
-    cp "$upgrade_timer" tmp.timer
-    sed -i "s/_USER_/$USER/g" tmp.timer
-    sudo cp tmp.timer /etc/systemd/system/scionupgrade.timer
+    cp "$upgrade_timer" "$tempfile"
+    sed -i "s/_USER_/$USER/g" "$tempfile"
+    sudo cp "$tempfile" /etc/systemd/system/scionupgrade.timer
+    rm "$tempfile"
 
     sudo systemctl enable scionupgrade.timer
     sudo systemctl enable scionupgrade.service
     
     sudo systemctl start scionupgrade.timer
     sudo systemctl start scionupgrade.service
-
-    rm tmp.service
-    rm tmp.timer
 else
     echo "SCION periodic upgrade service and timer files are not provided."
 fi
