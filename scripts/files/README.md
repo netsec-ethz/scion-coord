@@ -8,7 +8,7 @@ SCION-coord systemd service is configured to send emails on every failure. To do
 
 ### Configuring email credentials
 
-By default `unit-status-mail@.service` is looking at `/home/scion/email.conf` for email configuration. It is necessary to create this file (or change file location in `unit-status-mail@.service` to different file) to be able to send emails. File has following structure:
+By default `unit-status-mail@.service` is looking at `/home/USER/.config/scion-coord/email.conf` for email configuration. It is necessary to create this file (or change file location in `unit-status-mail@.service` to different file) to be able to send emails. File has following structure:
 
 ```
 [smtp]
@@ -19,9 +19,11 @@ smtp_host=<SMTP_HOST>
 smtp_port=<SMTP_PORT>
 ```
 
+You may encounter problems if using Gmail as the provider. Refer to e.g. https://stackoverflow.com/a/27515833 for a workaround.
+
 ### Configuring recipients
 
-By default `unit-status-mail@.service` uses `/home/scion/recipients.txt` as a file that contains email addresses that will receive email on failure. This file has to be created or appropriate argument in `unit-status-mail@.service` must be changed to point to different file.
+By default `unit-status-mail@.service` uses `/home/USER/.config/scion-coord/recipients.txt` as a file that contains email addresses that will receive email on failure. This file has to be created or appropriate argument in `unit-status-mail@.service` must be changed to point to different file.
 File should contain list of email addresses, each in new line. No comments are allowed. Example file could look like this:
 
 ```

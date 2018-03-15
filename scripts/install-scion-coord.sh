@@ -49,6 +49,12 @@ sudo cp "$tmpfile" "unit-status-mail@.service"
 popd >/dev/null
 sudo cp "$basedir/scripts/files/emailer.py" "/usr/local/bin/emailer"
 
+# if it doesn't exist, create the default configuration for the emailer:
+if [ ! -f "$HOME/.config/scion-coord/email.conf" ] || [ ! -f "$HOME/.config/scion-coord/recipients.txt" ][ ! -f "$HOME/.config/scion-coord/recipients.txt" ] then
+    echo "We need the email.conf file. Please read the scripts/files/README.md file"
+    exit 1
+fi
+
 sudo systemctl daemon-reload
 sudo systemctl start "scion-coord"
 sleep 1
