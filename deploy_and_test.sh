@@ -162,9 +162,10 @@ fi
 # we should do this per ISD with an attachment point
 mkdir -p "$SCIONCOORD/credentials"
 cd "$SCIONCOORD/credentials"
+VERS=$(ls $SCION/gen/ISD1/AS11/br1-11-1/certs/*.crt | sort -r | awk 'NR==1{print $1}' | sed -n 's/^.*ISD1-AS11-V\([0-9]*\)\.crt/\1/p')
 if missingOrDifferentFiles "$SCION/gen/ISD1/AS11/br1-11-1/keys/as-sig.seed" ISD1.key ||
-   missingOrDifferentFiles "$SCION/gen/ISD1/AS11/br1-11-1/certs/ISD1-AS11-V0.crt" ISD1.crt ||
-   missingOrDifferentFiles "$SCION/gen/ISD1/AS11/br1-11-1/certs/ISD1-V0.trc" ISD1.trc ;
+   missingOrDifferentFiles "$SCION/gen/ISD1/AS11/br1-11-1/certs/ISD1-AS11-V$VERS.crt" ISD1.crt ||
+   missingOrDifferentFiles "$SCION/gen/ISD1/AS11/br1-11-1/certs/ISD1-V$VERS.trc" ISD1.trc ;
 then
     echo "Credentials in SCION Coord. Serv. seem different. Running SCION and using those"
     pushd "$SCION" >/dev/null
@@ -172,8 +173,9 @@ then
     popd >/dev/null
 
     cp "$SCION/gen/ISD1/AS11/br1-11-1/keys/as-sig.seed" ISD1.key
-    cp "$SCION/gen/ISD1/AS11/br1-11-1/certs/ISD1-AS11-V0.crt" ISD1.crt
-    cp "$SCION/gen/ISD1/AS11/br1-11-1/certs/ISD1-V0.trc" ISD1.trc
+    VERS=$(ls $SCION/gen/ISD1/AS11/br1-11-1/certs/*.crt | sort -r | awk 'NR==1{print $1}' | sed -n 's/^.*ISD1-AS11-V\([0-9]*\)\.crt/\1/p')
+    cp "$SCION/gen/ISD1/AS11/br1-11-1/certs/ISD1-AS11-V$VERS.crt" ISD1.crt
+    cp "$SCION/gen/ISD1/AS11/br1-11-1/certs/ISD1-V$VERS.trc" ISD1.trc
 fi
 
 # VPN stuff
@@ -237,7 +239,7 @@ out=$(runSQL "$sql") && stat=0 || stat=$?
 
 sql="INSERT INTO scion_coord_test.attachment_point
 (vpn_ip, start_vpn_ip, end_vpn_ip, as_id)
-SELECT '10.0.2.10', '10.0.2.16',  '10.0.2.31', id
+SELECT '10.0.8.1', '10.0.8.2',  '10.0.8.254', id
 FROM scion_coord_test.scion_lab_as WHERE user_email='netsec.test.email@gmail.com';"
 out=$(runSQL "$sql") && stat=0 || stat=$?
 
