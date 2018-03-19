@@ -59,7 +59,7 @@ onExit() {
 trap onExit EXIT INT TERM
 
 cleanZookeeper() {
-    if [ -x /usr/share/zookeeper/bin/zkCli.sh ]; then
+    if [ -x /usr/share/zookeeper/bin/zkCli.sh ] && [ /usr/share/zookeeper/bin/zkServer.sh status &>/dev/null ]; then
         printf 'rmr /1-11 \nrmr /1-12 \nrmr /1-13 \nrmr /1-1001 \n' | /usr/share/zookeeper/bin/zkCli.sh &>/dev/null
     fi
 }
@@ -134,6 +134,11 @@ if ! dpkg-query -s mysql-server &> /dev/null ; then
     echo "mysql-server-5.7 mysql-server/root_password password development_pass" | sudo debconf-set-selections
     echo "mysql-server-5.7 mysql-server/root_password_again password development_pass" | sudo debconf-set-selections
     DEBIAN_FRONTEND="noninteractive" sudo apt-get install mysql-server -y
+fi
+# check if mysqld is running:
+if ! pgrep -x "mysqld" &>/dev/null; then
+    echo "MySQL is not running. Starting the service."
+    sudo systemctl restart mysql
 fi
 
 if ! dpkg-query -s easy-rsa &> /dev/null ; then

@@ -315,3 +315,9 @@ Unattended-Upgrade::Automatic-Reboot-Time "02:00";' | sudo tee /etc/apt/apt.conf
 else
     echo "SCION periodic upgrade service and timer files are not provided."
 fi
+
+# check if zookeeper is running:
+if ! /usr/share/zookeeper/bin/zkServer.sh status &>/dev/null; then
+    echo "Zookeeper not started. Starting the service."
+    sudo systemctl restart zookeeper # restart, because we want to ensure it's running
+fi
