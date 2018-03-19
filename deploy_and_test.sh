@@ -116,10 +116,31 @@ archiveGenFolder
 bash "$thisdir/scion_install_script.sh"
 source ~/.profile
 
+# check requirements to be an attachment point
+if [ "$doTest" -eq 1 ]; then
+    echo "Installing AP for testing..."
+    cd "$CURRENTWD"
+    if [ ! -d "${SCIONBOXLOCATION:?}" ]; then
+        echo "Error: ${SCIONBOXLOCATION:?} doesn't look like a valid directory for scion-box"
+        exit 1
+    fi
+    pushd "${SCIONBOXLOCATION:?}" &>/dev/null
+    ./scripts/install_attachment_point.sh -t
+    popd &>/dev/null
+    echo "Done installing AP for testing."
+fi
+
 # check go dependencies
 command -v govendor >/dev/null 2>&1 || go get github.com/kardianos/govendor
 cd "$SCIONCOORD/vendor"
 govendor sync
+
+# check other requirements to be a Coordinator:
+if ! python3 -c "from Crypto import Random" &>/dev/null; then
+    echo "Installing required packages..."
+    pip3 install --upgrade pycrypto
+    echo "Done installing required packages."
+fi
 
 # Custom configuration
 if [ ! -f "$SCIONCOORD/conf/development.conf" ]; then
@@ -304,8 +325,8 @@ rm -rf "$GENFOLDERTMP"
 # update existing AS12 using the scion box update-gen script
 pushd "$CURRENTWD" >/dev/null
 # run update gen:
-cd $(dirname "${SCIONUPDATEGENLOCATION:?}")
-torun="./$(basename ${SCIONUPDATEGENLOCATION:?})"
+cd "${SCIONBOXLOCATION:?}"
+torun="./scionLab.sh"
 params="--url $SCION_COORD_URL --address $INTF_ADDR --accountId $ACC_ID --secret $ACC_PW --updateAS 1-12"
 echo "Calling: $torun $params"
 "$torun" "$params"
