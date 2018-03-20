@@ -33,20 +33,34 @@ run_osx() {
     run_vagrant
 }
 
+add_vb_vagrant_sources() {\
+    # add source and update only once, for performance reasons
+    if [ -z "$add_vb_vagrant_sources_singleton" ]; then
+        sudo bash -c 'echo deb http://vagrant-deb.linestarve.com/ any main > /etc/apt/sources.list.d/wolfgang42-vagrant.list'
+        sudo apt-key adv --keyserver pgp.mit.edu --recv-key AD319E0F7CFFA38B4D9F6E55CE3F3DE92099F7A4
+        sudo apt-get update
+        add_vb_vagrant_sources_singleton=1
+    fi
+}
+
+# version less or equal. E.g. verleq 1.9 2.0.8  == true (1.9 <= 2.0.8)
+verleq() {
+    [  "$1" = "`echo -e "$1\n$2" | sort -V | head -n1`" ]
+}
+
 run_linux() {
     if [[ -f "/usr/bin/apt-get" && -f "/usr/bin/dpkg" ]]
     then
         echo "[SCIONLabVM] Given system: LINUX"
-        sudo bash -c 'echo deb http://vagrant-deb.linestarve.com/ any main > /etc/apt/sources.list.d/wolfgang42-vagrant.list'
-        sudo apt-key adv --keyserver pgp.mit.edu --recv-key AD319E0F7CFFA38B4D9F6E55CE3F3DE92099F7A4
-        sudo apt-get update
-        if dpkg --get-selections | grep -q "^$VB[[:space:]]*install$" >/dev/null; then
+        if dpkg --get-selections | grep -q "^virtualbox.*[[:space:]]\{1,\}install$" >/dev/null; then
             echo "[SCIONLabVM] $VB is already installed"
         else
             echo "[SCIONLabVM] Installing $VB"
-            sudo apt-get --yes install $VB
+            add_vb_vagrant_sources
+            sudo apt-get --no-remove --yes install $VB
         fi
-        if vagrant version | grep "Installed Version: 1.9" >/dev/null; then
+        VERS=$(vagrant version | grep "Installed Version:" | sed -n 's/^Installed Version: \(.*\)$/\1/p')
+        if verleq 1.9 $VERS; then
             echo "[SCIONLabVM] $VG is already installed"
         elif dpkg --get-selections | grep -q "^$VG[[:space:]]*install$" >/dev/null; then
             echo "[SCIONLabVM] ${RED}Warning!${NC} Current version of $VG in your system is out of date."
@@ -60,7 +74,7 @@ run_linux() {
             done
         else
             echo "[SCIONLabVM] Installing $VG"
-            sudo apt-get --yes install $VG
+            sudo apt-get --no-remove --yes install $VG
         fi
         run_vagrant
     else
