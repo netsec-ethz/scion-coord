@@ -2,7 +2,10 @@
 Description=Run SCION upgrade daily
 
 [Timer]
-OnUnitActiveSec=1d
+OnCalendar=07:00:00 UTC   # activate timer every day at 07:00 UTC
+OnActiveSec=12h           # every 12 hours from the timer activation
+AccuracySec=1m            # allow to coalesce timers iff in the same minute
+RandomizedDelaySec=10m    # spreads the real start time to the range [start, start+10m]
 
 [Install]
 WantedBy=multi-user.target
