@@ -25,8 +25,8 @@ check_system_files() {
         fi
     done
     if [ $need_to_reload -eq 1 ]; then
-        sudo systemctl start scionupgrade.timer
-        sudo systemctl start scionupgrade.service
+        sudo systemctl stop scionupgrade.timer
+        sudo systemctl stop scionupgrade.service
         sudo systemctl daemon-reload
         sudo systemctl start scionupgrade.timer
         sudo systemctl start scionupgrade.service
