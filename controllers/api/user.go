@@ -63,10 +63,11 @@ type uiButtons struct {
 }
 
 type userPageData struct {
-	User    user
-	MaxASes int // maximal number of ASes this user can have
-	APs     map[string]apInfo
-	ASInfos []asInfo
+	User        user
+	MaxASes     int // maximal number of ASes this user can have
+	APs         map[string]apInfo
+	ASInfos     []asInfo
+	GrafanaLink string
 }
 
 // generates the structs containing information about the user's AS and the
@@ -221,10 +222,11 @@ func (c *LoginController) UserInformation(w http.ResponseWriter, r *http.Request
 	}
 
 	userData := userPageData{
-		User:    user,
-		MaxASes: config.MaxASes(user.IsAdmin),
-		ASInfos: asInfo,
-		APs:     aps,
+		User:        user,
+		MaxASes:     config.MaxASes(user.IsAdmin),
+		ASInfos:     asInfo,
+		APs:         aps,
+		GrafanaLink: config.GRAFANA_URL,
 	}
 
 	c.JSON(&userData, w, r)
