@@ -81,20 +81,8 @@ while getopts ":p:g:v:s:z:ha:cu:t:" opt; do
 done
 
 echo "Starting SCION installation..."
-
-# Check if we are running on correct Ubuntu system
-if [ -f /etc/os-release ]
-then
-    . /etc/os-release
-
-    if [[ $NAME == "Ubuntu" && $VERSION_ID == 16.04* ]] ; then
-      echo "We are running on $NAME version $VERSION_ID seems okay"
-    else
-      echo "ERROR! We are not running on Ubuntu 16.04 system, shutting down!" >&2
-      exit 1
-    fi
-else
-    echo "ERROR! This script can only be run on Ubuntu 16.04" >&2
+if ! dpkg --version &>/dev/null || ! apt-get --version &>/dev/null; then
+    echo "Unsupported system."
     exit 1
 fi
 
