@@ -15,8 +15,10 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/sec51/goconf"
 )
@@ -55,7 +57,7 @@ var (
 	RESERVED_BRS_INFRASTRUCTURE, _ = goconf.AppConf.Int("reserved_brs_infrastructure")
 	ASES_PER_USER, _               = goconf.AppConf.Int("ases_per_user")
 	ASES_PER_ADMIN, _              = goconf.AppConf.Int("ases_per_admin")
-	SIGNING_ASES                   = goconf.AppConf.Strings("signing_ases")
+	SIGNING_ASES                   = make(map[int]int) // map[ISD]=signing_as
 	MTU, _                         = goconf.AppConf.Int("mtu")
 	BR_START_PORT                  uint16
 	BR_INTERNAL_START_PORT         uint16
@@ -80,6 +82,24 @@ func init() {
 	BR_INTERNAL_START_PORT = uint16(sp) // Ports are only 16 bits
 	if HTTP_ENABLE_HTTPS {
 		HTTP_PROTOCOL = "https"
+	}
+	signingMap, err := goconf.AppConf.GetSection("signing_ases")
+	if err != nil {
+		fmt.Println("Error reading configuration for signing_ases:", err)
+		os.Exit(1)
+	}
+	for k, v := range signingMap {
+		ki, err := strconv.Atoi(k)
+		if err != nil {
+			fmt.Println("Error parsing section signing_ases:", err)
+			os.Exit(1)
+		}
+		vi, err := strconv.Atoi(v)
+		if err != nil {
+			fmt.Println("Error parsing section signing_ases:", err)
+			os.Exit(1)
+		}
+		SIGNING_ASES[ki] = vi
 	}
 }
 
