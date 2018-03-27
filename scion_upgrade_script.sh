@@ -2,6 +2,9 @@
 
 set -e
 
+# version of the systemd files:
+SERVICE_CURRENT_VERSION="0.2"
+
 # version less or equal. E.g. verleq 1.9 2.0.8  == true (1.9 <= 2.0.8)
 verleq() {
     [  "$1" = "`echo -e "$1\n$2" | sort -V | head -n1`" ]
@@ -14,7 +17,7 @@ check_system_files() {
                                "/etc/systemd/system/scionupgrade.timer")
     for f in "${FILES_TO_CHECK[@]}"; do
         VERS=$(grep "^# SCION upgrade version" "$f" | sed -n 's/^# SCION upgrade version \([0-9\.]*\).*$/\1/p')
-        if ! verleq "0.1" "$VERS"; then
+        if ! verleq "$SERVICE_CURRENT_VERSION" "$VERS"; then
             # need to upgrade. (1) get the file with wget. (2) copy the file (3) reload systemd things
             bf=$(basename $f)
             tmpfile=$(mktemp)
