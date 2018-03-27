@@ -326,7 +326,7 @@ rm -rf "$GENFOLDERTMP"
 pushd "$CURRENTWD" >/dev/null
 # run update gen:
 cd "${SCIONBOXLOCATION:?}"
-torun="./scionLab.sh"
+torun="./updateGen.sh"
 params="--url $SCION_COORD_URL --address $INTF_ADDR --accountId $ACC_ID --secret $ACC_PW --updateAS 1-12"
 echo "Calling: $torun $params"
 "$torun" "$params"
