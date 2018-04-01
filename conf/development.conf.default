@@ -92,3 +92,8 @@ ases_per_user = 2
 ases_per_admin = 10
 # ASes signing certificates for new ASes in each ISD starting by ISD1, separated by ";"
 signing_ases = 1;21;31
+
+# For image service
+img_builder.address = "https://vmtest.serber.club"
+img_builder.secret_token = "qSq9xa89F5V4BbqpRjBW7jvKSuVfrDfuQHGpLZRTE2eLRgun"
+img_builder.build_delay = 5
