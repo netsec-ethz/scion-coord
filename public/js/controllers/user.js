@@ -87,19 +87,19 @@ scionApp
             };
 
             $scope.buildImage = function (imageName, asInfo) {
-                $scope.error = "";
-                $scope.message = "";
+                $scope.error2 = "";
+                $scope.message2 = "";
 
                 userService.startBuildJob(imageName, asInfo.ASID).then(
                     function (data) {
                         console.log(data);
-                        $scope.message = data;
+                        $scope.message2 = data;
 
                         $scope.userImagesData();
                     },
                     function (response) {
-                        console.log(response);
-                        $scope.error = response.data;
+                        console.log(response.data);
+                        $scope.error2 = response.data;
                     });
 
                 console.log("Creating image for: "+imageName)
@@ -153,8 +153,8 @@ scionApp
             };
 
             $scope.downloadImage= function(userImage) {
-                $scope.error = "";
-                $scope.message = "";
+                $scope.error2 = "";
+                $scope.message2 = "";
                 
                 window.location.assign(userImage.download_link);                  
             };
