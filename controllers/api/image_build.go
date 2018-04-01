@@ -184,13 +184,15 @@ func (s *SCIONImgBuildController) GenerateImage(w http.ResponseWriter, r *http.R
     asID := vars["as_id"]
     as, err := models.FindSCIONLabASByUserEmailAndASID(uSess.Email, asID)
     if err != nil || as.Status == models.INACTIVE || as.Status == models.REMOVE {
-        log.Printf("No active configuration found for user %v\n", uSess.Email)
+        log.Printf("No active configuration found for user %v with asId %v\n", uSess.Email, asID)
         s.BadRequest(w, nil, "No active configuration found for user %v",
             uSess.Email)
         return
     }
+
     fileName := UserPackageName(uSess.Email, as.ISD, as.ASID) + ".tar.gz"
     filePath := filepath.Join(PackagePath, fileName)
+    log.Printf("Configuration filepath: %v\n",filePath)
 
     // Get build request
     if err := r.ParseForm(); err != nil {
@@ -231,7 +233,7 @@ func startBuildJob(configFileName, configFilePath string, bRequest buildRequest,
     if err != nil {
         return fmt.Errorf("Error reading configuration file [%s] %v", configFileName, err)
     }
-
+    log.Printf("Starting build job")
     body := new(bytes.Buffer)
     writer := multipart.NewWriter(body)
     part, err := writer.CreateFormFile("config_file", configFileName)
@@ -281,7 +283,7 @@ func startBuildJob(configFileName, configFilePath string, bRequest buildRequest,
 }
 
 func (s *SCIONImgBuildController) GetUserImages(w http.ResponseWriter, r *http.Request) {
-    log.Printf("Got request to generate image!")
+    log.Printf("Requesting user images")
 
     _, userSession, err := middleware.GetUserSession(r)
     if err != nil {
