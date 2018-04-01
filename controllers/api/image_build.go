@@ -189,10 +189,8 @@ func (s *SCIONImgBuildController) GenerateImage(w http.ResponseWriter, r *http.R
             uSess.Email)
         return
     }
-
     fileName := UserPackageName(uSess.Email, as.ISD, as.ASID) + ".tar.gz"
     filePath := filepath.Join(PackagePath, fileName)
-    log.Printf("Configuration filepath: %v\n",filePath)
 
     // Get build request
     if err := r.ParseForm(); err != nil {
@@ -233,7 +231,6 @@ func startBuildJob(configFileName, configFilePath string, bRequest buildRequest,
     if err != nil {
         return fmt.Errorf("Error reading configuration file [%s] %v", configFileName, err)
     }
-    log.Printf("Starting build job")
     body := new(bytes.Buffer)
     writer := multipart.NewWriter(body)
     part, err := writer.CreateFormFile("config_file", configFileName)
