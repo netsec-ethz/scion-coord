@@ -189,6 +189,13 @@ func (s *SCIONImgBuildController) GenerateImage(w http.ResponseWriter, r *http.R
             uSess.Email)
         return
     }
+
+    if as.Type!=models.DEDICATED {
+        log.Printf("Configuration for selected AS is not made for dedicated system\n")
+        s.BadRequest(w, nil, "You must reconfigure your AS to use dedicated system configuration")
+        return
+    }
+
     fileName := UserPackageName(uSess.Email, as.ISD, as.ASID) + ".tar.gz"
     filePath := filepath.Join(PackagePath, fileName)
 
