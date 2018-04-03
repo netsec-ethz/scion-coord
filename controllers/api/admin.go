@@ -49,20 +49,11 @@ type invitationInfo struct {
 	Organisation string
 }
 
-type emailTemplateInfo struct {
-	FirstName        string
-	LastName         string
-	InviterFirstName string
-	InviterLastName  string
-	Protocol         string
-	HostAddress      string
-	UUID             string
-}
-
 type invitationsData []invitationInfo
 
 var invitationsTemplate = "invitation.html"
 
+// TODO review we have preregisterAndSendInvitation which is also parsing invitation.html
 func (c AdminController) AdminInformation(w http.ResponseWriter, r *http.Request) {
 	user, account, err := populateUserData(r)
 	if err != nil {
@@ -99,12 +90,18 @@ func preregisterAndSendInvitation(userSession *models.Session, invitation *invit
 		return err
 	}
 
-	data := emailTemplateInfo{
+	data := struct {
+		FirstName        string
+		LastName         string
+		InviterFirstName string
+		InviterLastName  string
+		HostAddress      string
+		UUID             string
+	}{
 		FirstName:        invitation.FirstName,
 		LastName:         invitation.LastName,
 		InviterFirstName: userSession.First,
 		InviterLastName:  userSession.Last,
-		Protocol:         config.HTTP_PROTOCOL,
 		HostAddress:      config.HTTP_HOST_ADDRESS,
 		UUID:             user.VerificationUUID,
 	}
