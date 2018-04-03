@@ -333,16 +333,14 @@ func sendConfirmationEmail(userEmail, action string) error {
 	data := struct {
 		FirstName   string
 		LastName    string
-		Protocol    string
 		HostAddress string
 		Message     string
-	}{user.FirstName, user.LastName, config.HTTP_PROTOCOL, config.HTTP_HOST_ADDRESS, message}
-
-	log.Printf("Sending confirmation email to user %v.", userEmail)
-	if err := email.ConstructAndSend("as_status.html", subject, data, "as-update",
-		userEmail); err != nil {
-		return err
+	}{
+		FirstName:   user.FirstName,
+		LastName:    user.LastName,
+		HostAddress: config.HTTP_HOST_ADDRESS,
+		Message:     message,
 	}
-
-	return nil
+	log.Printf("Sending confirmation email to user %v.", userEmail)
+	return email.ConstructAndSend("as_status.html", subject, data, "as-update", userEmail)
 }
