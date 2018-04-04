@@ -509,6 +509,7 @@ func (s *SCIONLabASController) generateTopologyFile(asInfo *SCIONLabASInfo) erro
 			asInfo.LocalAS.UserEmail, err)
 	}
 	localIP := config.LOCALHOST_IP
+	bindIP := "0.0.0.0"
 	if asInfo.LocalAS.Type == models.VM {
 		localIP = config.VM_LOCAL_IP
 	}
@@ -516,7 +517,7 @@ func (s *SCIONLabASController) generateTopologyFile(asInfo *SCIONLabASInfo) erro
 	// Topo file parameters
 	data := map[string]string{
 		"IP":           asInfo.IP,
-		"BIND_IP":      asInfo.LocalAS.BindIP(asInfo.IsVPN, asInfo.IP),
+		"BIND_IP":      bindIP,
 		"ISD_ID":       strconv.Itoa(asInfo.LocalAS.ISD),
 		"AS_ID":        strconv.Itoa(asInfo.LocalAS.ASID),
 		"LOCAL_ADDR":   localIP,
