@@ -509,6 +509,7 @@ func (s *SCIONLabASController) generateTopologyFile(asInfo *SCIONLabASInfo) erro
 			asInfo.LocalAS.UserEmail, err)
 	}
 	localIP := config.LOCALHOST_IP
+	bindIP := "0.0.0.0"
 	if asInfo.LocalAS.Type == models.VM {
 		localIP = config.VM_LOCAL_IP
 	}
@@ -516,7 +517,7 @@ func (s *SCIONLabASController) generateTopologyFile(asInfo *SCIONLabASInfo) erro
 	// Topo file parameters
 	data := map[string]string{
 		"IP":           asInfo.IP,
-		"BIND_IP":      asInfo.LocalAS.BindIP(asInfo.IsVPN, asInfo.IP),
+		"BIND_IP":      bindIP,
 		"ISD_ID":       strconv.Itoa(asInfo.LocalAS.ISD),
 		"AS_ID":        strconv.Itoa(asInfo.LocalAS.ASID),
 		"LOCAL_ADDR":   localIP,
@@ -544,14 +545,15 @@ func (s *SCIONLabASController) generateLocalGen(asInfo *SCIONLabASInfo) error {
 	userEmail := asInfo.LocalAS.UserEmail
 	log.Printf("Calling create local gen. ISD-ID: %v, AS-ID: %v, UserEmail: %v", isd, asID,
 		userEmail)
-	if len(config.SIGNING_ASES) < isd {
+	signingAs, haveit := config.SIGNING_ASES[isd]
+	if !haveit {
 		return fmt.Errorf("Signing AS for ISD %v not configured", isd)
 	}
 
 	cmd := exec.Command("python3", localGenPath,
 		"--topo_file="+asInfo.topologyFile(), "--user_id="+asInfo.UserPackageName(),
 		"--joining_ia="+utility.IAString(isd, asID),
-		"--core_ia="+utility.IAString(isd, config.SIGNING_ASES[isd-1]),
+		"--core_ia="+utility.IAString(isd, signingAs),
 		"--core_sign_priv_key_file="+CoreSigKey(isd),
 		"--core_cert_file="+CoreCertFile(isd),
 		"--trc_file="+TrcFile(isd),

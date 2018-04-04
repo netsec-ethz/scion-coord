@@ -29,7 +29,7 @@ http.bind_address = "127.0.0.1"
 http.bind_port = 8080
 
 # Use for development setup
-http.host_address = "localhost:8080"
+http.host_address = "http://localhost:8080"
 # Use for production setup via HTTPS
 #http.host_address = "scioncoord.mydomain.xyz"
 
@@ -90,5 +90,10 @@ reserved_brs_infrastructure = 10
 # Maximal number of ASes a user or admin can have
 ases_per_user = 2
 ases_per_admin = 10
-# ASes signing certificates for new ASes in each ISD starting by ISD1, separated by ";"
-signing_ases = 1;21;31
+
+# ASes signing certificates for new ASes in each ISD: [ISD]=ASid
+[signing_ases]
+1=11
+2=21
+3=31
+4=41
