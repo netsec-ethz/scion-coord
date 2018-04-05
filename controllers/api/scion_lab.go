@@ -51,6 +51,7 @@ var (
 	scionUtilPath   = filepath.Join(scionCoordPath, "sub", "util")
 	pythonPath      = filepath.Join(scionPath, "python")
 	vagrantPath     = filepath.Join(scionCoordPath, "vagrant")
+	auxFilesPath    = filepath.Join(scionCoordPath, "files")
 	PackagePath     = config.PACKAGE_DIRECTORY
 	BoxPackagePath  = filepath.Join(PackagePath, "SCIONBox")
 	credentialsPath = filepath.Join(scionCoordPath, "credentials")
@@ -212,6 +213,12 @@ func (s *SCIONLabASController) ConfigureSCIONLabAS(w http.ResponseWriter, r *htt
 			s.Error500(w, err, "Error generating VPN config")
 			return
 		}
+	}
+	if err = s.addAuxiliaryFiles(asInfo); err != nil {
+		errTitle := "Error adding auxiliary files to the package"
+		log.Printf(errTitle+": %v", err)
+		s.Error500(w, err, errTitle)
+		return
 	}
 	// Package the SCIONLab AS configuration
 	if err = s.packageConfiguration(asInfo); err != nil {
@@ -570,6 +577,21 @@ func (s *SCIONLabASController) generateLocalGen(asInfo *SCIONLabASInfo) error {
 	errOutput, _ := ioutil.ReadAll(cmdErr)
 	fmt.Printf("STDOUT generateLocalGen: %s\n", stdOutput)
 	fmt.Printf("ERROUT generateLocalGen: %s\n", errOutput)
+	return nil
+}
+
+func (s *SCIONLabASController) addAuxiliaryFiles(asInfo *SCIONLabASInfo) error {
+	userEmail := asInfo.LocalAS.UserEmail
+	userPackagePath := asInfo.UserPackagePath()
+	log.Printf("Adding auxiliary files to the package %v", asInfo.UserPackageName())
+	if asInfo.LocalAS.Type == models.DEDICATED {
+		dedicatedAuxFiles := filepath.Join(auxFilesPath, "dedicated_box")
+		err := utility.CopyPath(dedicatedAuxFiles, userPackagePath)
+		if err != nil {
+			return fmt.Errorf("Failed to copy files for user %v: src: %v, dst: %v, %v",
+				userEmail, dedicatedAuxFiles, userPackagePath, err)
+		}
+	}
 	return nil
 }
 

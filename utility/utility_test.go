@@ -14,7 +14,13 @@
 
 package utility
 
-import "testing"
+import (
+	"bytes"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 type ipComparisonTest struct {
 	ip1  string
@@ -127,5 +133,81 @@ func TestGetAvailableID(t *testing.T) {
 			t.Errorf("Expected %v, got %v", tt.expected, actual)
 			t.Errorf("Test table index %d, content:\n%v", i, tt)
 		}
+	}
+}
+
+func TestCopyFile(t *testing.T) {
+	dir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	defer os.RemoveAll(dir)
+	src := filepath.Join(dir, "src")
+	dst := filepath.Join(dir, "dst")
+	if err := ioutil.WriteFile(src, []byte("test string\n"), 0666); err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	if err := CopyFile(src, dst); err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	contents, err := ioutil.ReadFile(dst)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	if !bytes.Equal(contents, []byte("test string\n")) {
+		t.Errorf("Test file contents differ on %v and %v", src, dst)
+	}
+}
+
+func TestCopyPath(t *testing.T) {
+	dir, err := ioutil.TempDir("", "utility_ut_")
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	defer os.RemoveAll(dir)
+	// temp/src/a
+	// temp/src/subdir/b
+	src := filepath.Join(dir, "src")
+	dst := filepath.Join(dir, "dst")
+	if err := os.Mkdir(src, 0777); err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	if _, err := os.Create(filepath.Join(src, "a")); err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	if err := ioutil.WriteFile(filepath.Join(src, "a"), []byte("test a\n"), 0666); err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	if err := os.Mkdir(filepath.Join(src, "subdir"), 0777); err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	if _, err := os.Create(filepath.Join(src, "subdir", "b")); err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	if err := ioutil.WriteFile(filepath.Join(src, "subdir", "b"), []byte("test b\n"), 0666); err != nil {
+		t.Errorf("Error: %v", err)
+	}
+
+	if err := os.Mkdir(dst, 0777); err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	if err := CopyPath(src, dst); err != nil {
+		t.Errorf("Error: %v", err)
+	}
+
+	content, err := ioutil.ReadFile(filepath.Join(dst, "a"))
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	if !bytes.Equal(content, []byte("test a\n")) {
+		t.Errorf("Test file \"a\" contents differ on %v and %v", src, dst)
+	}
+	content, err = ioutil.ReadFile(filepath.Join(dst, "subdir", "b"))
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	if !bytes.Equal(content, []byte("test b\n")) {
+		t.Errorf("Test file \"b\" contents differ on %v and %v",
+			filepath.Join(src, "subdir"), filepath.Join(dst, "subdir"))
 	}
 }
