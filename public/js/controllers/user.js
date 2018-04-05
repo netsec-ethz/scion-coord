@@ -7,8 +7,6 @@ scionApp
             $scope.error2 = "";
             $scope.message2 = "";
 
-            $scope.isVmReady=true
-
             $scope.userPageData = function () {
 
                 userService.userPageData().then(
@@ -56,7 +54,7 @@ scionApp
                                 done()
                             }
                         }
-                    });  
+                    });
             };
 
             $scope.availableImagesData = function() {
@@ -66,7 +64,7 @@ scionApp
                         console.log(data);
                         $scope.availableImages=data;
                         $scope.imageNames={}
-                        
+
                         data.forEach(function(img){
                             console.log("Setting up: "+img.name+" "+img.display_name)
                             $scope.imageNames[img.name]=img.display_name    
@@ -83,7 +81,7 @@ scionApp
                         if (response.status === 401 || response.status === 403) {
                             $location.path('/login');
                         }
-                    });  
+                    });
             };
 
             $scope.buildImage = function (imageName, asInfo) {
@@ -155,7 +153,7 @@ scionApp
             $scope.downloadImage= function(userImage) {
                 $scope.error2 = "";
                 $scope.message2 = "";
-                
+
                 window.location.assign(userImage.download_link);                  
             };
 

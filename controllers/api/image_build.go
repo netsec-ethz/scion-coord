@@ -213,7 +213,7 @@ func (s *SCIONImgBuildController) GenerateImage(w http.ResponseWriter, r *http.R
         return
     }
 
-    // Start build job build job
+    // Start build job
     buildJobs := s.getUserBuildJobs(uSess.Email)
     if buildJobs.isRateLimited() {
         s.BadRequest(w, fmt.Errorf("Rate limited request"), "You have exceeded all build jobs, please wait and try again later")
@@ -222,13 +222,13 @@ func (s *SCIONImgBuildController) GenerateImage(w http.ResponseWriter, r *http.R
 
     if err := startBuildJob(fileName, filePath, bRequest, buildJobs); err!=nil{
         log.Println(err)
-        //TODO: Reset last build job time, rate limiting should not apply here
+        //TODO: Update last build time in isRateLimited() function atomically so we can avoid race condition
         s.Error500(w, err, "Error running build job")
         return
     }
 
-    message := "We started configuring image for your IoT device." +
-        "Please wait few minutes for build to finish."
+    message := "We started configuring an image for your IoT device." +
+        "Please wait a few minutes for the build to finish."
     fmt.Fprintln(w, message)
 }
 
@@ -258,7 +258,7 @@ func startBuildJob(configFileName, configFilePath string, bRequest buildRequest,
     }
 
     resp, err := httpClient.Do(req)
-    
+
     if err != nil {
         // Error in communication with server
         return err
@@ -295,7 +295,7 @@ func (s *SCIONImgBuildController) GetUserImages(w http.ResponseWriter, r *http.R
         s.Forbidden(w, err, "Error getting the user session")
         return
     }
-    
+
     buildJobs := s.getUserBuildJobs(userSession.Email)
     userImages := buildJobs.getUserImages()
 
@@ -309,7 +309,7 @@ func (s *SCIONImgBuildController) GetUserImages(w http.ResponseWriter, r *http.R
             buildJobs.removeImage(img.JobId)
         }
     }
-    
+
     userImages=buildJobs.getUserImages()
 
     w.Header().Set("Content-Type", "application/json")
@@ -332,6 +332,6 @@ func getJobStatus(id string)(bool, bool, error){
     if(err!=nil){
         return false, false, err
     }
-    
+
     return status.Exists, status.Finished, nil
 }
