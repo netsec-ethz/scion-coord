@@ -508,7 +508,7 @@ func (s *SCIONLabASController) generateTopologyFile(asInfo *SCIONLabASInfo) erro
 		return fmt.Errorf("Error creating topology file config for user %v: %v",
 			asInfo.LocalAS.UserEmail, err)
 	}
-	localIP := config.LOCALHOST_IP
+	localIP := asInfo.IP
 	if asInfo.LocalAS.Type == models.VM {
 		localIP = config.VM_LOCAL_IP
 	}
