@@ -21,6 +21,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -46,6 +47,40 @@ func CopyFile(source string, dest string) (err error) {
 		err = os.Chmod(dest, sourceinfo.Mode())
 	}
 	return
+}
+
+// CopyPath copies the src path to dst. Example: CopyPath("/tmp/a", "/tmp/b") will copy /tmp/a/* to /tmp/b/
+// replacing contents if files or dirs existed in b with the same names as a/*
+func CopyPath(src, dst string) error {
+	srcDir, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("Failed to open directory %v: %v", src, err)
+	}
+	objects, err := srcDir.Readdir(-1)
+	if err != nil {
+		return fmt.Errorf("Error listing directory %v: %v", src, err)
+	}
+	for _, obj := range objects {
+		if obj.IsDir() {
+			subDirSrc := filepath.Join(src, obj.Name())
+			subDirDst := filepath.Join(dst, obj.Name())
+			srcStat, err := os.Stat(subDirSrc)
+			if err != nil {
+				return fmt.Errorf("Error stating %v: %v", subDirSrc, err)
+			}
+			if err := os.Mkdir(subDirDst, srcStat.Mode()); err != nil {
+				return fmt.Errorf("Error creating directory %v: %v", subDirDst, err)
+			}
+			if err := CopyPath(subDirSrc, subDirDst); err != nil {
+				return err
+			}
+		} else {
+			if err := CopyFile(filepath.Join(src, obj.Name()), filepath.Join(dst, obj.Name())); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // Some helper functions for IP addresses
