@@ -88,6 +88,7 @@ else
 
     echo "Starting SCION again..."
     ./scion.sh clean || true
+    ./env/deps || echo "ERROR: Dependencies failed. Starting SCION might fail!"
     ./scion.sh run
 fi
 
