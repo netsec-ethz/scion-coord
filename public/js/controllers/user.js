@@ -154,7 +154,7 @@ scionApp
                 $scope.error2 = "";
                 $scope.message2 = "";
 
-                window.location.assign(userImage.download_link);                  
+                window.location.assign(userImage.download_link);
             };
 
             $scope.configureSCIONLabAS = function (user, asInfo) {
