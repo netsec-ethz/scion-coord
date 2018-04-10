@@ -1,0 +1,20 @@
+[Unit]
+Description=SCION Coordination Service
+After=network-online.target
+OnFailure=unit-status-mail@%n.service
+
+[Service]
+Type=simple
+RemainAfterExit=no
+User=_USER_
+WorkingDirectory=/home/_USER_/go/src/github.com/netsec-ethz/scion-coord
+Environment="PATH=/home/_USER_/.local/bin:/home/_USER_/go/bin:/usr/local/go/bin:/home/_USER_/bin:/home/_USER_/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" "GOPATH=/home/_USER_/go"
+ExecStart=/home/_USER_/go/src/github.com/netsec-ethz/scion-coord/scion-coord
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=scion-coord
+RestartSec=1
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
