@@ -3,14 +3,14 @@
 set -e
 shopt -s nullglob
 
+export LC_ALL=C
 ACCOUNT_ID=$1
 ACCOUNT_SECRET=$2
 IA=$3
 
 DEFAULT_BRANCH_NAME="scionlab"
 REMOTE_REPO="origin"
-# TODO: Change me to official URL when we migrate
-SCION_COORD_URL="https://scion-ad6.inf.ethz.ch"
+SCION_COORD_URL="https://coord.scionproto.net"
 
 echo "Invoking update script with $ACCOUNT_ID $ACCOUNT_SECRET $IA"
 
@@ -26,6 +26,14 @@ echo "Update branch is: ${UPDATE_BRANCH}"
 
 cd $SC
 
+git_username=$(git config user.name || true)
+if [ -z "$git_username" ]
+then
+    echo "GIT user credentials not set, configuring defaults"
+    git config --global user.name "Scion User" 
+    git config --global user.email "scion@scion-architecture.net"
+    git config --global url.https://github.com/.insteadOf git@github.com:
+fi
 git fetch "$REMOTE_REPO" "$UPDATE_BRANCH"
 rebase_result=$(git rebase "${REMOTE_REPO}/${UPDATE_BRANCH}")
 
@@ -42,6 +50,7 @@ else
     bash -c 'yes | GO_INSTALL=true ./env/deps'
 
     echo "Starting SCION again..."
+    ./scion.sh clean || true
     ./scion.sh run
 fi
 
