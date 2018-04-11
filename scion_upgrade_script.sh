@@ -1,6 +1,41 @@
 #!/bin/bash
 
 set -e
+
+# version of the systemd files:
+SERVICE_CURRENT_VERSION="0.2"
+
+# version less or equal. E.g. verleq 1.9 2.0.8  == true (1.9 <= 2.0.8)
+verleq() {
+    [  "$1" = "`echo -e "$1\n$2" | sort -V | head -n1`" ]
+}
+
+check_system_files() {
+    # check service files:
+    need_to_reload=0
+    declare -a FILES_TO_CHECK=("/etc/systemd/system/scionupgrade.service"
+                               "/etc/systemd/system/scionupgrade.timer")
+    for f in "${FILES_TO_CHECK[@]}"; do
+        VERS=$(grep "^# SCION upgrade version" "$f" | sed -n 's/^# SCION upgrade version \([0-9\.]*\).*$/\1/p')
+        if ! verleq "$SERVICE_CURRENT_VERSION" "$VERS"; then
+            # need to upgrade. (1) get the file with wget. (2) copy the file (3) reload systemd things
+            bf=$(basename $f)
+            tmpfile=$(mktemp)
+            wget "https://raw.githubusercontent.com/netsec-ethz/scion-coord/master/vagrant/$bf" -O "$tmpfile"
+            sed -i "s/_USER_/$USER/g" "$tmpfile"
+            sudo cp "$tmpfile" "$f"
+            need_to_reload=1
+        fi
+    done
+    if [ $need_to_reload -eq 1 ]; then
+        sudo systemctl stop scionupgrade.timer
+        sudo systemctl stop scionupgrade.service
+        sudo systemctl daemon-reload
+        sudo systemctl start scionupgrade.timer
+        sudo systemctl start scionupgrade.service
+    fi
+}
+
 shopt -s nullglob
 
 export LC_ALL=C
@@ -14,6 +49,9 @@ SCION_COORD_URL="https://coord.scionproto.net"
 
 echo "Invoking update script with $ACCOUNT_ID $ACCOUNT_SECRET $IA"
 
+# systemd files upgrade:
+check_system_files
+
 UPDATE_BRANCH=$(curl --fail "${SCION_COORD_URL}/api/as/queryUpdateBranch/${ACCOUNT_ID}/${ACCOUNT_SECRET}?IA=${IA}" || true)
 
 if [  -z "$UPDATE_BRANCH"  ]
@@ -21,7 +59,6 @@ then
     echo "No branch name has been specified, using default value ${DEFAULT_BRANCH_NAME}. "
     UPDATE_BRANCH=$DEFAULT_BRANCH_NAME
 fi
-
 echo "Update branch is: ${UPDATE_BRANCH}"
 
 cd $SC
