@@ -220,6 +220,7 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 	log.Printf("action = %v, cns = %v", action, cns)
 	type emailConfirmation struct {
 		user   string
+		IA     IA
 		action string
 	}
 	failedConfirmations := []string{}
@@ -297,10 +298,10 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 					ia, apAS.IA(), action)
 			}
 		}
-		emails = append(emails, emailConfirmation{as.UserEmail, action})
+		emails = append(emails, emailConfirmation{as.UserEmail, as.IA(), action})
 	}
 	for _, e := range emails {
-		if err := sendConfirmationEmail(e.user, e.action); err != nil {
+		if err := sendConfirmationEmail(e.user, e.IA, e.action); err != nil {
 			log.Printf("Error sending email confirmation to user %v: %v", e.user, err)
 		}
 	}
@@ -308,25 +309,26 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 }
 
 // Function which sends confirmation emails to users
-func sendConfirmationEmail(userEmail, action string) error {
+func sendConfirmationEmail(userEmail string, IA IA, action string) error {
 	user, err := models.FindUserByEmail(userEmail)
 	if err != nil {
 		return err
 	}
 
 	var message string
+	IAstring := string(IA.ISD) + "-" + string(IA.AS)
 	subject := "[SCIONLab] "
 	switch action {
 	case CREATED:
-		message = "The infrastructure for your SCIONLab AS has been created. " +
-			"You are now able to use the SCION network through your AS."
+		message = "The infrastructure for your SCIONLab AS" + IAstring + " has been created. " +
+			"You are now able to use the SCION network through your AS" + IAstring + "."
 		subject += "AS creation request completed"
 	case UPDATED:
-		message = "The settings for your SCIONLab AS have been updated."
+		message = "The settings for your SCIONLab AS" + IAstring + " have been updated."
 		subject += "AS update request completed"
 	case REMOVED:
 		message = "Your removal request has been processed. " +
-			"All infrastructure for your SCIONLab AS has been removed."
+			"All infrastructure for your SCIONLab AS" + IAstring + " has been removed."
 		subject += "AS removal request completed"
 	}
 
