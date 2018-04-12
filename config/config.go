@@ -73,6 +73,7 @@ var (
 	HTTP_PROTOCOL = "http"
 	HB_PERIOD, _  = goconf.AppConf.Int("heartbeat.period")
 	HB_LIMIT, _   = goconf.AppConf.Int("heartbeat.limit")
+	GRAFANA_URL   = goconf.AppConf.String("grafana.url")
 )
 
 func init() {
