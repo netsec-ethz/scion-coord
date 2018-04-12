@@ -84,11 +84,10 @@ else
     ~/.local/bin/supervisorctl -c supervisor/supervisord.conf shutdown
 
     echo "Reinstalling dependencies..."
-    bash -c 'yes | GO_INSTALL=true ./env/deps'
+    ./scion.sh clean || true
+    bash -c 'yes | GO_INSTALL=true ./env/deps' || echo "ERROR: Dependencies failed. Starting SCION might fail!"
 
     echo "Starting SCION again..."
-    ./scion.sh clean || true
-    ./env/deps || echo "ERROR: Dependencies failed. Starting SCION might fail!"
     ./scion.sh run
 fi
 
