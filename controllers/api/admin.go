@@ -53,7 +53,6 @@ type invitationsData []invitationInfo
 
 var invitationsTemplate = "invitation.html"
 
-// TODO review we have preregisterAndSendInvitation which is also parsing invitation.html
 func (c AdminController) AdminInformation(w http.ResponseWriter, r *http.Request) {
 	user, account, err := populateUserData(r)
 	if err != nil {

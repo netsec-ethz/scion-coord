@@ -31,7 +31,7 @@ http.bind_port = 8080
 # Use for development setup
 http.host_address = "http://localhost:8080"
 # Use for production setup via HTTPS
-#http.host_address = "scioncoord.mydomain.xyz"
+#http.host_address = "http://scioncoord.mydomain.xyz"
 
 # the URL of the grafana service
 grafana.url = https://prometheus.scionlab.org/d/UcSvf4giz/scionlab?orgId=1
