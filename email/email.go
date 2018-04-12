@@ -39,7 +39,6 @@ type Email struct {
 type EmailData struct {
 	FirstName        string
 	LastName         string
-	Protocol         string
 	HostAddress      string
 	VerificationUUID string
 }
