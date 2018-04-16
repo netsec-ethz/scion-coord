@@ -49,7 +49,7 @@ if [ ! -d "gen" ]; then
 fi
 
 # check we can sudo
-sudo -S -v < /dev/null && success=1 || success=0
+sudo -S echo a >/dev/null </dev/null && success=1 || success=0
 if [ $success != 1 ]; then
     echo "sudo failed"
     exit 1
