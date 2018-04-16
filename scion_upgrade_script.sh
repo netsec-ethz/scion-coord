@@ -45,7 +45,7 @@ IA=$3
 
 DEFAULT_BRANCH_NAME="scionlab"
 REMOTE_REPO="origin"
-SCION_COORD_URL="https://coord.scionproto.net"
+SCION_COORD_URL="https://www.scionlab.org"
 
 echo "Invoking update script with $ACCOUNT_ID $ACCOUNT_SECRET $IA"
 
