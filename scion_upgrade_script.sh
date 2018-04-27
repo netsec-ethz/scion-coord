@@ -3,7 +3,7 @@
 set -e
 
 # version of the systemd files:
-SERVICE_CURRENT_VERSION="0.2"
+SERVICE_CURRENT_VERSION="0.3"
 
 # version less or equal. E.g. verleq 1.9 2.0.8  == true (1.9 <= 2.0.8)
 verleq() {
@@ -28,11 +28,9 @@ check_system_files() {
         fi
     done
     if [ $need_to_reload -eq 1 ]; then
-        sudo systemctl stop scionupgrade.timer
-        sudo systemctl stop scionupgrade.service
+        # don't attempt to stop the service as we are a child !
+        # if really needed, specify KillMode=none in the service file itself
         sudo systemctl daemon-reload
-        sudo systemctl start scionupgrade.timer
-        sudo systemctl start scionupgrade.service
     fi
 }
 
