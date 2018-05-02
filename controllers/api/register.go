@@ -117,7 +117,6 @@ func (c *RegistrationController) ResetPassword(w http.ResponseWriter, r *http.Re
 		LastName:         u.LastName,
 		HostAddress:      config.HTTP_HOST_ADDRESS,
 		VerificationUUID: u.VerificationUUID,
-		Protocol:         config.HTTP_PROTOCOL,
 	}
 	if err = email.ConstructAndSend(
 		"password_reset.html",
@@ -310,7 +309,6 @@ func sendVerificationEmail(userID uint64) error {
 	data := email.EmailData{
 		FirstName:        user.FirstName,
 		LastName:         user.LastName,
-		Protocol:         config.HTTP_PROTOCOL,
 		HostAddress:      config.HTTP_HOST_ADDRESS,
 		VerificationUUID: user.VerificationUUID,
 	}

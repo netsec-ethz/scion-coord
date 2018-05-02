@@ -1,0 +1,10 @@
+[Unit]
+Description=Unit Status Mailer Service
+After=network-online.target
+
+[Service]
+Type=simple
+User=_USER_
+WorkingDirectory=/home/_USER_
+Environment="PATH=/home/_USER_/.local/bin:/home/_USER_/go/bin:/usr/local/go/bin:/home/_USER_/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
+ExecStart=/usr/local/bin/emailer -r .config/scion-coord/recipients.txt -s "Unit %I has restarted unexpectedly" -b "On host %H unit %I has been restarted. You might want to take a look at it." -c .config/scion-coord/email.conf

@@ -220,6 +220,7 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 	log.Printf("action = %v, cns = %v", action, cns)
 	type emailConfirmation struct {
 		user   string
+		IA     string
 		action string
 	}
 	failedConfirmations := []string{}
@@ -297,10 +298,10 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 					ia, apAS.IA(), action)
 			}
 		}
-		emails = append(emails, emailConfirmation{as.UserEmail, action})
+		emails = append(emails, emailConfirmation{as.UserEmail, as.IA(), action})
 	}
 	for _, e := range emails {
-		if err := sendConfirmationEmail(e.user, e.action); err != nil {
+		if err := sendConfirmationEmail(e.user, e.IA, e.action); err != nil {
 			log.Printf("Error sending email confirmation to user %v: %v", e.user, err)
 		}
 	}
@@ -308,7 +309,7 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 }
 
 // Function which sends confirmation emails to users
-func sendConfirmationEmail(userEmail, action string) error {
+func sendConfirmationEmail(userEmail, IA, action string) error {
 	user, err := models.FindUserByEmail(userEmail)
 	if err != nil {
 		return err
@@ -318,31 +319,29 @@ func sendConfirmationEmail(userEmail, action string) error {
 	subject := "[SCIONLab] "
 	switch action {
 	case CREATED:
-		message = "The infrastructure for your SCIONLab AS has been created. " +
-			"You are now able to use the SCION network through your AS."
+		message = fmt.Sprintf("The infrastructure for your SCIONLab AS %s has been created. "+
+			"You are now able to use the SCION network through your AS.", IA)
 		subject += "AS creation request completed"
 	case UPDATED:
-		message = "The settings for your SCIONLab AS have been updated."
+		message = fmt.Sprintf("The settings for your SCIONLab AS %s have been updated.", IA)
 		subject += "AS update request completed"
 	case REMOVED:
-		message = "Your removal request has been processed. " +
-			"All infrastructure for your SCIONLab AS has been removed."
+		message = fmt.Sprintf("Your removal request has been processed. "+
+			"All infrastructure for your SCIONLab AS %s has been removed.", IA)
 		subject += "AS removal request completed"
 	}
 
 	data := struct {
 		FirstName   string
 		LastName    string
-		Protocol    string
 		HostAddress string
 		Message     string
-	}{user.FirstName, user.LastName, config.HTTP_PROTOCOL, config.HTTP_HOST_ADDRESS, message}
-
-	log.Printf("Sending confirmation email to user %v.", userEmail)
-	if err := email.ConstructAndSend("as_status.html", subject, data, "as-update",
-		userEmail); err != nil {
-		return err
+	}{
+		FirstName:   user.FirstName,
+		LastName:    user.LastName,
+		HostAddress: config.HTTP_HOST_ADDRESS,
+		Message:     message,
 	}
-
-	return nil
+	log.Printf("Sending confirmation email to user %v.", userEmail)
+	return email.ConstructAndSend("as_status.html", subject, data, "as-update", userEmail)
 }

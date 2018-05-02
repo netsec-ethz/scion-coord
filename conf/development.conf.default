@@ -29,9 +29,12 @@ http.bind_address = "127.0.0.1"
 http.bind_port = 8080
 
 # Use for development setup
-http.host_address = "localhost:8080"
+http.host_address = "http://localhost:8080"
 # Use for production setup via HTTPS
-#http.host_address = "scioncoord.mydomain.xyz"
+#http.host_address = "http://scioncoord.mydomain.xyz"
+
+# the URL of the grafana service
+grafana.url = https://prometheus.scionlab.org/d/UcSvf4giz/scionlab?orgId=1
 
 # Setup for using HTTPS instead of HTTP
 # This requires a registered domain set for "http.host_address" and the ability
@@ -90,10 +93,16 @@ reserved_brs_infrastructure = 10
 # Maximal number of ASes a user or admin can have
 ases_per_user = 2
 ases_per_admin = 10
-# ASes signing certificates for new ASes in each ISD starting by ISD1, separated by ";"
-signing_ases = 1;21;31
 
 # For image service
 img_builder.address = "https://vmtest.serber.club"
 img_builder.secret_token = "qSq9xa89F5V4BbqpRjBW7jvKSuVfrDfuQHGpLZRTE2eLRgun"
 img_builder.build_delay = 5
+
+
+# ASes signing certificates for new ASes in each ISD: [ISD]=ASid
+[signing_ases]
+1=11
+2=21
+3=31
+4=41
