@@ -39,6 +39,31 @@ scionApp
                 console.log(response);
                 return response.data;
             });
+        },
+
+        getUserBuildImages: function() {
+            console.log("Get user images");
+            return $http.get('/api/imgbuild/user-images').then(function (response) {
+                console.log(response);
+                return response.data;
+            });
+        },
+
+        getAvailableImages: function() {
+            console.log("Get available images");
+            return $http.get('/api/imgbuild/images').then(function (response) {
+                console.log(response);
+                return response.data;
+            });
+        },
+
+        startBuildJob: function(imageName, asID) {
+            console.log("Start build job");
+            return $http.post('/api/imgbuild/create/'+asID, {"image_name":imageName}).then(function (response) {
+                console.log(response);
+                return response.data;
+            });
         }
+
     };
 }]);
