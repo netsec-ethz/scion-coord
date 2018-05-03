@@ -15,48 +15,48 @@
 package api
 
 import (
-    "bytes"
-    "fmt"
-    "io/ioutil"
-    "log"
-    "net/http"
-    "path/filepath"
-    "io"
-    "time"
-    "mime/multipart"
-    "sync"
-    "encoding/json"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"log"
+	"mime/multipart"
+	"net/http"
+	"path/filepath"
+	"sync"
+	"time"
 
-    "github.com/gorilla/mux"
+	"github.com/gorilla/mux"
 
-    "github.com/netsec-ethz/scion-coord/config"
-    "github.com/netsec-ethz/scion-coord/controllers"
-    "github.com/netsec-ethz/scion-coord/controllers/middleware"
-    "github.com/netsec-ethz/scion-coord/models"
+	"github.com/netsec-ethz/scion-coord/config"
+	"github.com/netsec-ethz/scion-coord/controllers"
+	"github.com/netsec-ethz/scion-coord/controllers/middleware"
+	"github.com/netsec-ethz/scion-coord/models"
 )
 
 var httpClient = &http.Client{Timeout: 10 * time.Second}
 
 // Image state
 const (
-    BUILDING = iota // 0
-    READY
+	BUILDING = iota // 0
+	READY
 )
 
 type buildRequest struct {
-    ImageName string `json:"image_name"`
+	ImageName string `json:"image_name"`
 }
 
 type jobStatus struct {
-    Exists bool   `json:"job_exists"`
-    Finished bool   `json:"build_finished"`
-    JobId string    `json:"job_id"`
+	Exists   bool   `json:"job_exists"`
+	Finished bool   `json:"build_finished"`
+	JobId    string `json:"job_id"`
 }
 
 type customImage struct {
-    Device string   `json:"image"`
-    JobId string    `json:"id"`
-    Status int
+	Device string `json:"image"`
+	JobId  string `json:"id"`
+	Status int
 }
 
 func (c *customImage) MarshalJSON() ([]byte, error) {
@@ -73,87 +73,87 @@ func (c *customImage) MarshalJSON() ([]byte, error) {
 }
 
 type userJobs struct {
-    userJobLock *sync.Mutex
+	userJobLock *sync.Mutex
 
-    LastBuildRequest time.Time
-    UserImages []*customImage
+	LastBuildRequest time.Time
+	UserImages       []*customImage
 }
 
 type SCIONImgBuildController struct {
-    controllers.HTTPController
+	controllers.HTTPController
 
-    // Keep track of users jobs
-    jobsLock *sync.Mutex
-    activeJobs map[string]*userJobs //FIXME! This should be integer not string, userIds are not unique check why?
+	// Keep track of users jobs
+	jobsLock   *sync.Mutex
+	activeJobs map[string]*userJobs //FIXME! This should be integer not string, userIds are not unique check why?
 }
 
-func CreateSCIONImgBuildController()(*SCIONImgBuildController){
-    return &SCIONImgBuildController{
-        jobsLock:&sync.Mutex{},
-        activeJobs:make(map[string]*userJobs),
-    }
+func CreateSCIONImgBuildController() *SCIONImgBuildController {
+	return &SCIONImgBuildController{
+		jobsLock:   &sync.Mutex{},
+		activeJobs: make(map[string]*userJobs),
+	}
 }
 
-func (s *SCIONImgBuildController) getUserBuildJobs(userId string)(*userJobs){
-    s.jobsLock.Lock()
-    defer s.jobsLock.Unlock()
+func (s *SCIONImgBuildController) getUserBuildJobs(userId string) *userJobs {
+	s.jobsLock.Lock()
+	defer s.jobsLock.Unlock()
 
-    if userJob, ok := s.activeJobs[userId]; ok{
-        return userJob;
-    }else{
-        newUserJob:=&userJobs{
-            LastBuildRequest:time.Unix(0,0),    // last build time - beginning of time
-            userJobLock:&sync.Mutex{},
-            UserImages:make([]*customImage, 0),
-        }
+	if userJob, ok := s.activeJobs[userId]; ok {
+		return userJob
+	} else {
+		newUserJob := &userJobs{
+			LastBuildRequest: time.Unix(0, 0), // last build time - beginning of time
+			userJobLock:      &sync.Mutex{},
+			UserImages:       make([]*customImage, 0),
+		}
 
-        s.activeJobs[userId]=newUserJob
+		s.activeJobs[userId] = newUserJob
 
-        return newUserJob
-    }
+		return newUserJob
+	}
 }
 
-func (u *userJobs) isRateLimited()(bool){
-    u.userJobLock.Lock()
-    defer u.userJobLock.Unlock()
+func (u *userJobs) isRateLimited() bool {
+	u.userJobLock.Lock()
+	defer u.userJobLock.Unlock()
 
-    duration := time.Since(u.LastBuildRequest)
-    return duration.Minutes()<float64(config.IMG_BUILD_BUILD_DELAY)
+	duration := time.Since(u.LastBuildRequest)
+	return duration.Minutes() < float64(config.IMG_BUILD_BUILD_DELAY)
 }
 
-func (u *userJobs) addImage(image *customImage){
-    u.userJobLock.Lock()
-    defer u.userJobLock.Unlock()
+func (u *userJobs) addImage(image *customImage) {
+	u.userJobLock.Lock()
+	defer u.userJobLock.Unlock()
 
-    u.LastBuildRequest=time.Now()
-    u.UserImages=append(u.UserImages, image)
+	u.LastBuildRequest = time.Now()
+	u.UserImages = append(u.UserImages, image)
 }
 
 // Returns copy of slice so we don't run in concurrency issues
-func (u *userJobs) getUserImages()([]*customImage){
-    u.userJobLock.Lock()
-    defer u.userJobLock.Unlock()
+func (u *userJobs) getUserImages() []*customImage {
+	u.userJobLock.Lock()
+	defer u.userJobLock.Unlock()
 
-    result := make([]*customImage, len(u.UserImages))
-    copy(result, u.UserImages)
+	result := make([]*customImage, len(u.UserImages))
+	copy(result, u.UserImages)
 
-    return result
+	return result
 }
 
-func (u *userJobs) removeImage(jobId string){
-    u.userJobLock.Lock()
-    defer u.userJobLock.Unlock()
+func (u *userJobs) removeImage(jobId string) {
+	u.userJobLock.Lock()
+	defer u.userJobLock.Unlock()
 
-    for i, img := range u.UserImages{
-        if(img.JobId==jobId){
+	for i, img := range u.UserImages {
+		if img.JobId == jobId {
 
-            u.UserImages[len(u.UserImages)-1], u.UserImages[i] = 
-                u.UserImages[i], u.UserImages[len(u.UserImages)-1]
-            u.UserImages=u.UserImages[:len(u.UserImages)-1]
+			u.UserImages[len(u.UserImages)-1], u.UserImages[i] =
+				u.UserImages[i], u.UserImages[len(u.UserImages)-1]
+			u.UserImages = u.UserImages[:len(u.UserImages)-1]
 
-            return
-        }
-    }
+			return
+		}
+	}
 }
 
 func (s *SCIONImgBuildController) GetAvailableDevices(w http.ResponseWriter, r *http.Request) {
@@ -169,67 +169,67 @@ func (s *SCIONImgBuildController) GetAvailableDevices(w http.ResponseWriter, r *
 }
 
 func (s *SCIONImgBuildController) GenerateImage(w http.ResponseWriter, r *http.Request) {
-    log.Printf("Got request to generate image!")
+	log.Printf("Got request to generate image!")
 
-    // Get user session
-    _, uSess, err := middleware.GetUserSession(r)
-    if err != nil {
-        log.Printf("Error getting the user session: %v", err)
-        s.Forbidden(w, err, "Error getting the user session")
-        return
-    }
+	// Get user session
+	_, uSess, err := middleware.GetUserSession(r)
+	if err != nil {
+		log.Printf("Error getting the user session: %v", err)
+		s.Forbidden(w, err, "Error getting the user session")
+		return
+	}
 
-    // Get configuration file for specified AS
-    vars := mux.Vars(r)
-    asID := vars["as_id"]
-    as, err := models.FindSCIONLabASByUserEmailAndASID(uSess.Email, asID)
-    if err != nil || as.Status == models.INACTIVE || as.Status == models.REMOVE {
-        log.Printf("No active configuration found for user %v with asId %v\n", uSess.Email, asID)
-        s.BadRequest(w, nil, "No active configuration found for user %v",
-            uSess.Email)
-        return
-    }
+	// Get configuration file for specified AS
+	vars := mux.Vars(r)
+	asID := vars["as_id"]
+	as, err := models.FindSCIONLabASByUserEmailAndASID(uSess.Email, asID)
+	if err != nil || as.Status == models.INACTIVE || as.Status == models.REMOVE {
+		log.Printf("No active configuration found for user %v with asId %v\n", uSess.Email, asID)
+		s.BadRequest(w, nil, "No active configuration found for user %v",
+			uSess.Email)
+		return
+	}
 
-    if as.Type!=models.DEDICATED {
-        log.Printf("Configuration for selected AS is not made for dedicated system\n")
-        s.BadRequest(w, nil, "You must reconfigure your AS to use dedicated system configuration")
-        return
-    }
+	if as.Type != models.DEDICATED {
+		log.Printf("Configuration for selected AS is not made for dedicated system\n")
+		s.BadRequest(w, nil, "You must reconfigure your AS to use dedicated system configuration")
+		return
+	}
 
-    fileName := UserPackageName(uSess.Email, as.ISD, as.ASID) + ".tar.gz"
-    filePath := filepath.Join(PackagePath, fileName)
+	fileName := UserPackageName(uSess.Email, as.ISD, as.ASID) + ".tar.gz"
+	filePath := filepath.Join(PackagePath, fileName)
 
-    // Get build request
-    if err := r.ParseForm(); err != nil {
-        s.BadRequest(w, fmt.Errorf("Error parsing the form: %v", err), "Error parsing form")
-        return
-    }
-    var bRequest buildRequest
-    decoder := json.NewDecoder(r.Body)
+	// Get build request
+	if err := r.ParseForm(); err != nil {
+		s.BadRequest(w, fmt.Errorf("Error parsing the form: %v", err), "Error parsing form")
+		return
+	}
+	var bRequest buildRequest
+	decoder := json.NewDecoder(r.Body)
 
-    if err := decoder.Decode(&bRequest); err != nil {
-        log.Println(err)
-        s.Error500(w, err, "Error decoding build request JSON")
-        return
-    }
+	if err := decoder.Decode(&bRequest); err != nil {
+		log.Println(err)
+		s.Error500(w, err, "Error decoding build request JSON")
+		return
+	}
 
-    // Start build job
-    buildJobs := s.getUserBuildJobs(uSess.Email)
-    if buildJobs.isRateLimited() {
-        s.BadRequest(w, fmt.Errorf("Rate limited request"), "You have exceeded all build jobs, please wait and try again later")
-        return
-    }
+	// Start build job
+	buildJobs := s.getUserBuildJobs(uSess.Email)
+	if buildJobs.isRateLimited() {
+		s.BadRequest(w, fmt.Errorf("Rate limited request"), "You have exceeded all build jobs, please wait and try again later")
+		return
+	}
 
-    if err := startBuildJob(fileName, filePath, bRequest, buildJobs); err!=nil{
-        log.Println(err)
-        //TODO: Update last build time in isRateLimited() function atomically so we can avoid race condition
-        s.Error500(w, err, "Error running build job")
-        return
-    }
+	if err := startBuildJob(fileName, filePath, bRequest, buildJobs); err != nil {
+		log.Println(err)
+		//TODO: Update last build time in isRateLimited() function atomically so we can avoid race condition
+		s.Error500(w, err, "Error running build job")
+		return
+	}
 
-    message := "We started configuring an image for your IoT device." +
-        "Please wait a few minutes for the build to finish."
-    fmt.Fprintln(w, message)
+	message := "We started configuring an image for your IoT device." +
+		"Please wait a few minutes for the build to finish."
+	fmt.Fprintln(w, message)
 }
 
 func startBuildJob(configFileName, configFilePath string, bRequest buildRequest, buildJobs *userJobs) error {
@@ -287,43 +287,43 @@ func startBuildJob(configFileName, configFilePath string, bRequest buildRequest,
 }
 
 func (s *SCIONImgBuildController) GetUserImages(w http.ResponseWriter, r *http.Request) {
-    log.Printf("Requesting user images")
+	log.Printf("Requesting user images")
 
-    _, userSession, err := middleware.GetUserSession(r)
-    if err != nil {
-        log.Printf("Error getting the user session: %v", err)
-        s.Forbidden(w, err, "Error getting the user session")
-        return
-    }
+	_, userSession, err := middleware.GetUserSession(r)
+	if err != nil {
+		log.Printf("Error getting the user session: %v", err)
+		s.Forbidden(w, err, "Error getting the user session")
+		return
+	}
 
-    buildJobs := s.getUserBuildJobs(userSession.Email)
-    userImages := buildJobs.getUserImages()
+	buildJobs := s.getUserBuildJobs(userSession.Email)
+	userImages := buildJobs.getUserImages()
 
-    for _, img := range userImages {
-        exists, finished, _ := getJobStatus(img.JobId)  //TODO: Handle error
-        if(finished){
-            img.Status=READY
-        }
+	for _, img := range userImages {
+		exists, finished, _ := getJobStatus(img.JobId) //TODO: Handle error
+		if finished {
+			img.Status = READY
+		}
 
-        if(!exists){
-            buildJobs.removeImage(img.JobId)
-        }
-    }
+		if !exists {
+			buildJobs.removeImage(img.JobId)
+		}
+	}
 
-    userImages=buildJobs.getUserImages()
+	userImages = buildJobs.getUserImages()
 
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(userImages)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(userImages)
 }
 
 func getJson(url string, target interface{}) error {
-    r, err := httpClient.Get(url)
-    if err != nil {
-        return err
-    }
-    defer r.Body.Close()
+	r, err := httpClient.Get(url)
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
 
-    return json.NewDecoder(r.Body).Decode(target)
+	return json.NewDecoder(r.Body).Decode(target)
 }
 
 func getJobStatus(id string) (bool, bool, error) {
@@ -333,5 +333,5 @@ func getJobStatus(id string) (bool, bool, error) {
 		return false, false, err
 	}
 
-    return status.Exists, status.Finished, nil
+	return status.Exists, status.Finished, nil
 }
