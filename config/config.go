@@ -78,9 +78,10 @@ var (
 	TUTORIALS_URL = goconf.AppConf.String("tutorials.url")
 
 	// Image building service information
-	IMG_BUILD_ADDRESS        = goconf.AppConf.String("img_builder.address")
-	IMG_BUILD_SECRET_TOKEN   = goconf.AppConf.String("img_builder.secret_token")
-	IMG_BUILD_BUILD_DELAY, _ = goconf.AppConf.Int64("img_builder.build_delay")
+	IMG_BUILD_ADDRESS_PUBLIC   = goconf.AppConf.String("img_builder.address.public")
+	IMG_BUILD_ADDRESS_INTERNAL = goconf.AppConf.String("img_builder.address.internal")
+	IMG_BUILD_SECRET_TOKEN     = goconf.AppConf.String("img_builder.secret_token")
+	IMG_BUILD_BUILD_DELAY, _   = goconf.AppConf.Int64("img_builder.build_delay")
 )
 
 func init() {
