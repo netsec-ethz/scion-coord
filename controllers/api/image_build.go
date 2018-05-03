@@ -59,17 +59,17 @@ type customImage struct {
     Status int
 }
 
-func (c *customImage) MarshalJSON() ([]byte, error) {  
-    m := make(map[string]string)
-    m["image"] = c.Device
-    m["id"] = c.JobId
-    m["download_link"] = config.IMG_BUILD_ADDRESS+"/download/"+c.JobId
-    if(c.Status==READY){
-        m["status"]="ready"
-    }else{
-        m["status"]="building"
-    }
-    return json.Marshal(m)
+func (c *customImage) MarshalJSON() ([]byte, error) {
+	m := make(map[string]string)
+	m["image"] = c.Device
+	m["id"] = c.JobId
+	m["download_link"] = config.IMG_BUILD_ADDRESS_PUBLIC + "/download/" + c.JobId
+	if c.Status == READY {
+		m["status"] = "ready"
+	} else {
+		m["status"] = "building"
+	}
+	return json.Marshal(m)
 }
 
 type userJobs struct {
@@ -157,15 +157,15 @@ func (u *userJobs) removeImage(jobId string){
 }
 
 func (s *SCIONImgBuildController) GetAvailableDevices(w http.ResponseWriter, r *http.Request) {
-    resp, err := http.Get(config.IMG_BUILD_ADDRESS+"/get-images")
-    if err != nil {
-        s.Error500(w, err, "Error contacting remote image building service!")
-        return
-    }
-    defer resp.Body.Close()
+	resp, err := http.Get(config.IMG_BUILD_ADDRESS_INTERNAL + "/get-images")
+	if err != nil {
+		s.Error500(w, err, "Error contacting remote image building service!")
+		return
+	}
+	defer resp.Body.Close()
 
-    w.Header().Set("Content-Type", "application/json")
-    io.Copy(w, resp.Body)
+	w.Header().Set("Content-Type", "application/json")
+	io.Copy(w, resp.Body)
 }
 
 func (s *SCIONImgBuildController) GenerateImage(w http.ResponseWriter, r *http.Request) {
@@ -232,58 +232,58 @@ func (s *SCIONImgBuildController) GenerateImage(w http.ResponseWriter, r *http.R
     fmt.Fprintln(w, message)
 }
 
-func startBuildJob(configFileName, configFilePath string, bRequest buildRequest, buildJobs *userJobs)(error){
+func startBuildJob(configFileName, configFilePath string, bRequest buildRequest, buildJobs *userJobs) error {
 
-    data, err := ioutil.ReadFile(configFilePath)
-    if err != nil {
-        return fmt.Errorf("Error reading configuration file [%s] %v", configFileName, err)
-    }
-    body := new(bytes.Buffer)
-    writer := multipart.NewWriter(body)
-    part, err := writer.CreateFormFile("config_file", configFileName)
-    if err != nil {
-        return err
-    }
-    part.Write(data)
+	data, err := ioutil.ReadFile(configFilePath)
+	if err != nil {
+		return fmt.Errorf("Error reading configuration file [%s] %v", configFileName, err)
+	}
+	body := new(bytes.Buffer)
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("config_file", configFileName)
+	if err != nil {
+		return err
+	}
+	part.Write(data)
 
-    writer.WriteField("token", config.IMG_BUILD_SECRET_TOKEN)
-    writer.Close()
+	writer.WriteField("token", config.IMG_BUILD_SECRET_TOKEN)
+	writer.Close()
 
-    url:=config.IMG_BUILD_ADDRESS+"/create/"+bRequest.ImageName
-    req, err := http.NewRequest(http.MethodPost, url , body)
-    log.Printf("Sending request to: %s", url)
-    req.Header.Add("Content-Type", writer.FormDataContentType())
-    if err != nil {
-        return err
-    }
+	url := config.IMG_BUILD_ADDRESS_INTERNAL + "/create/" + bRequest.ImageName
+	req, err := http.NewRequest(http.MethodPost, url, body)
+	log.Printf("Sending request to: %s", url)
+	req.Header.Add("Content-Type", writer.FormDataContentType())
+	if err != nil {
+		return err
+	}
 
-    resp, err := httpClient.Do(req)
+	resp, err := httpClient.Do(req)
 
-    if err != nil {
-        // Error in communication with server
-        return err
-    } else if (resp.StatusCode!=200){
-        // Server returned an error!
-        buf := new(bytes.Buffer)
-        buf.ReadFrom(resp.Body)
-        return fmt.Errorf("Server returned %d error: %s", resp.StatusCode, buf.String())
-    }
+	if err != nil {
+		// Error in communication with server
+		return err
+	} else if resp.StatusCode != 200 {
+		// Server returned an error!
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(resp.Body)
+		return fmt.Errorf("Server returned %d error: %s", resp.StatusCode, buf.String())
+	}
 
-    responseBody, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        return err
-    }
+	responseBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
 
-    newImage := &customImage{}
-    err = json.Unmarshal(responseBody, newImage)
-    if(err != nil){
-        return err
-    }
+	newImage := &customImage{}
+	err = json.Unmarshal(responseBody, newImage)
+	if err != nil {
+		return err
+	}
 
-    newImage.Status=BUILDING
-    buildJobs.addImage(newImage)
+	newImage.Status = BUILDING
+	buildJobs.addImage(newImage)
 
-    return nil
+	return nil
 }
 
 func (s *SCIONImgBuildController) GetUserImages(w http.ResponseWriter, r *http.Request) {
@@ -326,12 +326,12 @@ func getJson(url string, target interface{}) error {
     return json.NewDecoder(r.Body).Decode(target)
 }
 
-func getJobStatus(id string)(bool, bool, error){
-    status := &jobStatus{}
-    err := getJson(config.IMG_BUILD_ADDRESS+"/status/"+id, status)
-    if(err!=nil){
-        return false, false, err
-    }
+func getJobStatus(id string) (bool, bool, error) {
+	status := &jobStatus{}
+	err := getJson(config.IMG_BUILD_ADDRESS_INTERNAL+"/status/"+id, status)
+	if err != nil {
+		return false, false, err
+	}
 
     return status.Exists, status.Finished, nil
 }
