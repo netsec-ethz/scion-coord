@@ -9,7 +9,7 @@ jobs:
           - MYSQL_ROOT_PASSWORD: development_pass
           - MYSQL_DATABASE: scion_coord_test
 
-        image: "circleci/mysql:latest"
+        image: "circleci/mysql:5.7"
     steps: 
       - checkout
       - run: "cp conf/development.conf.default conf/development.conf"
