@@ -61,12 +61,8 @@ func (s *SCIONLabASController) checkAuthorization(r *http.Request) (apIA string,
 	}
 
 	ases, err := s.ownedASes(r)
-	if err != nil {
-		return
-	}
-
-	for _, as := range ases {
-		if as == apIA {
+	if err == nil {
+		if _, ourAS := ases[apIA]; ourAS {
 			return
 		}
 	}
@@ -75,10 +71,14 @@ func (s *SCIONLabASController) checkAuthorization(r *http.Request) (apIA string,
 }
 
 // List of all ASes belonging to the account
-func (s *SCIONLabASController) ownedASes(r *http.Request) (ases []string, err error) {
+func (s *SCIONLabASController) ownedASes(r *http.Request) (ases map[string]struct{}, err error) {
 	vars := mux.Vars(r)
 	accountID := vars["account_id"]
-	ases, err = models.FindSCIONLabASesByAccountID(accountID)
+	asesList, err := models.FindSCIONLabASesByAccountID(accountID)
+	ases = make(map[string]struct{})
+	for _, as := range asesList {
+		ases[as] = struct{}{}
+	}
 	return
 }
 
@@ -180,12 +180,7 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 
 	failedConfirmations := []string{}
 	for ia, event := range UpdateLists {
-		isAuthorized := false
-		for _, as := range ownedASes {
-			if as == ia {
-				isAuthorized = true
-			}
-		}
+		_, isAuthorized := ownedASes[ia]
 		if !isAuthorized {
 			log.Printf("Unauthorized updates from AS %v", ia)
 		}
@@ -215,8 +210,7 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 
 // Updates the relevant DB tables based on the received confirmations from the SCIONLab AP and sends
 // out confirmation emails
-func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONLabAS, action string,
-	cns []string) []string {
+func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONLabAS, action string, cns []string) []string {
 	log.Printf("action = %v, cns = %v", action, cns)
 	type emailConfirmation struct {
 		user   string
