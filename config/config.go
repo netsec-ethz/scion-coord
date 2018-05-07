@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/sec51/goconf"
 )
@@ -35,6 +36,7 @@ var (
 	EMAIL_PM_SERVER_TOKEN    = goconf.AppConf.String("email.pm_server_token")
 	EMAIL_PM_ACCOUNT_TOKEN   = goconf.AppConf.String("email.pm_account_token")
 	EMAIL_FROM               = goconf.AppConf.String("email.from")
+	EMAIL_ADMINS             = goconf.AppConf.Strings("email.admin_emails")
 	CAPTCHA_SECRET_KEY       = goconf.AppConf.String("captcha.secret_key")
 	CAPTCHA_SITE_KEY         = goconf.AppConf.String("captcha.site_key")
 	SESSION_PATH             = goconf.AppConf.String("session.path")
@@ -110,6 +112,12 @@ func init() {
 		}
 		SIGNING_ASES[ki] = vi
 	}
+	// validate email addresses?
+	validated := []string{}
+	for _, admin := range EMAIL_ADMINS {
+		validated = append(validated, strings.Trim(admin, " "))
+	}
+	EMAIL_ADMINS = validated
 }
 
 func MaxASes(isAdmin bool) int {

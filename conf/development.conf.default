@@ -50,6 +50,7 @@ http.enable_https = 0
 email.from = "no-reply@scionlab.org"
 email.pm_server_token = ""
 email.pm_account_token = ""
+email.admin_emails = "admin1@scionlab.org; admin2@scionlab.org"
 
 # Captcha configs
 captcha.site_key = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
