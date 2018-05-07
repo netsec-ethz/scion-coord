@@ -17,8 +17,10 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
 
 	"errors"
 
@@ -153,22 +155,41 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 	fmt.Fprintln(w, string(b))
 }
 
+type attachedAsAck struct {
+	IA      string
+	Success bool
+}
+
+type rejectedAS struct {
+	IA     string
+	AP     string
+	action string
+}
+
 // API end-point to mark the provided SCIONLabASes as Created, Updated or Removed
 // An example request to this API may look like the following:
 // {"1-7":
 //        {"Created":[],
 //         "Removed":[],
-//         "Updated":["1-1020", "1-1023"]
+//         "Updated":[{"IA": "1-1020", "success": true}, {"IA": "1-1020", "success": false}]
 //        }
 // }
-// If sucessful, the API will return an empty JSON response with HTTP code 200.
+// If successful, the API will return an empty JSON response with HTTP code 200.
 func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("API Call for ConfirmUpdatesFromAP")
+	bodyBytes, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("Error reading body of HTTP request. Error: %v \nBody: %v", r.Body, err)
+		s.BadRequest(w, err, "Error reading request body")
+		return
+	}
+	body := string(bodyBytes)
+	fmt.Println("Body:", body)
 
-	var UpdateLists map[string]map[string][]string
-	decoder := json.NewDecoder(r.Body)
+	var UpdateLists map[string]map[string][]attachedAsAck
+	decoder := json.NewDecoder(strings.NewReader(body))
 	if err := decoder.Decode(&UpdateLists); err != nil {
-		log.Printf("Error decoding JSON: %v, %v", r.Body, err)
+		log.Printf("Error decoding JSON: %v, %v", err, body)
 		s.BadRequest(w, err, "Error decoding JSON")
 		return
 	}
@@ -179,6 +200,8 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 	}
 
 	failedConfirmations := []string{}
+
+	rejectedIAs := []rejectedAS{}
 	for ia, event := range UpdateLists {
 		_, isAuthorized := ownedASes[ia]
 		if !isAuthorized {
@@ -190,23 +213,37 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 		}
 		if !isAuthorized || err != nil {
 			for _, cns := range event {
-				for _, ia := range cns {
+				for _, attachedAS := range cns {
+					ia := attachedAS.IA
 					failedConfirmations = append(failedConfirmations, ia)
 				}
 			}
+			continue
 		}
+
 		for action, cns := range event {
-			failedConfirmations = append(failedConfirmations, s.processConfirmedUpdatesFromAP(
-				as, action, cns)...)
+			successIAs := []string{}
+			for _, conn := range cns {
+				if conn.Success {
+					successIAs = append(successIAs, conn.IA)
+				} else {
+					rejectedIAs = append(rejectedIAs, rejectedAS{IA: conn.IA, AP: ia, action: action})
+				}
+			}
+			failedConfirmations = append(failedConfirmations, s.processConfirmedUpdatesFromAP(as, action, successIAs)...)
 		}
 	}
+	s.processRejectedUpdatesFromAP(rejectedIAs)
 	if len(failedConfirmations) > 0 {
+		log.Printf("ERROR processing confirmations for the following ASes: %v", failedConfirmations)
 		s.Error500(w, nil, "Error processing confirmations for the following ASes: %v",
 			failedConfirmations)
 		return
 	}
 	fmt.Fprintln(w, "{}")
 }
+
+// 3-1034,[141.44.25.146]:30100
 
 // Updates the relevant DB tables based on the received confirmations from the SCIONLab AP and sends
 // out confirmation emails
@@ -218,7 +255,7 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 		action string
 	}
 	failedConfirmations := []string{}
-	emails := []emailConfirmation{}
+	successEmails := []emailConfirmation{}
 	for _, ia := range cns {
 		// find the connection to the SCIONLabAS. e.g. ia=1-1001
 		IA, err := addr.IAFromString(ia)
@@ -292,14 +329,36 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 					ia, apAS.IA(), action)
 			}
 		}
-		emails = append(emails, emailConfirmation{as.UserEmail, as.IA(), action})
+		successEmails = append(successEmails, emailConfirmation{as.UserEmail, as.IA(), action})
 	}
-	for _, e := range emails {
+	for _, e := range successEmails {
 		if err := sendConfirmationEmail(e.user, e.IA, e.action); err != nil {
 			log.Printf("Error sending email confirmation to user %v: %v", e.user, err)
 		}
 	}
 	return failedConfirmations
+}
+
+func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejectedAS) []string {
+	failedNotifications := []string{}
+	// for each rejected AS, send an email to the admin and user
+	for _, ras := range rejections {
+		as, err := models.FindSCIONLabASByIAString(ras.IA)
+		if err != nil {
+			log.Printf("Error finding SCIONLabAS %v: %v", ras.IA, err)
+			failedNotifications = append(failedNotifications, ras.IA)
+			continue
+		}
+		err = sendRejectedEmail(as.UserEmail, ras.IA, ras.action, ras.AP)
+		if err != nil {
+			log.Printf("Error sending email about rejected AS %v: %v", ras.IA, err)
+			failedNotifications = append(failedNotifications, ras.IA)
+			continue
+		}
+		// now, clear the rejected AS, as the AP went out of sync with the Coordinator
+	}
+
+	return failedNotifications
 }
 
 // Function which sends confirmation emails to users
@@ -310,7 +369,7 @@ func sendConfirmationEmail(userEmail, IA, action string) error {
 	}
 
 	var message string
-	subject := "[SCIONLab] "
+	subject := "[SCIONLab] Failure, "
 	switch action {
 	case CREATED:
 		message = fmt.Sprintf("The infrastructure for your SCIONLab AS %s has been created. "+
@@ -338,4 +397,30 @@ func sendConfirmationEmail(userEmail, IA, action string) error {
 	}
 	log.Printf("Sending confirmation email to user %v.", userEmail)
 	return email.ConstructAndSend("as_status.html", subject, data, "as-update", userEmail)
+}
+
+// sends an email notifying of a failure to synchronize the attachment point with the user AS.\
+// Also notifies an admin in netsec
+func sendRejectedEmail(userEmail string, userIA, action, attachmentPointIA string) error {
+	user, err := models.FindUserByEmail(userEmail)
+	if err != nil {
+		return err
+	}
+
+	subject := fmt.Sprintf("[SCIONLab] Could not complete request for %s", userIA)
+	message := fmt.Sprintf(`The request for your AS %s to be (%s) from the attachment point %s could not be completed. You need to check the configuration for your AS in the Coordinator. Ensure you select the option to Update and Download the ScionLab Configuration after reviewing it.
+If the problem persists, please contact the ScionLab Administrators.`, userIA, action, attachmentPointIA)
+
+	data := struct {
+		FirstName   string
+		LastName    string
+		HostAddress string
+		Message     string
+	}{
+		FirstName:   user.FirstName,
+		LastName:    user.LastName,
+		HostAddress: config.HTTP_HOST_ADDRESS,
+		Message:     message,
+	}
+	return email.ConstructAndSendEmail("as_status.html", subject, data, "as-rejection", userEmail, true)
 }
