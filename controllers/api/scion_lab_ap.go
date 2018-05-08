@@ -349,13 +349,67 @@ func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejecte
 			failedNotifications = append(failedNotifications, ras.IA)
 			continue
 		}
+		ap, err := models.FindSCIONLabASByIAString(ras.AP)
+		if err != nil {
+			log.Printf("Error finding SCIONLabAS %v: %v", ras.IA, err)
+			failedNotifications = append(failedNotifications, ras.IA)
+			continue
+		}
+		asCns, err := ap.GetRespondConnectionInfoToAS(ras.IA)
+		if err != nil {
+			log.Printf("Error finding the connection to SCIONLabAS %v: %v", ras.IA, err)
+			failedNotifications = append(failedNotifications, ras.IA)
+			continue
+		}
 		err = sendRejectedEmail(as.UserEmail, ras.IA, ras.action, ras.AP)
 		if err != nil {
 			log.Printf("Error sending email about rejected AS %v: %v", ras.IA, err)
 			failedNotifications = append(failedNotifications, ras.IA)
 			continue
 		}
+
 		// now, clear the rejected AS, as the AP went out of sync with the Coordinator
+		for _, cn := range asCns {
+			switch cn.Status {
+			default:
+				continue
+			case models.CREATE, models.UPDATE, models.REMOVE:
+				// just go on
+			}
+			err = models.DeleteConnection(cn.ID)
+			if err != nil {
+				log.Printf("ERROR removing rejected connection. UserAS: %s, AP: %s, action: %s", ras.IA, ras.AP, ras.action)
+				failedNotifications = append(failedNotifications, ras.IA)
+			}
+			break // only one connection could have been rejected. We just processed it, so get out of here
+		}
+		// fix the status of the AS entry, if needed:
+		switch as.Status {
+		default: // nothing to do
+		case models.UPDATE, models.REMOVE:
+			// only case where a rejected connection could keep the Status out of sync
+			cns, err := as.GetJoinConnectionInfo()
+			if err != nil {
+				log.Printf("ERROR removing rejected connection, get connections to reset AS Status for AS %s: %v", ras.IA, err)
+				failedNotifications = append(failedNotifications, ras.IA)
+				continue
+			}
+			switch len(cns) {
+			case 0:
+				as.Status = models.INACTIVE
+			case 1:
+				as.Status = cns[0].Status
+			default:
+			}
+			if err = as.Update(); err != nil {
+				log.Printf("ERROR removing rejected connection, re-setting AS Status for AS %s: %v", ras.IA, err)
+				continue
+			}
+		}
+		if as.Update() != nil {
+			log.Printf("ERROR removing rejected connection. Updating status of user AS failed for %s", ras.IA)
+			continue
+		}
 	}
 
 	return failedNotifications

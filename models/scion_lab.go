@@ -407,6 +407,22 @@ func (as *SCIONLabAS) GetJoinConnectionInfoToAS(apIA string) ([]ConnectionInfo, 
 	return res, err
 }
 
+// GetRespondConnectionInfoToAS returns a list where the AS is the responding AS (the AP), and the
+// other IA is the user AS attached to it.
+func (as *SCIONLabAS) GetRespondConnectionInfoToAS(anotherIA string) ([]ConnectionInfo, error) {
+	cns, err := as.GetRespondConnectionInfo()
+	if err != nil {
+		return nil, err
+	}
+	var res []ConnectionInfo
+	for _, cn := range cns {
+		if utility.IAString(cn.NeighborISD, cn.NeighborAS) == anotherIA {
+			res = append(res, cn)
+		}
+	}
+	return res, err
+}
+
 // Takes the IA string as an input and returns all ConnectionInfos where the AS is the AP
 func FindRespondConnectionInfoByIA(ia string) ([]ConnectionInfo, error) {
 	as, err := FindSCIONLabASByIAString(ia)
@@ -669,7 +685,6 @@ func (as *SCIONLabAS) DeleteConnectionFromDB(cnInfo *ConnectionInfo) error {
 	return cn.Delete()
 }
 
-
 func (as *SCIONLabAS) FlagAllConnectionsToApToBeDeleted(apIA string) error {
 	cns, err := as.GetJoinConnectionInfo()
 	if err != nil {
@@ -702,5 +717,10 @@ func (ap *AttachmentPoint) Delete() error {
 
 func (cn *Connection) Delete() error {
 	_, err := o.Delete(cn)
+	return err
+}
+
+func DeleteConnection(connectionId uint64) error {
+	_, err := o.Delete(&Connection{ID: connectionId})
 	return err
 }
