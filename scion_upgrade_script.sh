@@ -3,7 +3,7 @@
 set -e
 
 # version of the systemd files:
-SERVICE_CURRENT_VERSION="0.3"
+SERVICE_CURRENT_VERSION="0.4"
 
 # version less or equal. E.g. verleq 1.9 2.0.8  == true (1.9 <= 2.0.8)
 verleq() {
@@ -28,6 +28,19 @@ check_system_files() {
         fi
     done
     if [ $need_to_reload -eq 1 ]; then
+        [[ $(ps aux | grep ntpd | grep -v grep | wc -l) == 1 ]] && ntp_running=1 || ntp_running=0
+        [[ $(grep -e 'start-stop-daemon\s*--start\s*--quiet\s*--oknodo\s*--exec\s*\/usr\/sbin\/VBoxService\s*--\s*--disable-timesync$' /etc/init.d/virtualbox-guest-utils |wc -l) == 1 ]] && host_synced=0 || host_synced=1
+        if [ $host_synced != 0 ]; then
+            echo "Disabling time synchronization via host..."
+            sudo sed -i -- 's/^\(\s*start-stop-daemon\s*--start\s*--quiet\s*--oknodo\s*--exec\s*\/usr\/sbin\/VBoxService\)$/\1 -- --disable-timesync/g' /etc/init.d/virtualbox-guest-utils
+            sudo systemctl daemon-reload
+            sudo systemctl restart virtualbox-guest-utils
+            sudo systemctl restart ntp || true # might fail if not installed yet
+        fi
+        if [ $ntp_running != 1 ]; then
+            echo "Installing ntpd..."
+            sudo apt-get install -y --no-remove ntp
+        fi
         # don't attempt to stop the service as we are a child !
         # if really needed, specify KillMode=none in the service file itself
         sudo systemctl daemon-reload
