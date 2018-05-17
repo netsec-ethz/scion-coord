@@ -76,7 +76,7 @@ scionCoordPid=''
 exitMessage=''
 restoreGen=''
 CURRENTWD="$PWD"
-thisdir="$(dirname $(realpath $0))"
+basedir="$(realpath $(dirname $(realpath $0))/../)"
 mkdir -p "$NETSEC"
 cd "$NETSEC"
 
@@ -107,13 +107,13 @@ case $opt in
 esac
 done
 
-if [ ! -f "$thisdir/scion_install_script.sh" ]; then
+if [ ! -f "$basedir/scion_install_script.sh" ]; then
     exitMessage="Could not find the SCION installation script. Aborting."
     exit 1
 fi
 cleanZookeeper
 archiveGenFolder
-bash "$thisdir/scion_install_script.sh"
+bash "$basedir/scion_install_script.sh"
 source ~/.profile
 
 # check requirements to be an attachment point
