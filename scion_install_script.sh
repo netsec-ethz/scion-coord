@@ -88,6 +88,7 @@ fi
 
 command -v git >/dev/null 2>&1 || sudo apt-get -y install git
 
+[ -f ~/.profile ] || touch ~/.profile
 source ~/.profile
 echo "$GOPATH" | grep "$HOME/go" &> /dev/null || echo 'export GOPATH="$HOME/go"' >> ~/.profile
 echo "$PATH" | grep "/usr/local/go/bin" &> /dev/null || echo 'export PATH="/usr/local/go/bin:$PATH"' >> ~/.profile
@@ -100,7 +101,6 @@ source ~/.profile
 # if you don't have a user configured, set up http to clone anonymously:
 git config -l | grep 'user.email' &>/dev/null || git config --global url.https://github.com/.insteadOf git@github.com:
 
-mkdir -p "$GOPATH"
 mkdir -p "$GOPATH/src/github.com/scionproto"
 cd "$GOPATH/src/github.com/scionproto"
 if [ ! -d scion ]
@@ -138,7 +138,6 @@ fi
 
 echo "Installing dependencies..."
 bash -c 'yes | GO_INSTALL=true ./env/deps' > /dev/null
-
 if ! areAllLinesInsideFile "$(cat docker/zoo.cfg)" "/etc/zookeeper/conf/zoo.cfg";
 then
     sudo cp docker/zoo.cfg /etc/zookeeper/conf/zoo.cfg
@@ -272,5 +271,5 @@ fi
 # check if zookeeper is running:
 if ! /usr/share/zookeeper/bin/zkServer.sh status &>/dev/null; then
     echo "Zookeeper not started. Starting the service."
-    sudo systemctl restart zookeeper # restart, because we want to ensure it's running
+    sudo systemctl restart zookeeper || true # restart, because we want to ensure it's running
 fi
