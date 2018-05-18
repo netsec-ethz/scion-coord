@@ -1,0 +1,34 @@
+version: '3'
+services:
+  mysql:
+    image: "mysql/mysql-server:5.7"
+    environment:
+      MYSQL_ROOT_PASSWORD: development_pass
+      MYSQL_ROOT_HOST: '%'
+      # MYSQL_ROOT_HOST: 172.*.*.*
+  test:
+    # call e.g.
+    # docker-compose -f docker/test-coordinator.yml up --abort-on-container-exit --exit-code-from test
+    depends_on:
+      - mysql
+
+    # image: "juagargi/scionlab-coord:0.1"
+    image: "scionlab-coord-test"
+    # build:
+    #   dockerfile: "./docker/Dockerfile-coord"
+    #   dockerfile: "./docker/Dockerfile-coord-test"
+    #   context: ..
+    # entrypoint:
+    #   - /bin/bash 
+    #   - -l
+    # entrypoint: sleep 30000
+    
+  # console:
+  #   image: "ubuntu:16.04"
+  #   # command: /bin/bash -l
+  #   # command: ["/bin/bash", "-l"]
+  #   entrypoint:
+  #     - /bin/bash 
+  #     - -l
+  #   stdin_open: true
+  #   tty: true
