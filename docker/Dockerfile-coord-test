@@ -1,0 +1,51 @@
+FROM scionlab-coord:0.1
+
+ENV HOME /home/scion
+ENV GOPATH $HOME/go
+ENV PATH /usr/lib/go-1.9/bin:$GOPATH/bin:$HOME/.local/bin:$PATH
+ENV SC $GOPATH/src/github.com/scionproto/scion
+ENV CONFDIR $HOME/scionLabConfigs
+
+ARG SCIONCOORD=$GOPATH/src/github.com/netsec-ethz/scion-coord
+ENV SCIONCOORD $SCIONCOORD
+
+USER scion
+
+WORKDIR $SC
+RUN rm -rf $./gen && ./scion.sh topology -c topology/Tiny.topo
+
+WORKDIR $HOME
+# just copy the whole thing:
+# TODO: copy only binaries, scripts, etc
+RUN rm -rf ${SCIONCOORD}
+RUN mkdir ${SCIONCOORD}
+COPY --chown=scion . ${SCIONCOORD}/
+# we need to configure again mysql (we overwrote the config file with the host's one)
+RUN sed -i -- 's/^db.host = "127.0.0.1"$/db.host = "mysql"/g'   "$SCIONCOORD/conf/development.conf"
+
+# requirements for this container as an AP:
+WORKDIR ${SCIONCOORD}/sub/scion-box
+RUN ./scripts/install_attachment_point.sh -t
+
+RUN mkdir -p "$SCIONCOORD/credentials"
+WORKDIR ${SCIONCOORD}/credentials
+RUN cp "$SC/gen/ISD1/AS11/br1-11-1/keys/as-sig.seed" ISD1.key
+RUN cp "$SC/gen/ISD1/AS11/br1-11-1/certs/ISD1-AS11-V1.crt" ISD1.crt
+RUN cp "$SC/gen/ISD1/AS11/br1-11-1/certs/ISD1-V1.trc" ISD1.trc
+
+# VPN keys:
+RUN mkdir -p "$CONFDIR"
+RUN cp -r /usr/share/easy-rsa "$CONFDIR"
+RUN cp "$SCIONCOORD/conf/easy-rsa_vars.default" "$CONFDIR/easy-rsa/vars"
+WORKDIR "$CONFDIR/easy-rsa"
+RUN sed -i -- 's/export KEY_EMAIL="scion@lists.inf.ethz.ch"/export KEY_EMAIL="netsec.test.email@gmail.com"/g' ./vars
+# build the CA non interactively
+RUN bash -c 'source ./vars && ./clean-all && ./pkitool --initca'
+
+
+
+# copy test script and run
+WORKDIR ${SCIONCOORD}
+COPY --chown=scion ./docker/testscripts/test1.sh ${SCIONCOORD}/docker/testscripts/test1.sh
+
+ENTRYPOINT ${SCIONCOORD}/docker/testscripts/test1.sh

@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Installs the Coordinator and requirements, prepares the DB and runs the Coordinator.
+# If invoked with the docker switch, it will just do the installation and return.
+
 set -e
 
 checkIfGitRepo() {
@@ -63,8 +66,6 @@ if ! checkIfGitRepo "./scion-coord" ; then
     fi
     git config --global url.https://github.com/.insteadOf git@github.com:
     git clone --recursive git@github.com:netsec-ethz/scion-coord 
-
-    # git clone --recursive https://github.com/netsec-ethz/scion-coord 
 fi
 
 # check go dependencies
@@ -75,10 +76,10 @@ echo "done (Coordinator installed)."
 
 # SCION
 if [ -x "$basedir/scion_install_script.sh" ]; then
-    echo "Installing / Checking SCION ..."
+    echo "... Installing / Checking SCION ..."
     bash "$basedir/scion_install_script.sh"
     source ~/.profile
-    echo "done (SCION installed)."
+    echo "... done (SCION installed)."
 fi
 
 echo "Installing other requirements..."
@@ -101,17 +102,29 @@ if ! dpkg-query -s mysql-server &> /dev/null ; then
     DEBIAN_FRONTEND="noninteractive" sudo apt-get install mysql-server -y
 fi
 
-# check if mysqld is running:
-if ! pgrep -x "mysqld" &>/dev/null; then
-    echo "MySQL is not running. Starting the service."
-    if [ "$inside_docker" != 1 ]; then
-        sudo systemctl restart mysql
+# check binary
+echo "Building SCION Coordinator binary..."
+rm -f "scion-coord"
+pushd "$SCIONCOORD" >/dev/null
+go build
+if [ ! -x "scion-coord" ]; then
+    echo "Still didn't find the binary. Abort."
+    exit 1
+fi
+popd >/dev/null
+echo "done (SCION Coordinator binary built)."
+
+if [ "$inside_docker" == 1 ]; then
+    echo "Running in docker. Configuring MySQL to run on host 'mysql'."
+    # copy the default configuration and edit it for postmark
+    cp "$SCIONCOORD/conf/development.conf.default" "$SCIONCOORD/conf/development.conf"
+    sed -i -- 's/email.pm_server_token = ""/email.pm_server_token = "server_token"/g' "$SCIONCOORD/conf/development.conf"
+    sed -i -- 's/email.pm_account_token = ""/email.pm_account_token = "account_token"/g' "$SCIONCOORD/conf/development.conf"
+    echo "Success."
+    exit 0
 fi
 
-if ! runSQL "SHOW DATABASES;" | grep "scion_coord_test" &> /dev/null; then
-    runSQL "CREATE DATABASE scion_coord_test;" || (echo "Failed to create the SCION Coordinator DB" && exit 1)
-    echo "Empty DB created"
-fi
+############## NON DOCKER system:
 
 # VPN stuff
 mkdir -p "$SCIONCOORD/credentials"
@@ -122,22 +135,15 @@ if [ ! -f "$CONFDIR/easy-rsa/keys/ca.crt" ]; then
     exit 1
 fi
 
-# check binary
-echo "Building SCION Coordinator binary..."
-rm -f "scion-coord"
-pushd "$basedir" >/dev/null
-go build
-if [ ! -x "scion-coord" ]; then
-    echo "Still didn't find the binary. Abort."
-    exit 1
+# check if mysqld is running:
+if ! pgrep -x "mysqld" &>/dev/null; then
+    echo "MySQL is not running. Starting the service."
+    sudo systemctl restart mysql
 fi
-popd >/dev/null
-echo "done (SCION Coordinator binary built)."
 
-if [ "$inside_docker" == 1 ]; then
-    echo "Running in docker. Nothing else to do."
-    echo "Success."
-    exit 0
+if ! runSQL "SHOW DATABASES;" | grep "scion_coord_test" &> /dev/null; then
+    runSQL "CREATE DATABASE scion_coord_test;" || (echo "Failed to create the SCION Coordinator DB" && exit 1)
+    echo "Empty DB created"
 fi
 
 # check service file
