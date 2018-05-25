@@ -22,7 +22,7 @@ scionApp
                         }
                         else
                             $scope.asInfo = $scope.asInfos[$scope.currentIndex];
-                        $scope.grafanaLink = data["GrafanaLink"]
+                            $scope.grafanaLink = data["GrafanaLink"]
                     },
                     function (response) {
                         console.log(response);
