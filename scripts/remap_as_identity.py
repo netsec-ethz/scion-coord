@@ -50,6 +50,7 @@ def solve_challenge(challenge):
         print("ERROR: could not find a certificate under ", certificate)
         sys.exit(1)
     certificate = os.path.join(certificate, certificates[0])
+    print (certificate)
     try:
         with open(certificate) as f:
             certificate = f.read()
@@ -82,12 +83,14 @@ def solve_challenge(challenge):
 
 
     # -------------------- we don't need this ------
+    print (certificate)
     chain = CertificateChain.from_raw(certificate)
     certificate = chain.as_cert
+    print (certificate)
     publickey = certificate.subject_sig_key_raw
 
     result = verify(challenge, signed, publickey)
-    print ("signature verified? ", result)
+    print ("signature verified? ", result, ", using publickey: ", publickey)
     # ----------------------------------------------
 
 
@@ -124,7 +127,10 @@ def something_pending():
         print ("Error querying Coordinator solving challenge: ", e)
         return False
     content = resp.content.decode('utf-8')
-    content = json.loads(content)
+    try:
+        content = json.loads(content)
+    except:
+        content = {}
     print ("------------------------- Reply from Coordinator after solution: -----------------------")
     print (content)
     return True

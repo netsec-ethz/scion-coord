@@ -178,3 +178,12 @@ func SendJSON(object interface{}, w http.ResponseWriter) error {
 	}
 	return err
 }
+
+// SendJSONError sends the object as JSON, with a 400 HTTP error code
+func SendJSONError(object interface{}, w http.ResponseWriter) error {
+	b, err := json.Marshal(object)
+	if err == nil {
+		http.Error(w, string(b), http.StatusBadRequest)
+	}
+	return err
+}

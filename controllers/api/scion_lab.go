@@ -28,7 +28,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
+	"strings"
 	"text/template"
 	"time"
 
@@ -39,7 +41,9 @@ import (
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/models"
 	"github.com/netsec-ethz/scion-coord/utility"
+	"github.com/netsec-ethz/scion/go/lib/crypto/cert"
 	"github.com/scionproto/scion/go/lib/addr"
+	"github.com/scionproto/scion/go/lib/crypto"
 )
 
 var (
@@ -713,6 +717,8 @@ func (s *SCIONLabASController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 
 // RemapASIdentity returns the challenge the AS should solve if said AS has to map the identity.
 func (s *SCIONLabASController) RemapASIdentity(w http.ResponseWriter, r *http.Request) {
+	// TODO: remove debug print s
+	// TODO: refactor
 	answer := make(map[string]interface{})
 	answer["error"] = false
 
@@ -722,8 +728,7 @@ func (s *SCIONLabASController) RemapASIdentity(w http.ResponseWriter, r *http.Re
 	if err != nil {
 		answer["error"] = true
 		answer["msg"] = fmt.Sprintf("Could not find AS with IA %v", asID)
-		utility.SendJSON(answer, w)
-		http.Error(w, "", http.StatusBadRequest)
+		utility.SendJSONError(answer, w)
 		return
 	}
 	answeringChallenge := false
@@ -736,8 +741,7 @@ func (s *SCIONLabASController) RemapASIdentity(w http.ResponseWriter, r *http.Re
 	if err != nil {
 		answer["error"] = true
 		answer["msg"] = fmt.Sprintf("Could not read JSON in the request: %v", err)
-		utility.SendJSON(answer, w)
-		http.Error(w, "", http.StatusBadRequest)
+		utility.SendJSONError(answer, w)
 		return
 	}
 	json.Unmarshal(body, &request)
@@ -749,21 +753,18 @@ func (s *SCIONLabASController) RemapASIdentity(w http.ResponseWriter, r *http.Re
 		if !havechallenge || !haveanswer {
 			answer["msg"] = `JSON missing "challenge" or "answer"`
 			answer["error"] = true
-			utility.SendJSON(answer, w)
-			http.Error(w, "", http.StatusBadRequest)
+			utility.SendJSONError(answer, w)
 			return
 		}
 	}
 	// check if the existing AS needs remapping
 	if !as.AreIDsFromScionLab() {
-		log.Printf("AS %s needs remapping", asID)
 		oldanswer := make(map[string]interface{})
 		err = json.Unmarshal([]byte(as.RemapStatus), &oldanswer)
 		if err != nil {
 			log.Printf("There was an error recovering RemapStatus for %s: %v", asID, err)
 			oldanswer = make(map[string]interface{})
 		}
-
 		randomBytes := make([]byte, 512)
 		pending, pendingExists := oldanswer["pending"]
 		challenge, challengeExists := oldanswer["challenge"]
@@ -781,8 +782,7 @@ func (s *SCIONLabASController) RemapASIdentity(w http.ResponseWriter, r *http.Re
 			if err != nil {
 				answer["error"] = true
 				answer["msg"] = "Could not create challenge"
-				utility.SendJSON(answer, w)
-				http.Error(w, "", http.StatusBadRequest)
+				utility.SendJSONError(answer, w)
 				return
 			}
 		}
@@ -795,14 +795,64 @@ func (s *SCIONLabASController) RemapASIdentity(w http.ResponseWriter, r *http.Re
 			if err != nil {
 				answer["error"] = true
 				answer["msg"] = fmt.Sprintf("Could not update challenge for AS: %v", err)
-				utility.SendJSON(answer, w)
-				http.Error(w, "", http.StatusBadRequest)
+				utility.SendJSONError(answer, w)
 				return
 			}
 		}
 		if answeringChallenge {
-			// TODO: check solution to challenge
-			if request["answer"] == "correct" {
+			if request["challenge"] != answer["challenge"] {
+				msg := fmt.Sprintf("Different challenge being solved for IA %s.\nChallenge in DB   : %v\nChallenge received: %v", asID, answer["challenge"], request["challenge"])
+				answer["error"] = true
+				answer["msg"] = msg
+				utility.SendJSONError(answer, w)
+				return
+			}
+			receivedSignature, err := base64.StdEncoding.DecodeString(request["answer"].(string))
+			if err != nil {
+				answer["error"] = true
+				answer["msg"] = "Cannot decode the answer to the challenge"
+				utility.SendJSONError(answer, w)
+				return
+			}
+			path := filepath.Join(PackagePath, UserPackageName(as.UserEmail, as.ISD, as.ASID), "gen", fmt.Sprintf("ISD%d", as.ISD), fmt.Sprintf("AS%d", as.ASID),
+				fmt.Sprintf("bs%d-%d-1", as.ISD, as.ASID), "certs")
+			var chain *cert.Chain
+			fileInfos, err := ioutil.ReadDir(path)
+			if err == nil {
+				possibleCerts := []string{}
+				for _, f := range fileInfos {
+					if !f.IsDir() && strings.HasSuffix(strings.ToLower(f.Name()), ".crt") {
+						possibleCerts = append(possibleCerts, f.Name())
+					}
+				}
+				if len(possibleCerts) < 1 {
+					err = fmt.Errorf("Cannot find any .crt file for IA %v", asID)
+				} else {
+					sort.Sort(sort.Reverse(sort.StringSlice(possibleCerts)))
+					fmt.Println("DEBUG: possible certs: ", possibleCerts)
+					path = filepath.Join(path, possibleCerts[0])
+					// TODO: deleteme
+					path = "/home/juan/go/src/github.com/scionproto/scion/gen/ISD1/AS1010/bs1-1010-1/certs/ISD1-AS1010-V1.crt"
+					chainBytes, err := ioutil.ReadFile(path)
+					if err == nil {
+						chain, err = cert.ChainFromRaw(chainBytes, false)
+					}
+				}
+			}
+			// we could assert that chain is not null iff err == nil, but we also test it istead:
+			if err != nil || chain == nil {
+				// TODO: this is actually very bad, do we delete the AS entry here? what do we do?
+				answer["error"] = true
+				msg := fmt.Sprintf("ERROR in Coordinator: cannot load the public certificate for AS %s", asID)
+				answer["msg"] = msg
+				log.Print(msg)
+				return
+			}
+			publicKey := chain.Leaf.SubjectSignKey
+			fmt.Println("publickey: ", publicKey)
+			err = crypto.Verify(randomBytes, receivedSignature, publicKey, crypto.Ed25519)
+			fmt.Println("VERIFY ERROR?: ", err)
+			if err == nil {
 				answer["pending"] = false
 				// TODO: send gen folder
 			}
