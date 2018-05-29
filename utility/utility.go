@@ -16,10 +16,12 @@ package utility
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -166,4 +168,13 @@ func FillTemplateAndSave(templatePath string, data interface{}, savePath string)
 		return fmt.Errorf("error executing template file %v: %v", templatePath, err)
 	}
 	return nil
+}
+
+// SendJSON will marshall the passed object and write it to the ResponseWriter in the argument.
+func SendJSON(object interface{}, w http.ResponseWriter) error {
+	b, err := json.Marshal(object)
+	if err == nil {
+		_, err = fmt.Fprintln(w, string(b))
+	}
+	return err
 }

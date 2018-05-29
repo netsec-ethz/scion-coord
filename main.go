@@ -199,6 +199,9 @@ func main() {
 		scionLabASController.RemoveSCIONLabAS))
 	router.Handle("/api/as/downloadTarball/{as_id}", userChain.ThenFunc(
 		scionLabASController.ReturnTarball))
+	router.Handle("/api/as/remapId/{as_id}", loggingChain.ThenFunc(
+		scionLabASController.RemapASIdentity)).Methods(http.MethodGet, http.MethodPost)
+
 	router.Handle("/api/as/getUpdatesForAP/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabASController.GetUpdatesForAP))
 	router.Handle("/api/as/confirmUpdatesFromAP/{account_id}/{secret}",

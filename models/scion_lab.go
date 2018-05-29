@@ -57,6 +57,7 @@ type SCIONLabAS struct {
 	Created     time.Time        // When the AS was first created
 	Updated     time.Time        // Last time the configuration was modified or the AS called `ConfirmUpdate`
 	Connections []*Connection    `orm:"reverse(many)"` // List of Connections
+	RemapStatus string           `orm:"size(1000);type(json)"`
 }
 
 type Connection struct {
@@ -720,4 +721,14 @@ func (cn *Connection) Delete() error {
 func DeleteConnection(connectionId uint64) error {
 	_, err := o.Delete(&Connection{ID: connectionId})
 	return err
+}
+
+// AreIDsFromScionLab checks the ISD and AS numbers against the standard
+// you can find in https://github.com/scionproto/scion/wiki/ISD-and-AS-numbering , and returns
+// true if they are okay for SCIONLab; false otherwise.
+func (as *SCIONLabAS) AreIDsFromScionLab() bool {
+	if as.ISD <= 15 || as.ASID <= 4294967295 {
+		return false
+	}
+	return true
 }

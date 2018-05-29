@@ -16,6 +16,8 @@ package api
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -707,6 +709,111 @@ func (s *SCIONLabASController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
 	w.Header().Set("Content-Transfer-Encoding", "binary")
 	http.ServeContent(w, r, fileName, time.Now(), bytes.NewReader(data))
+}
+
+// RemapASIdentity returns the challenge the AS should solve if said AS has to map the identity.
+func (s *SCIONLabASController) RemapASIdentity(w http.ResponseWriter, r *http.Request) {
+	answer := make(map[string]interface{})
+	answer["error"] = false
+
+	vars := mux.Vars(r)
+	asID := vars["as_id"]
+	as, err := models.FindSCIONLabASByIAString(asID)
+	if err != nil {
+		answer["error"] = true
+		answer["msg"] = fmt.Sprintf("Could not find AS with IA %v", asID)
+		utility.SendJSON(answer, w)
+		http.Error(w, "", http.StatusBadRequest)
+		return
+	}
+	answeringChallenge := false
+	if r.Method == http.MethodPost {
+		answeringChallenge = true
+	}
+
+	request := make(map[string]interface{})
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		answer["error"] = true
+		answer["msg"] = fmt.Sprintf("Could not read JSON in the request: %v", err)
+		utility.SendJSON(answer, w)
+		http.Error(w, "", http.StatusBadRequest)
+		return
+	}
+	json.Unmarshal(body, &request)
+	fmt.Println(" ########### request: ", request)
+	if answeringChallenge {
+		// check we have the needed fields
+		_, havechallenge := request["challenge"]
+		_, haveanswer := request["answer"]
+		if !havechallenge || !haveanswer {
+			answer["msg"] = `JSON missing "challenge" or "answer"`
+			answer["error"] = true
+			utility.SendJSON(answer, w)
+			http.Error(w, "", http.StatusBadRequest)
+			return
+		}
+	}
+	// check if the existing AS needs remapping
+	if !as.AreIDsFromScionLab() {
+		log.Printf("AS %s needs remapping", asID)
+		oldanswer := make(map[string]interface{})
+		err = json.Unmarshal([]byte(as.RemapStatus), &oldanswer)
+		if err != nil {
+			log.Printf("There was an error recovering RemapStatus for %s: %v", asID, err)
+			oldanswer = make(map[string]interface{})
+		}
+
+		randomBytes := make([]byte, 512)
+		pending, pendingExists := oldanswer["pending"]
+		challenge, challengeExists := oldanswer["challenge"]
+		if challengeExists && pendingExists && pending.(bool) {
+			randomBytes, err = base64.StdEncoding.DecodeString(challenge.(string))
+			if err != nil {
+				// internal logic error
+				log.Printf("Logic error, failed to base64 decode stored challenge: %v", err)
+				return
+			}
+			answer["pending"] = pending
+		} else {
+			answer["pending"] = true
+			_, err = rand.Read(randomBytes)
+			if err != nil {
+				answer["error"] = true
+				answer["msg"] = "Could not create challenge"
+				utility.SendJSON(answer, w)
+				http.Error(w, "", http.StatusBadRequest)
+				return
+			}
+		}
+		answer["challenge"] = base64.StdEncoding.EncodeToString(randomBytes)
+		if !pendingExists {
+			// save the challenge to DB
+			marshalled, _ := json.Marshal(answer)
+			as.RemapStatus = string(marshalled)
+			err = as.Update()
+			if err != nil {
+				answer["error"] = true
+				answer["msg"] = fmt.Sprintf("Could not update challenge for AS: %v", err)
+				utility.SendJSON(answer, w)
+				http.Error(w, "", http.StatusBadRequest)
+				return
+			}
+		}
+		if answeringChallenge {
+			// TODO: check solution to challenge
+			if request["answer"] == "correct" {
+				answer["pending"] = false
+				// TODO: send gen folder
+			}
+		}
+	} // if needed remapping
+	err = utility.SendJSON(answer, w)
+	if err != nil {
+		log.Printf("Error during JSON marshaling: %v", err)
+		s.Error500(w, err, "Error during JSON marshaling")
+		return
+	}
 }
 
 // The handler function to remove a SCIONLab AS for the given user.
