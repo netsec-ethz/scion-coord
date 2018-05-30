@@ -35,6 +35,8 @@ http.host_address = "http://localhost:8080"
 
 # the URL of the grafana service
 grafana.url = https://prometheus.scionlab.org/d/UcSvf4giz/scionlab?orgId=1
+# the URL of the tutorials pages
+tutorials.url = https://netsec-ethz.github.io/scion-tutorials/
 
 # Setup for using HTTPS instead of HTTP
 # This requires a registered domain set for "http.host_address" and the ability
