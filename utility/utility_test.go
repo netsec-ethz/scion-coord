@@ -211,3 +211,29 @@ func TestCopyPath(t *testing.T) {
 			filepath.Join(src, "subdir"), filepath.Join(dst, "subdir"))
 	}
 }
+
+var mapOldIAToNewOneTests = []struct {
+	fromISD uint
+	fromAS  uint
+	toISD   uint
+	toAS    uint
+}{
+	{1, 1001, 17, 0xFFAA00010001},
+	{2, 1001, 18, 0xFFAA00010001},
+	{0, 1001, 0, 0},
+	{9, 1001, 0, 0},
+	{42, 1001, 0, 0},
+	{1, 1000, 0, 0},
+	{1, 2001, 0, 0},
+	{8, 1017, 24, 0xFFAA00010011},
+}
+
+func TestMapOldIAToNewOne(t *testing.T) {
+	for _, c := range mapOldIAToNewOneTests {
+		I, A := MapOldIAToNewOne(c.fromISD, c.fromAS)
+		if I != c.toISD || A != c.toAS {
+			t.Errorf("Wrong mapping (%d,%d) -> (%d,%#x). Should be (%d,%#x)", c.fromISD, c.fromAS, I, A, c.toISD, c.toAS)
+		}
+	}
+	// t.Errorf("we are done")
+}
