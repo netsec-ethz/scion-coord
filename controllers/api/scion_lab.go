@@ -220,16 +220,16 @@ func (s *SCIONLabASController) ConfigureSCIONLabAS(w http.ResponseWriter, r *htt
 		s.Error500(w, err, errTitle)
 		return
 	}
-	// Package the SCIONLab AS configuration
-	if err = s.packageConfiguration(asInfo); err != nil {
-		log.Printf("Error packaging SCIONLabAS configuration: %v", err)
-		s.Error500(w, err, "Error packaging SCIONLabAS configuration")
-		return
-	}
 	// Add account id and secret to gen directory
 	if err = s.createUserLoginConfiguration(asInfo); err != nil {
 		log.Printf("Error generating user credential files: %v", err)
 		s.Error500(w, err, "Error generating user credential files")
+		return
+	}
+	// Package the SCIONLab AS configuration
+	if err = s.packageConfiguration(asInfo); err != nil {
+		log.Printf("Error packaging SCIONLabAS configuration: %v", err)
+		s.Error500(w, err, "Error packaging SCIONLabAS configuration")
 		return
 	}
 	// Persist the relevant data into the DB
@@ -641,7 +641,11 @@ func (s *SCIONLabASController) packageConfiguration(asInfo *SCIONLabASInfo) erro
 
 	cmd := exec.Command("tar", "zcvf", userPackageName+".tar.gz", userPackageName)
 	cmd.Dir = PackagePath
-	if err := cmd.Start(); err != nil {
+	err := cmd.Start()
+	if err == nil {
+		err = cmd.Wait()
+	}
+	if err != nil {
 		return fmt.Errorf("Failed to create SCIONLabAS tarball for user %v: %v", userEmail, err)
 	}
 	return nil
