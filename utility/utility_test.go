@@ -213,8 +213,8 @@ func TestCopyPath(t *testing.T) {
 }
 
 var mapOldIAToNewOneTests = []struct {
-	fromISD uint
-	fromAS  uint
+	fromISD int
+	fromAS  int
 	toISD   uint
 	toAS    uint
 }{

@@ -57,7 +57,7 @@ type SCIONLabAS struct {
 	Created     time.Time        // When the AS was first created
 	Updated     time.Time        // Last time the configuration was modified or the AS called `ConfirmUpdate`
 	Connections []*Connection    `orm:"reverse(many)"` // List of Connections
-	RemapStatus string           `orm:"size(1000);type(json)"`
+	RemapStatus string           `orm:"size(1000);type(json);null"`
 }
 
 type Connection struct {
@@ -731,4 +731,18 @@ func (as *SCIONLabAS) AreIDsFromScionLab() bool {
 		return false
 	}
 	return true
+}
+
+// RemapASIDComputeNewGenFolder creates a new gen folder using a valid remapped ID
+// e.g. 17-ffaa:0:1 . This does not change IDs in the DB but recomputes topologies and certificates.
+// After finishing, there will be a new tgz file ready to download using the mapped ID.
+func (as *SCIONLabAS) RemapASIDComputeNewGenFolder() (*addr.ISD_AS, error) {
+	// TODO do it
+	I, A := utility.MapOldIAToNewOne(as.ISD, as.ASID)
+	if I == 0 || A == 0 {
+		return nil, fmt.Errorf("Invalid source address to map: (%d, %d)", as.ISD, as.ASID)
+	}
+	ia := addr.ISD_AS{I: int(I), A: int(A)}
+
+	return &ia, nil
 }

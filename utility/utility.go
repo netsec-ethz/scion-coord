@@ -201,11 +201,11 @@ func SendJSONError(object interface{}, w http.ResponseWriter) error {
 // the old one. E.g. (1,1001) -> (17, ffaa:0001:0000)
 // The convention for scionlab user ASes is to start from exactly ffaa:0001:0000, meaning
 // we reserve ffaa:0000:0000 to ffaa:0000:ffff for infrastructure.
-func MapOldIAToNewOne(ISDid, ASid uint) (uint, uint) {
+func MapOldIAToNewOne(ISDid, ASid int) (uint, uint) {
 	if ISDid < 1 || ISDid > 8 || ASid < 1001 || ASid > 2000 {
 		// invalid request for scionlab
 		return 0, 0
 	}
 
-	return ISDid + ScionLabISDOffsetAddr - 1, ASid - 1001 + ScionlabUserASOffsetAddr
+	return uint(ISDid) + ScionLabISDOffsetAddr - 1, uint(ASid) - 1001 + ScionlabUserASOffsetAddr
 }
