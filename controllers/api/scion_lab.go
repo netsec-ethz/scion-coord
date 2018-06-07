@@ -715,8 +715,8 @@ func (s *SCIONLabASController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 	http.ServeContent(w, r, fileName, time.Now(), bytes.NewReader(data))
 }
 
-// RemapASIdentity returns the challenge the AS should solve if said AS has to map the identity.
-func (s *SCIONLabASController) RemapASIdentity(w http.ResponseWriter, r *http.Request) {
+// RemapASIdentityChallengeAndSolution returns the challenge the AS should solve if said AS has to map the identity.
+func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.ResponseWriter, r *http.Request) {
 	// TODO: remove debug print s
 	// TODO: refactor
 	answer := make(map[string]interface{})
@@ -843,9 +843,10 @@ func (s *SCIONLabASController) RemapASIdentity(w http.ResponseWriter, r *http.Re
 			if err != nil || chain == nil {
 				// TODO: this is actually very bad, do we delete the AS entry here? what do we do?
 				answer["error"] = true
-				msg := fmt.Sprintf("ERROR in Coordinator: cannot load the public certificate for AS %s", asID)
+				msg := fmt.Sprintf("ERROR in Coordinator: cannot load the public certificate for AS %s : %v", asID, err)
 				answer["msg"] = msg
 				log.Print(msg)
+				utility.SendJSONError(answer, w)
 				return
 			}
 			publicKey := chain.Leaf.SubjectSignKey
@@ -854,7 +855,31 @@ func (s *SCIONLabASController) RemapASIdentity(w http.ResponseWriter, r *http.Re
 			fmt.Println("VERIFY ERROR?: ", err)
 			if err == nil {
 				answer["pending"] = false
+
 				// TODO: send gen folder
+				answer["ia"], err = as.RemapASIDComputeNewGenFolder()
+				if err != nil {
+					// TODO: this is actually very bad, do we delete the AS entry here? what do we do?
+					answer["error"] = true
+					msg := fmt.Sprintf("ERROR in Coordinator: while mapping the ID, cannot generate a gen folder for the AS %s : %v", asID, err)
+					answer["msg"] = msg
+					log.Print(msg)
+					utility.SendJSONError(answer, w)
+					return
+				}
+
+				// fileName := "netsec.test.email@gmail.com_1-1001.tar.gz"
+				// filePath := "/home/juan/scionLabConfigs/netsec.test.email@gmail.com_1-1001.tar.gz"
+				// data, err := ioutil.ReadFile(filePath)
+				// if err != nil {
+				// 	// TODO
+
+				// 	return
+				// }
+				// w.Header().Set("Content-Type", "application/gzip")
+				// w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
+				// w.Header().Set("Content-Transfer-Encoding", "binary")
+				// http.ServeContent(w, r, fileName, time.Now(), bytes.NewReader(data))
 			}
 		}
 	} // if needed remapping
