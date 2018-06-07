@@ -123,7 +123,7 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 		cnInfo := APConnectionInfo{
 			ASID:      utility.IAString(as.ISD, cn.NeighborAS),
 			IsVPN:     cn.IsVPN,
-			VPNUserID: s.vpnUserID(cn.NeighborUser, cn.NeighborAS),
+			VPNUserID: vpnUserID(cn.NeighborUser, cn.NeighborAS),
 			IP:        cn.NeighborIP,
 			UserPort:  cn.NeighborPort,
 			APPort:    cn.LocalPort,

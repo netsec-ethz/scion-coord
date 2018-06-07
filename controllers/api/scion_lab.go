@@ -170,6 +170,33 @@ func (s *SCIONLabASController) GenerateNewSCIONLabAS(w http.ResponseWriter, r *h
 	return
 }
 
+func generateGenForAS(asInfo *SCIONLabASInfo) error {
+	var err error
+	// Generate topology file
+	if err = generateTopologyFile(asInfo); err != nil {
+		return fmt.Errorf("Error generating topology file: %v", err)
+	}
+	// Generate local gen
+	if err = generateLocalGen(asInfo); err != nil {
+		return fmt.Errorf("Error generating local config: %v", err)
+	}
+	// Generate VPN config if this is a VPN setup
+	if asInfo.IsVPN {
+		if err = generateVPNConfig(asInfo); err != nil {
+			return fmt.Errorf("Error generating VPN config: %v", err)
+		}
+	}
+	if err = addAuxiliaryFiles(asInfo); err != nil {
+		return fmt.Errorf("Error adding auxiliary files to the package: %v", err)
+	}
+	// Add account id and secret to gen directory
+	err = createUserLoginConfiguration(asInfo)
+	if err != nil {
+		return fmt.Errorf("Error generating user credential files: %v", err)
+	}
+	return nil
+}
+
 // The main handler function to generates a SCIONLab AS for the given user.
 // If successful, the front-end will initiate the downloading of the tarball.
 func (s *SCIONLabASController) ConfigureSCIONLabAS(w http.ResponseWriter, r *http.Request) {
@@ -194,40 +221,14 @@ func (s *SCIONLabASController) ConfigureSCIONLabAS(w http.ResponseWriter, r *htt
 		return
 	}
 	// Remove all existing files from UserPackagePath
-	// TODO(mlegner): May want to archive somewhere?
 	os.RemoveAll(asInfo.UserPackagePath() + "/")
-	// Generate topology file
-	if err = s.generateTopologyFile(asInfo); err != nil {
-		log.Printf("Error generating topology file: %v", err)
-		s.Error500(w, err, "Error generating topology file")
-		return
+	// generate the gen folder:
+	err = generateGenForAS(asInfo)
+	if err != nil {
+		log.Print(err)
+		s.Error500(w, err, "Error generating the configuration")
 	}
-	// Generate local gen
-	if err = s.generateLocalGen(asInfo); err != nil {
-		log.Printf("Error generating local config: %v", err)
-		s.Error500(w, err, "Error generating local config")
-		return
-	}
-	// Generate VPN config if this is a VPN setup
-	if asInfo.IsVPN {
-		if err = s.generateVPNConfig(asInfo); err != nil {
-			log.Printf("Error generating VPN config: %v", err)
-			s.Error500(w, err, "Error generating VPN config")
-			return
-		}
-	}
-	if err = s.addAuxiliaryFiles(asInfo); err != nil {
-		errTitle := "Error adding auxiliary files to the package"
-		log.Printf(errTitle+": %v", err)
-		s.Error500(w, err, errTitle)
-		return
-	}
-	// Add account id and secret to gen directory
-	if err = s.createUserLoginConfiguration(asInfo); err != nil {
-		log.Printf("Error generating user credential files: %v", err)
-		s.Error500(w, err, "Error generating user credential files")
-		return
-	}
+
 	// Package the SCIONLab AS configuration
 	if err = s.packageConfiguration(asInfo); err != nil {
 		log.Printf("Error packaging SCIONLabAS configuration: %v", err)
@@ -505,7 +506,7 @@ func (asInfo *SCIONLabASInfo) topologyFile() string {
 // Generates the topology file for the SCIONLab AS AS. It uses the template file
 // simple_config_topo.tmpl under templates folder in order to populate and generate the
 // JSON file.
-func (s *SCIONLabASController) generateTopologyFile(asInfo *SCIONLabASInfo) error {
+func generateTopologyFile(asInfo *SCIONLabASInfo) error {
 	log.Printf("Generating topology file for SCIONLab AS")
 	t, err := template.ParseFiles("templates/simple_config_topo.tmpl")
 	if err != nil {
@@ -546,7 +547,7 @@ func (s *SCIONLabASController) generateTopologyFile(asInfo *SCIONLabASInfo) erro
 // Creates the local gen folder of the SCIONLab AS AS. It calls a Python wrapper script
 // located under the python directory. The script uses SCION's and SCION-WEB's library
 // functions in order to generate the certificate, AS keys etc.
-func (s *SCIONLabASController) generateLocalGen(asInfo *SCIONLabASInfo) error {
+func generateLocalGen(asInfo *SCIONLabASInfo) error {
 	log.Printf("Creating gen folder for SCIONLab AS")
 	isd := asInfo.LocalAS.ISD
 	asID := asInfo.LocalAS.ASID
@@ -582,7 +583,7 @@ func (s *SCIONLabASController) generateLocalGen(asInfo *SCIONLabASInfo) error {
 	return nil
 }
 
-func (s *SCIONLabASController) addAuxiliaryFiles(asInfo *SCIONLabASInfo) error {
+func addAuxiliaryFiles(asInfo *SCIONLabASInfo) error {
 	userEmail := asInfo.LocalAS.UserEmail
 	userPackagePath := asInfo.UserPackagePath()
 	log.Printf("Adding auxiliary files to the package %v", asInfo.UserPackageName())
@@ -647,10 +648,11 @@ func (s *SCIONLabASController) packageConfiguration(asInfo *SCIONLabASInfo) erro
 	if err != nil {
 		return fmt.Errorf("failed to create SCIONLabAS tarball for user %v: %v", userEmail, err)
 	}
+
 	return nil
 }
 
-func (s *SCIONLabASController) createUserLoginConfiguration(asInfo *SCIONLabASInfo) error {
+func createUserLoginConfiguration(asInfo *SCIONLabASInfo) error {
 	log.Printf("Creating user authentication files")
 	userEmail := asInfo.LocalAS.UserEmail
 	acc, err := models.FindAccountByUserEmail(userEmail)
@@ -658,7 +660,6 @@ func (s *SCIONLabASController) createUserLoginConfiguration(asInfo *SCIONLabASIn
 		return fmt.Errorf("failed to find account for email %s: %v", userEmail, err)
 	}
 
-	//TODO: maybe a better place for adding these files would be in generateLocalGen function?
 	userGenDir := filepath.Join(asInfo.UserPackagePath(), "gen")
 
 	accountId := []byte(acc.AccountID)
