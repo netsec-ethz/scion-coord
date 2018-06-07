@@ -112,12 +112,10 @@ func init() {
 		}
 		SIGNING_ASES[ki] = vi
 	}
-	// validate email addresses?
-	validated := []string{}
-	for _, admin := range EMAIL_ADMINS {
-		validated = append(validated, strings.Trim(admin, " "))
+	// we don't validate the email addresses, we just trim them in case they had leading/trailing spaces
+	for i, admin := range EMAIL_ADMINS {
+		EMAIL_ADMINS[i] = strings.Trim(admin, " ")
 	}
-	EMAIL_ADMINS = validated
 }
 
 func MaxASes(isAdmin bool) int {

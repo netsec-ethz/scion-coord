@@ -155,7 +155,7 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 	fmt.Fprintln(w, string(b))
 }
 
-type attachedAsAck struct {
+type attachedASAckMessage struct {
 	IA      string
 	Success bool
 }
@@ -184,9 +184,8 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 		return
 	}
 	body := string(bodyBytes)
-	fmt.Println("Body:", body)
 
-	var UpdateLists map[string]map[string][]attachedAsAck
+	var UpdateLists map[string]map[string][]attachedASAckMessage
 	decoder := json.NewDecoder(strings.NewReader(body))
 	if err := decoder.Decode(&UpdateLists); err != nil {
 		log.Printf("Error decoding JSON: %v, %v", err, body)
@@ -242,8 +241,6 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 	}
 	fmt.Fprintln(w, "{}")
 }
-
-// 3-1034,[141.44.25.146]:30100
 
 // Updates the relevant DB tables based on the received confirmations from the SCIONLab AP and sends
 // out confirmation emails
@@ -339,32 +336,34 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 	return failedConfirmations
 }
 
+// processRejectedUpdatesFromAP will receive a list of AS with rejected updates,
+// will notify the ScionLab administrators, and remove the pending change.
 func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejectedAS) []string {
 	failedNotifications := []string{}
 	// for each rejected AS, send an email to the admin and user
-	for _, ras := range rejections {
-		as, err := models.FindSCIONLabASByIAString(ras.IA)
+	for _, rejectedAS := range rejections {
+		as, err := models.FindSCIONLabASByIAString(rejectedAS.IA)
 		if err != nil {
-			log.Printf("Error finding SCIONLabAS %v: %v", ras.IA, err)
-			failedNotifications = append(failedNotifications, ras.IA)
+			log.Printf("Error finding SCIONLabAS %v: %v", rejectedAS.IA, err)
+			failedNotifications = append(failedNotifications, rejectedAS.IA)
 			continue
 		}
-		ap, err := models.FindSCIONLabASByIAString(ras.AP)
+		ap, err := models.FindSCIONLabASByIAString(rejectedAS.AP)
 		if err != nil {
-			log.Printf("Error finding SCIONLabAS %v: %v", ras.IA, err)
-			failedNotifications = append(failedNotifications, ras.IA)
+			log.Printf("Error finding SCIONLabAS %v: %v", rejectedAS.AP, err)
+			failedNotifications = append(failedNotifications, rejectedAS.IA)
 			continue
 		}
-		asCns, err := ap.GetRespondConnectionInfoToAS(ras.IA)
+		asCns, err := ap.GetRespondConnectionInfoToAS(rejectedAS.IA)
 		if err != nil {
-			log.Printf("Error finding the connection to SCIONLabAS %v: %v", ras.IA, err)
-			failedNotifications = append(failedNotifications, ras.IA)
+			log.Printf("Error finding the connection to SCIONLabAS %v: %v", rejectedAS.IA, err)
+			failedNotifications = append(failedNotifications, rejectedAS.IA)
 			continue
 		}
-		err = sendRejectedEmail(as.UserEmail, ras.IA, ras.action, ras.AP)
+		err = sendRejectedEmail(as.UserEmail, rejectedAS.IA, rejectedAS.action, rejectedAS.AP)
 		if err != nil {
-			log.Printf("Error sending email about rejected AS %v: %v", ras.IA, err)
-			failedNotifications = append(failedNotifications, ras.IA)
+			log.Printf("Error sending email about rejected AS %v: %v", rejectedAS.IA, err)
+			failedNotifications = append(failedNotifications, rejectedAS.IA)
 			continue
 		}
 
@@ -372,26 +371,25 @@ func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejecte
 		for _, cn := range asCns {
 			switch cn.Status {
 			default:
+				// if we don't have pending actions, skip completely
 				continue
 			case models.CREATE, models.UPDATE, models.REMOVE:
 				// just go on
 			}
 			err = models.DeleteConnection(cn.ID)
 			if err != nil {
-				log.Printf("ERROR removing rejected connection. UserAS: %s, AP: %s, action: %s", ras.IA, ras.AP, ras.action)
-				failedNotifications = append(failedNotifications, ras.IA)
+				log.Printf("ERROR removing rejected connection. UserAS: %s, AP: %s, action: %s", rejectedAS.IA, rejectedAS.AP, rejectedAS.action)
+				failedNotifications = append(failedNotifications, rejectedAS.IA)
 			}
 			break // only one connection could have been rejected. We just processed it, so get out of here
 		}
 		// fix the status of the AS entry, if needed:
-		switch as.Status {
-		default: // nothing to do
-		case models.UPDATE, models.REMOVE:
+		if as.Status == models.UPDATE || as.Status == models.REMOVE {
 			// only case where a rejected connection could keep the Status out of sync
 			cns, err := as.GetJoinConnectionInfo()
 			if err != nil {
-				log.Printf("ERROR removing rejected connection, get connections to reset AS Status for AS %s: %v", ras.IA, err)
-				failedNotifications = append(failedNotifications, ras.IA)
+				log.Printf("ERROR removing rejected connection, get connections to reset AS Status for AS %s: %v", rejectedAS.IA, err)
+				failedNotifications = append(failedNotifications, rejectedAS.IA)
 				continue
 			}
 			switch len(cns) {
@@ -402,12 +400,12 @@ func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejecte
 			default:
 			}
 			if err = as.Update(); err != nil {
-				log.Printf("ERROR removing rejected connection, re-setting AS Status for AS %s: %v", ras.IA, err)
+				log.Printf("ERROR removing rejected connection, re-setting AS Status for AS %s: %v", rejectedAS.IA, err)
 				continue
 			}
 		}
 		if as.Update() != nil {
-			log.Printf("ERROR removing rejected connection. Updating status of user AS failed for %s", ras.IA)
+			log.Printf("ERROR removing rejected connection. Updating status of user AS failed for %s", rejectedAS.IA)
 			continue
 		}
 	}
@@ -423,7 +421,7 @@ func sendConfirmationEmail(userEmail, IA, action string) error {
 	}
 
 	var message string
-	subject := "[SCIONLab] Failure, "
+	subject := "[SCIONLab] "
 	switch action {
 	case CREATED:
 		message = fmt.Sprintf("The infrastructure for your SCIONLab AS %s has been created. "+
@@ -450,7 +448,7 @@ func sendConfirmationEmail(userEmail, IA, action string) error {
 		Message:     message,
 	}
 	log.Printf("Sending confirmation email to user %v.", userEmail)
-	return email.ConstructAndSend("as_status.html", subject, data, "as-update", userEmail)
+	return email.ConstructAndSendEmail("as_status.html", subject, data, "as-update", userEmail, false)
 }
 
 // sends an email notifying of a failure to synchronize the attachment point with the user AS.\
