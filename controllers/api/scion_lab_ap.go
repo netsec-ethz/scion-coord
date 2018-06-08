@@ -185,9 +185,9 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 	}
 	body := string(bodyBytes)
 
-	var UpdateLists map[string]map[string][]attachedASAckMessage
+	var updateLists map[string]map[string][]attachedASAckMessage
 	decoder := json.NewDecoder(strings.NewReader(body))
-	if err := decoder.Decode(&UpdateLists); err != nil {
+	if err := decoder.Decode(&updateLists); err != nil {
 		log.Printf("Error decoding JSON: %v, %v", err, body)
 		s.BadRequest(w, err, "Error decoding JSON")
 		return
@@ -201,7 +201,7 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 	failedConfirmations := []string{}
 
 	rejectedIAs := []rejectedAS{}
-	for ia, event := range UpdateLists {
+	for ia, event := range updateLists {
 		_, isAuthorized := ownedASes[ia]
 		if !isAuthorized {
 			log.Printf("Unauthorized updates from AS %v", ia)
@@ -380,6 +380,7 @@ func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejecte
 			}
 			break // only one connection could have been rejected. We just processed it, so get out of here
 		}
+
 		// fix the status of the AS entry, if needed:
 		if as.Status == models.UPDATE || as.Status == models.REMOVE {
 			// only case where a rejected connection could keep the Status out of sync
@@ -397,13 +398,9 @@ func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejecte
 			default:
 			}
 			if err = as.Update(); err != nil {
-				log.Printf("ERROR removing rejected connection, re-setting AS Status for AS %s: %v", rejectedAS.IA, err)
+				log.Printf("ERROR removing rejected connection. Updating status of user AS failed for %s: %v", rejectedAS.IA, err)
 				continue
 			}
-		}
-		if as.Update() != nil {
-			log.Printf("ERROR removing rejected connection. Updating status of user AS failed for %s", rejectedAS.IA)
-			continue
 		}
 	}
 
