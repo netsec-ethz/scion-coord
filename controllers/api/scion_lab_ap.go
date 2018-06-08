@@ -369,12 +369,9 @@ func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejecte
 
 		// now, clear the rejected AS, as the AP went out of sync with the Coordinator
 		for _, cn := range asCns {
-			switch cn.Status {
-			default:
+			if cn.Status != models.CREATE && cn.Status != models.UPDATE && cn.Status != models.REMOVE {
 				// if we don't have pending actions, skip completely
 				continue
-			case models.CREATE, models.UPDATE, models.REMOVE:
-				// just go on
 			}
 			err = models.DeleteConnection(cn.ID)
 			if err != nil {
@@ -460,19 +457,20 @@ func sendRejectedEmail(userEmail string, userIA, action, attachmentPointIA strin
 	}
 
 	subject := fmt.Sprintf("[SCIONLab] Could not complete request for %s", userIA)
-	message := fmt.Sprintf(`The request for your AS %s to be (%s) from the attachment point %s could not be completed. You need to check the configuration for your AS in the Coordinator. Ensure you select the option to Update and Download the ScionLab Configuration after reviewing it.
-If the problem persists, please contact the ScionLab Administrators.`, userIA, action, attachmentPointIA)
-
 	data := struct {
 		FirstName   string
 		LastName    string
 		HostAddress string
-		Message     string
+		AS          string
+		Operation   string
+		AP          string
 	}{
 		FirstName:   user.FirstName,
 		LastName:    user.LastName,
 		HostAddress: config.HTTP_HOST_ADDRESS,
-		Message:     message,
+		AS:          userIA,
+		Operation:   action,
+		AP:          attachmentPointIA,
 	}
-	return email.ConstructAndSendEmail("as_status.html", subject, data, "as-rejection", userEmail, true)
+	return email.ConstructAndSendEmail("as_failure.html", subject, data, "as-rejection", userEmail, true)
 }
