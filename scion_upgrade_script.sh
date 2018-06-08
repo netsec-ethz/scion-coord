@@ -40,6 +40,7 @@ check_system_files() {
         if [ $ntp_running != 1 ]; then
             echo "Installing ntpd..."
             sudo apt-get install -y --no-remove ntp || true
+            sudo systemctl enable ntp || true
             sudo systemctl restart ntp || true
         fi
         # don't attempt to stop the service as this script is a child of the service and will also be killed !
