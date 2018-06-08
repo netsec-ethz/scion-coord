@@ -118,12 +118,13 @@ func (c *RegistrationController) ResetPassword(w http.ResponseWriter, r *http.Re
 		HostAddress:      config.HTTP_HOST_ADDRESS,
 		VerificationUUID: u.VerificationUUID,
 	}
-	if err = email.ConstructAndSend(
+	if err = email.ConstructAndSendEmail(
 		"password_reset.html",
 		"[SCIONLab] Password reset",
 		data,
 		"password-reset",
-		userEmail); err != nil {
+		userEmail,
+		false); err != nil {
 		log.Printf("Error sending password-reset email to user %v: %v", u.Email, err)
 		c.BadRequest(w, err, "Error sending email")
 		return
@@ -313,12 +314,13 @@ func sendVerificationEmail(userID uint64) error {
 		VerificationUUID: user.VerificationUUID,
 	}
 
-	if err := email.ConstructAndSend(
+	if err := email.ConstructAndSendEmail(
 		"verification.html",
 		"[SCIONLab] Verify your email address for SCIONLab Coordination Service",
 		data,
 		"email-verification",
-		user.Email); err != nil {
+		user.Email,
+		false); err != nil {
 		return err
 	}
 

@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/sec51/goconf"
 )
@@ -35,6 +36,7 @@ var (
 	EMAIL_PM_SERVER_TOKEN    = goconf.AppConf.String("email.pm_server_token")
 	EMAIL_PM_ACCOUNT_TOKEN   = goconf.AppConf.String("email.pm_account_token")
 	EMAIL_FROM               = goconf.AppConf.String("email.from")
+	EMAIL_ADMINS             = goconf.AppConf.Strings("email.admin_emails")
 	CAPTCHA_SECRET_KEY       = goconf.AppConf.String("captcha.secret_key")
 	CAPTCHA_SITE_KEY         = goconf.AppConf.String("captcha.site_key")
 	SESSION_PATH             = goconf.AppConf.String("session.path")
@@ -109,6 +111,10 @@ func init() {
 			os.Exit(1)
 		}
 		SIGNING_ASES[ki] = vi
+	}
+	// we don't validate the email addresses, we just trim them in case they had leading/trailing spaces
+	for i, admin := range EMAIL_ADMINS {
+		EMAIL_ADMINS[i] = strings.Trim(admin, " ")
 	}
 }
 

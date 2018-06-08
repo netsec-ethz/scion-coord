@@ -47,9 +47,31 @@ func EmailTemplatePath(template string) string {
 	return filepath.Join(EMAIL_TEMPLATES_PATH, template)
 }
 
+// construct builds an email to the user specified by
+// their userEmail by filling in the specified template with the given subject
+// and information in the data object
+func construct(emailTemplate, subject string, data interface{}, tag, userEmail string) (*Email, error) {
+	tmpl, err := template.ParseFiles(EmailTemplatePath(emailTemplate))
+	if err != nil {
+		log.Printf("Parsing template %v failed: %v", emailTemplate, err)
+		return nil, err
+	}
+
+	buf := new(bytes.Buffer)
+	tmpl.Execute(buf, data)
+	body := buf.String()
+
+	mail := new(Email)
+	mail.From = config.EMAIL_FROM
+	mail.To = []string{userEmail}
+	mail.Subject = subject
+	mail.Body = body
+	mail.Tag = tag
+	return mail, nil
+}
+
 // Send connects to the PostMark email API and sends the email
 func Send(mail *Email) error {
-
 	client := postmark.NewClient(config.EMAIL_PM_SERVER_TOKEN, config.EMAIL_PM_ACCOUNT_TOKEN)
 
 	email := postmark.Email{
@@ -69,36 +91,45 @@ func Send(mail *Email) error {
 	}
 
 	return nil
-
 }
 
-// ConstructAndSend builds and then sends an email to the user specified by
-// their userEmail by filling in the specified template with the given subject
-// and information in the data object
-func ConstructAndSend(emailTemplate string, subject string, data interface{},
-	tag string, userEmail string) (err error) {
+// ConstructAndSendEmail builds and then sends an email. It relies on Construct and Send
+func ConstructAndSendEmail(emailTemplate string, subject string, data interface{},
+	tag string, userEmail string, alsoToAdmins bool) error {
 
-	tmpl, err := template.ParseFiles(EmailTemplatePath(emailTemplate))
+	mail, err := construct(emailTemplate, subject, data, tag, userEmail)
 	if err != nil {
-		log.Printf("Parsing template %v failed: %v", emailTemplate, err)
+		log.Printf("ConstructAndSend failed in Construct: %v", err)
 		return err
 	}
-
-	buf := new(bytes.Buffer)
-	tmpl.Execute(buf, data)
-	body := buf.String()
-
-	mail := new(Email)
-	mail.From = config.EMAIL_FROM
-	mail.To = []string{userEmail}
-	mail.Subject = subject
-	mail.Body = body
-	mail.Tag = tag
-
 	if err = Send(mail); err != nil {
 		log.Printf("Sending email to %v failed: %v", userEmail, err)
 		return err
 	}
 
+	if alsoToAdmins {
+		mail.To = config.EMAIL_ADMINS
+		mail.Subject = "[SCIONLab ADMIN]" + mail.Subject
+		if err = Send(mail); err != nil {
+			log.Printf("Sending email to %v failed: %v", config.EMAIL_ADMINS, err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+// ConstructAndSendEmailToAdmins builds and sends an email to the ScionLab admins
+func ConstructAndSendEmailToAdmins(emailTemplate string, subject string, data interface{}, tag string) error {
+	mail, err := construct(emailTemplate, subject, data, tag, "")
+	if err != nil {
+		log.Printf("ConstructAndSend failed in Construct: %v", err)
+		return err
+	}
+	mail.To = config.EMAIL_ADMINS
+	if err = Send(mail); err != nil {
+		log.Printf("Sending email to %v failed: %v", config.EMAIL_ADMINS, err)
+		return err
+	}
 	return nil
 }
