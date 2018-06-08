@@ -96,8 +96,10 @@ reserved_brs_infrastructure = 10
 ases_per_user = 2
 ases_per_admin = 10
 
-# For image service
-img_builder.address = "https://vmtest.serber.club"
+# public address of the image service
+img_builder.address.public = "https://vmtest.serber.club"
+# address of the image service as seen by the coordinator machine:
+img_builder.address.internal = "http://10.10.10.2:8080"
 img_builder.secret_token = "qSq9xa89F5V4BbqpRjBW7jvKSuVfrDfuQHGpLZRTE2eLRgun"
 img_builder.build_delay = 5
 
