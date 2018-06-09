@@ -235,7 +235,7 @@ func (as *SCIONLabAS) GetFreeBRID() (uint16, error) {
 
 // TODO(mlegner): Avoid signed/unsigned casting; could be problematic if huge IP ranges are used
 func (as *SCIONLabAS) GetFreeVPNIP() (string, error) {
-	cns, err := as.getRespondConnections()
+	cns, err := as.GetRespondConnections()
 	if err != nil {
 		return "", fmt.Errorf("error finding connections of AP %v: %v", as.IA(), err)
 	}
@@ -251,7 +251,7 @@ func (as *SCIONLabAS) GetFreeVPNIP() (string, error) {
 }
 
 // Only returns the connections of the AS in its function as the joining AS
-func (as *SCIONLabAS) getJoinConnections() ([]*Connection, error) {
+func (as *SCIONLabAS) GetJoinConnections() ([]*Connection, error) {
 	_, err := o.LoadRelated(as, "Connections")
 	if err == orm.ErrNoRows {
 		return []*Connection{}, nil
@@ -260,7 +260,7 @@ func (as *SCIONLabAS) getJoinConnections() ([]*Connection, error) {
 }
 
 // Only returns the connections of the AS in its function as an AP
-func (as *SCIONLabAS) getRespondConnections() ([]*Connection, error) {
+func (as *SCIONLabAS) GetRespondConnections() ([]*Connection, error) {
 	var cns []*Connection
 	if as.AP != nil {
 		APCns, err := as.AP.getConnections()
@@ -274,11 +274,11 @@ func (as *SCIONLabAS) getRespondConnections() ([]*Connection, error) {
 
 // Returns all connections of the AS
 func (as *SCIONLabAS) getAllConnections() ([]*Connection, error) {
-	joinCns, err := as.getJoinConnections()
+	joinCns, err := as.GetJoinConnections()
 	if err != nil {
 		return nil, err
 	}
-	resCns, err := as.getRespondConnections()
+	resCns, err := as.GetRespondConnections()
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +302,7 @@ func (cn *Connection) getRespondAS() *SCIONLabAS {
 
 // Returns a list of ConnectionInfo where the AS is the joining AS
 func (as *SCIONLabAS) GetJoinConnectionInfo() ([]ConnectionInfo, error) {
-	cns, err := as.getJoinConnections()
+	cns, err := as.GetJoinConnections()
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +340,7 @@ func (as *SCIONLabAS) GetJoinConnectionInfo() ([]ConnectionInfo, error) {
 
 // Returns a list of ConnectionInfo where the AS is the responding AS
 func (as *SCIONLabAS) GetRespondConnectionInfo() ([]ConnectionInfo, error) {
-	cns, err := as.getRespondConnections()
+	cns, err := as.GetRespondConnections()
 	if err != nil {
 		return nil, err
 	}
