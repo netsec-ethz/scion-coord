@@ -194,6 +194,11 @@ func generateGenForAS(asInfo *SCIONLabASInfo) error {
 	if err != nil {
 		return fmt.Errorf("Error generating user credential files: %v", err)
 	}
+	// Package the SCIONLab AS configuration
+	err = packageConfiguration(asInfo)
+	if err != nil {
+		return fmt.Errorf("Error packaging SCIONLabAS configuration: %v", err)
+	}
 	return nil
 }
 
@@ -229,12 +234,6 @@ func (s *SCIONLabASController) ConfigureSCIONLabAS(w http.ResponseWriter, r *htt
 		s.Error500(w, err, "Error generating the configuration")
 	}
 
-	// Package the SCIONLab AS configuration
-	if err = s.packageConfiguration(asInfo); err != nil {
-		log.Printf("Error packaging SCIONLabAS configuration: %v", err)
-		s.Error500(w, err, "Error packaging SCIONLabAS configuration")
-		return
-	}
 	// Persist the relevant data into the DB
 	if err = s.updateDB(asInfo); err != nil {
 		log.Printf("Error updating DB tables: %v", err)
@@ -620,7 +619,7 @@ func addAuxiliaryFiles(asInfo *SCIONLabASInfo) error {
 // TODO(mlegner): Add README for Dedicated setup
 // Packages the SCIONLab AS configuration as a tarball and returns the name of the
 // generated file.
-func (s *SCIONLabASController) packageConfiguration(asInfo *SCIONLabASInfo) error {
+func packageConfiguration(asInfo *SCIONLabASInfo) error {
 	log.Printf("Packaging SCIONLab AS")
 	userEmail := asInfo.LocalAS.UserEmail
 	userPackageName := asInfo.UserPackageName()
