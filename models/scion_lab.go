@@ -287,17 +287,31 @@ func (as *SCIONLabAS) getAllConnections() ([]*Connection, error) {
 
 func (cn *Connection) getJoinAS() *SCIONLabAS {
 	as := new(SCIONLabAS)
+	// TODO, Question: if we have cn.JoinAS as the JoinAS, with the correct type, why
+	// do we need to query the DB again?
 	o.QueryTable(as).Filter("ID", cn.JoinAS.ID).RelatedSel().One(as)
 	return as
 }
 
-func (cn *Connection) getRespondAS() *SCIONLabAS {
-	ap := new(AttachmentPoint)
-	if err := o.QueryTable(ap).Filter("ID", cn.RespondAP.ID).RelatedSel().One(ap); err != nil {
-		return nil
-	}
-	o.LoadRelated(ap, "AS")
-	return ap.AS
+func (cn *Connection) GetRespondAS() *SCIONLabAS {
+	// ap := new(AttachmentPoint)
+	// if err := o.QueryTable(ap).Filter("ID", cn.RespondAP.ID).RelatedSel().One(ap); err != nil {
+	// 	return nil
+	// }
+	// o.LoadRelated(ap, "AS")
+	// return ap.AS
+
+	// TODO: Question: same as the above method
+	fmt.Println("####### 1 ", cn.RespondAP.ID)
+	fmt.Println("####### 2 ", cn.RespondAP.HasVPN)
+	fmt.Println("####### 2 ", cn.RespondAP.VPNPort)
+	fmt.Println("####### 3 ", cn.RespondAP.VPNIP)
+	fmt.Println("####### 4 ", cn.RespondAP.StartVPNIP)
+	fmt.Println("####### 5 ", cn.RespondAP.EndVPNIP)
+	fmt.Println("####### 6 ", cn.RespondAP.AS)
+	fmt.Println("####### 7 ", cn.RespondAP.Connections)
+	o.LoadRelated(cn.RespondAP, "AS")
+	return cn.RespondAP.AS
 }
 
 // Returns a list of ConnectionInfo where the AS is the joining AS
@@ -309,7 +323,7 @@ func (as *SCIONLabAS) GetJoinConnectionInfo() ([]ConnectionInfo, error) {
 	var cnInfo ConnectionInfo
 	var cnInfos []ConnectionInfo
 	for _, cn := range cns {
-		respondAS := cn.getRespondAS()
+		respondAS := cn.GetRespondAS()
 		joinAS := cn.getJoinAS()
 		// If the connection has been removed continue
 		if cn.JoinStatus == Removed {
@@ -347,7 +361,7 @@ func (as *SCIONLabAS) GetRespondConnectionInfo() ([]ConnectionInfo, error) {
 	var cnInfo ConnectionInfo
 	var cnInfos []ConnectionInfo
 	for _, cn := range cns {
-		respondAS := cn.getRespondAS()
+		respondAS := cn.GetRespondAS()
 		joinAS := cn.getJoinAS()
 		if cn.RespondStatus == Removed {
 			continue
@@ -444,7 +458,7 @@ func (as *SCIONLabAS) UpdateDBConnection(cnInfo *ConnectionInfo) error {
 	cn.JoinIP = cnInfo.LocalIP
 	cn.RespondIP = cnInfo.NeighborIP
 
-	respondAS := cn.getRespondAS()
+	respondAS := cn.GetRespondAS()
 	joinAS := cn.getJoinAS()
 	if joinAS.ID == as.ID {
 		cn.JoinStatus = cnInfo.Status

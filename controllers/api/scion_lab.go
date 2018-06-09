@@ -422,7 +422,6 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 }
 
 func getSCIONLabASInfoFromDB(conn *models.Connection) (*SCIONLabASInfo, error) {
-	fmt.Println("heyyy")
 	asInfo := SCIONLabASInfo{
 		IsNewConnection: false,
 		IsVPN: conn.IsVPN,
@@ -1030,7 +1029,6 @@ func (s *SCIONLabASController) ConfirmUpdate(w http.ResponseWriter, r *http.Requ
 // e.g. 17-ffaa:0:1 . This does not change IDs in the DB but recomputes topologies and certificates.
 // After finishing, there will be a new tgz file ready to download using the mapped ID.
 func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.ISD_AS, error) {
-	// TODO do it
 	I, A := utility.MapOldIAToNewOne(as.ISD, as.ASID)
 	if I == 0 || A == 0 {
 		return nil, fmt.Errorf("Invalid source address to map: (%d, %d)", as.ISD, as.ASID)
@@ -1049,7 +1047,9 @@ func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.ISD_AS, error) {
 		return nil, err
 	}
 	conn := conns[0]
+	conn.RespondAP.AS = conn.GetRespondAS()
 	asInfo, err := getSCIONLabASInfoFromDB(conn)
+	fmt.Println("[DEBUG] ** 11")
 	if err != nil {
 		return nil, err
 	}
