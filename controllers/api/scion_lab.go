@@ -878,7 +878,7 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 				answer["pending"] = false
 
 				// TODO: send gen folder
-				answer["ia"], err = as.RemapASIDComputeNewGenFolder()
+				answer["ia"], err = RemapASIDComputeNewGenFolder(as)
 				if err != nil {
 					// TODO: this is actually very bad, do we delete the AS entry here? what do we do?
 					answer["error"] = true
@@ -1024,4 +1024,40 @@ func (s *SCIONLabASController) ConfirmUpdate(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	as.Update()
+}
+
+// RemapASIDComputeNewGenFolder creates a new gen folder using a valid remapped ID
+// e.g. 17-ffaa:0:1 . This does not change IDs in the DB but recomputes topologies and certificates.
+// After finishing, there will be a new tgz file ready to download using the mapped ID.
+func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.ISD_AS, error) {
+	// TODO do it
+	I, A := utility.MapOldIAToNewOne(as.ISD, as.ASID)
+	if I == 0 || A == 0 {
+		return nil, fmt.Errorf("Invalid source address to map: (%d, %d)", as.ISD, as.ASID)
+	}
+	ia := addr.ISD_AS{I: int(I), A: int(A)}
+	// replace IDs in the AS entry, but don't save in DB:
+	as.ISD = int(I)
+	as.ASID = int(A)
+	// retrieve connection:
+	conns, err := as.GetJoinConnections()
+	if err != nil {
+		return nil, err
+	}
+	if len(conns) != 1 {
+		err = fmt.Errorf("User AS should have only 1 connection. %s has %d", ia, len(conns))
+		return nil, err
+	}
+	conn := conns[0]
+	asInfo, err := getSCIONLabASInfoFromDB(conn)
+	if err != nil {
+		return nil, err
+	}
+	// finally, generate the gen folder:
+	err = generateGenForAS(asInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ia, nil
 }
