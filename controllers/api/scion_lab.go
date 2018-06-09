@@ -421,6 +421,26 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 	}, nil
 }
 
+func getSCIONLabASInfoFromDB(conn *models.Connection) (*SCIONLabASInfo, error) {
+	fmt.Println("heyyy")
+	asInfo := SCIONLabASInfo{
+		IsNewConnection: false,
+		IsVPN: conn.IsVPN,
+		RemoteIA: conn.RespondAP.AS.IA(),
+		IP: conn.JoinIP,
+		LocalPort: conn.JoinAS.StartPort,
+		OldAP: "",
+		RemoteIP: conn.RespondIP,
+		RemoteBRID: conn.RespondBRID,
+		RemotePort: conn.RespondAP.AS.GetPortNumberFromBRID(conn.RespondBRID),
+		VPNServerIP: conn.RespondAP.VPNIP,
+		VPNServerPort: conn.RespondAP.VPNPort,
+		LocalAS: conn.JoinAS,
+		RemoteAS: conn.RespondAP.AS,
+	}
+	return &asInfo, nil
+}
+
 // Updates the relevant database tables related to SCIONLab AS creation.
 func (s *SCIONLabASController) updateDB(asInfo *SCIONLabASInfo) error {
 	userEmail := asInfo.LocalAS.UserEmail
