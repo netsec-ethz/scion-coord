@@ -1048,6 +1048,7 @@ func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.ISD_AS, error) {
 	conn := conns[0]
 	conn.RespondAP.AS = conn.GetRespondAS()
 	asInfo, err := getSCIONLabASInfoFromDB(conn)
+	asInfo.LocalAS = as
 	fmt.Println("[DEBUG] ** 11")
 	if err != nil {
 		return nil, err
