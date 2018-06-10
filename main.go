@@ -201,6 +201,8 @@ func main() {
 		scionLabASController.ReturnTarball))
 	router.Handle("/api/as/remapId/{as_id}", loggingChain.ThenFunc(
 		scionLabASController.RemapASIdentityChallengeAndSolution)).Methods(http.MethodGet, http.MethodPost)
+	router.Handle("/api/as/remapIdDownloadGen/{as_id}/{challenge_solution}", loggingChain.ThenFunc(
+		scionLabASController.RemapASDownloadGen)).Methods(http.MethodPost)
 
 	router.Handle("/api/as/getUpdatesForAP/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabASController.GetUpdatesForAP))

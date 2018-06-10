@@ -768,9 +768,9 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 	if answeringChallenge {
 		// check we have the needed fields
 		_, havechallenge := request["challenge"]
-		_, haveanswer := request["answer"]
+		_, haveanswer := request["challenge_solution"]
 		if !havechallenge || !haveanswer {
-			answer["msg"] = `JSON missing "challenge" or "answer"`
+			answer["msg"] = `JSON missing "challenge" or "challenge_solution"`
 			answer["error"] = true
 			utility.SendJSONError(answer, w)
 			return
@@ -826,7 +826,7 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 				utility.SendJSONError(answer, w)
 				return
 			}
-			receivedSignature, err := base64.StdEncoding.DecodeString(request["answer"].(string))
+			receivedSignature, err := base64.StdEncoding.DecodeString(request["challenge_solution"].(string))
 			if err != nil {
 				answer["error"] = true
 				answer["msg"] = "Cannot decode the answer to the challenge"
@@ -877,6 +877,7 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 
 				// TODO: send gen folder
 				answer["ia"], err = RemapASIDComputeNewGenFolder(as)
+				fmt.Println("Loooooooooooooooooooooooooooooook!!!!!")
 				if err != nil {
 					// TODO: this is actually very bad, do we delete the AS entry here? what do we do?
 					answer["error"] = true
@@ -886,7 +887,7 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 					utility.SendJSONError(answer, w)
 					return
 				}
-
+				delete(answer, "challenge")
 				// fileName := "netsec.test.email@gmail.com_1-1001.tar.gz"
 				// filePath := "/home/juan/scionLabConfigs/netsec.test.email@gmail.com_1-1001.tar.gz"
 				// data, err := ioutil.ReadFile(filePath)
@@ -901,13 +902,44 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 				// http.ServeContent(w, r, fileName, time.Now(), bytes.NewReader(data))
 			}
 		}
-	} // if needed remapping
+	} else {
+		answer["pending"] = false
+	}
 	err = utility.SendJSON(answer, w)
 	if err != nil {
 		log.Printf("Error during JSON marshaling: %v", err)
 		s.Error500(w, err, "Error during JSON marshaling")
 		return
 	}
+}
+
+func (s *SCIONLabASController) RemapASDownloadGen(w http.ResponseWriter, r *http.Request) {
+	// answer := make(map[string]interface{})
+	// answer["error"] = false
+	// vars := mux.Vars(r)
+	// asID := vars["as_id"]
+	// challengeSolution := vars["challenge_solution"]
+	// as, err := models.FindSCIONLabASByIAString(asID)
+	// if err != nil {
+	// 	answer["error"] = true
+	// 	answer["msg"] = fmt.Sprintf("Could not find AS with IA %v", asID)
+	// 	utility.SendJSONError(answer, w)
+	// 	return
+	// }
+	
+	
+	// fileName := UserPackageName(as.UserEmail, I, A)
+	// filePath := filepath.Join(PackagePath, fileName)
+	// data, err := ioutil.ReadFile(filePath)
+	// if err != nil {
+	// 	log.Printf("Error reading the tarball. FileName: %v, %v", fileName, err)
+	// 	s.Error500(w, err, "Error reading tarball")
+	// 	return
+	// }
+	// w.Header().Set("Content-Type", "application/gzip")
+	// w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
+	// w.Header().Set("Content-Transfer-Encoding", "binary")
+	// http.ServeContent(w, r, fileName, time.Now(), bytes.NewReader(data))
 }
 
 // The handler function to remove a SCIONLab AS for the given user.

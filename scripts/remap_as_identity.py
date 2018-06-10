@@ -100,22 +100,32 @@ def solve_challenge(challenge):
 
 
 def something_pending():
+    """
+    Returns true/false if pending and
+    dictionaty with the answer from the server
+    """
     url = SCION_COORD_URL + "/api/as/remapId/" + IA
     try:
         resp = requests.get(url)
     except requests.exceptions.ConnectionError as e:
         print ("Error querying Coordinator: ", e)
-        return False
+        return False, None
     content = resp.content.decode('utf-8')
     content = json.loads(content)
     print ("------------------------- ANS: -----------------------")
     print (content)
+    if "pending" not in content:
+        print("ERROR: Wrong answer, does not contain the pending key")
+        return False, None
+    if not content["pending"]:
+        return False, None
 
 
     answer = {"challenge": content["challenge"]}
     challenge = base64.standard_b64decode(content["challenge"])
     solution = solve_challenge(challenge=challenge)
-    answer["answer"] = base64.standard_b64encode(solution).decode("utf-8")
+    challenge_solution = base64.standard_b64encode(solution).decode("utf-8")
+    answer["challenge_solution"] = challenge_solution
     print ("-------------- POST Solution to challenge: ---------------")
     print (answer)
     
@@ -125,7 +135,7 @@ def something_pending():
             url = resp.next.url if resp.is_redirect and resp.next else None
     except requests.exceptions.ConnectionError as e:
         print ("Error querying Coordinator solving challenge: ", e)
-        return False
+        return False, None
     content = resp.content.decode('utf-8')
     try:
         content = json.loads(content)
@@ -133,7 +143,23 @@ def something_pending():
         content = {}
     print ("------------------------- Reply from Coordinator after solution: -----------------------")
     print (content)
-    return True
+    # content["challenge"] = base64.standard_b64encode(challenge).decode("utf-8")
+    content["challenge_solution"] = challenge_solution
+    return True, content
+
+
+def download_gen_folder(answer):
+    mapped_ia = answer["ia"]
+    # challenge = answer["challenge"]
+    challenge_solution= answer["challenge_solution"]
+    url = SCION_COORD_URL + "/api/as/remapIdDownloadGen/" + IA + "/" + challenge_solution
+    try:
+        resp = requests.get(url)
+    except requests.exceptions.ConnectionError as ex:
+        print ("Error download Gen folder from Coordinator: ", ex)
+        return
+    
+
 
 def parse_command_line_args():
     # global IA, ACC_ID, ACC_PW
@@ -158,9 +184,12 @@ def parse_command_line_args():
 
 def main():
     parse_command_line_args()
-    if something_pending():
-        print ("Something is pending")
-        pass
+    pending, answer = something_pending()
+    if not pending:
+        print ("Nothing is pending, out.")
+        return 0
+    download_gen_folder(answer)
+
 
 
 if __name__ == '__main__':
