@@ -62,7 +62,7 @@ func (c AdminController) AdminInformation(w http.ResponseWriter, r *http.Request
 	}
 
 	// TODO (mlegner): Fill in template except FirstName and LastName
-	text, err := ioutil.ReadFile(email.EmailTemplatePath(invitationsTemplate))
+	text, err := ioutil.ReadFile(email.MailTemplatePath(invitationsTemplate))
 
 	adminData := adminPageData{
 		User:         user,
@@ -101,7 +101,7 @@ func preregisterAndSendInvitation(userSession *models.Session, invitation *invit
 		LastName:         invitation.LastName,
 		InviterFirstName: userSession.First,
 		InviterLastName:  userSession.Last,
-		HostAddress:      config.HTTP_HOST_ADDRESS,
+		HostAddress:      config.HTTPHostAddress,
 		UUID:             user.VerificationUUID,
 	}
 
@@ -141,8 +141,8 @@ func (c AdminController) SendInvitationEmails(w http.ResponseWriter, r *http.Req
 		c.Forbidden(w, err, "No user session found")
 	}
 
-	errorEmails := []string{}
-	errors := []string{}
+	var errorEmails []string
+	var errors []string
 	for _, invitation := range invitations {
 		err := preregisterAndSendInvitation(userSession, &invitation)
 		if err != nil {

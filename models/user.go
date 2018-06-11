@@ -21,20 +21,19 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"time"
 
-	"fmt"
-
 	"github.com/astaxie/beego/orm"
-	uuid "github.com/pborman/uuid"
+	"github.com/pborman/uuid"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/crypto/scrypt"
 )
 
 const (
-	API_CONTEXT   = string("scion-coordinator")
-	SALT_LENGTH   = 80
-	SECRET_LENGTH = 32
+	APIContext   = string("scion-coordinator")
+	SaltLength   = 80
+	SecretLength = 32
 )
 
 type Account struct {
@@ -67,13 +66,13 @@ type user struct {
 }
 
 func generateSalt() ([]byte, error) {
-	salt := make([]byte, SALT_LENGTH)
+	salt := make([]byte, SaltLength)
 	var saltErr error
 	var total int
 
 	for i := 0; i < 10; i++ {
 		total, saltErr = rand.Read(salt)
-		if saltErr == nil && total == SALT_LENGTH {
+		if saltErr == nil && total == SaltLength {
 			return salt, nil
 		}
 	}
@@ -92,7 +91,7 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 	storedUser, err := FindUserByEmail(email)
 
 	if err == nil && storedUser != nil && storedUser.ID > 0 {
-		return nil, errors.New("User already registered")
+		return nil, errors.New("user already registered")
 	}
 
 	// generate a random salt when the user registers the first time
@@ -118,8 +117,8 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 		if err == orm.ErrNoRows {
 
 			// Generate the accountID and the secret
-			apiSecretReader := hkdf.New(sha256.New, derivedPassword, salt, []byte(API_CONTEXT))
-			apiSecretBytes, apiSecretError := bufio.NewReader(apiSecretReader).Peek(SECRET_LENGTH)
+			apiSecretReader := hkdf.New(sha256.New, derivedPassword, salt, []byte(APIContext))
+			apiSecretBytes, apiSecretError := bufio.NewReader(apiSecretReader).Peek(SecretLength)
 
 			if apiSecretError != nil {
 				return nil, apiSecretError
@@ -166,7 +165,7 @@ func RegisterUser(accountName, organisation, email, password, first, last string
 
 	}
 
-	return nil, errors.New("Unknown error while registering a new user")
+	return nil, errors.New("unknown error while registering a new user")
 }
 
 func (a *Account) Upsert() error {
@@ -206,22 +205,22 @@ func FindUserByID(id string) (*user, error) {
 	return u, err
 }
 
-func FindAccountByAccountIDAndSecret(acc_id, secret string) (*Account, error) {
+func FindAccountByAccountIDAndSecret(accID, secret string) (*Account, error) {
 	a := new(Account)
-	err := o.QueryTable(a).Filter("AccountID", acc_id).Filter("Secret", secret).One(a)
+	err := o.QueryTable(a).Filter("AccountID", accID).Filter("Secret", secret).One(a)
 	return a, err
 }
 
-func FindAccountByAccountID(acc_id string) (*Account, error) {
+func FindAccountByAccountID(accID string) (*Account, error) {
 	a := new(Account)
-	err := o.QueryTable(a).Filter("AccountID", acc_id).One(a)
+	err := o.QueryTable(a).Filter("AccountID", accID).One(a)
 	return a, err
 }
 
 func FindAccountByUserEmail(email string) (*Account, error) {
 	user, err := FindUserByEmail(email)
 	if err != nil {
-		return nil, fmt.Errorf("Error looking up user with email %v: %v", email, err)
+		return nil, fmt.Errorf("error looking up user with email %v: %v", email, err)
 	}
 	return user.Account, nil
 }
@@ -282,12 +281,12 @@ func (u *user) checkPassword(password string) error {
 	// 	return err
 	// }
 
-	return errors.New("Password invalid")
+	return errors.New("password invalid")
 }
 
 func (u *user) CheckVerified() error {
 	if !u.Verified {
-		return errors.New("Email is not verified")
+		return errors.New("email is not verified")
 	}
 	return nil
 }

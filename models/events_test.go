@@ -33,7 +33,7 @@ func createTestUser(t *testing.T) *user {
 func TestJoinRequest(t *testing.T) {
 	u := createTestUser(t)
 	jReqIn := &JoinRequest{RequestID: 777, RespondIA: "100-100", SigPubKey: "sigkey",
-		RequesterID: u.Account.AccountID, EncPubKey: "enckey", Status: PENDING}
+		RequesterID: u.Account.AccountID, EncPubKey: "enckey", Status: Pending}
 	if err := jReqIn.Insert(); err != nil {
 		t.Error("Failed to insert the test join request.", err)
 	}
@@ -87,7 +87,7 @@ func TestConnRequest(t *testing.T) {
 	cReqIn := &ConnRequest{RequestID: 999, RespondIA: "111-111", RequestIA: "222-222",
 		Account: u.Account, RequesterCertificate: "test_cert", Info: "test_info",
 		IP: "123.123.123.123", Port: 555, OverlayType: "UDP/IP", MTU: 1472, Bandwidth: 1000,
-		Signature: "test_sig", Status: PENDING}
+		Signature: "test_sig", Status: Pending}
 	if err := cReqIn.Insert(); err != nil {
 		t.Error("Failed to insert the test connection request.", err)
 	}

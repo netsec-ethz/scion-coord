@@ -120,7 +120,7 @@ func GetAllAPsByISD(isd int) ([]SCIONLabAS, error) {
 	}
 	for _, ap := range w {
 		if ap.ISD == isd {
-			if ap.Status == ACTIVE {
+			if ap.Status == Active {
 				v = append(v, *ap)
 			}
 		}

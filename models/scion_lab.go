@@ -49,8 +49,8 @@ type SCIONLabAS struct {
 	ASID        int              `orm:"column(as_id)"`
 	Core        bool             `orm:"default(false)"` // Is this SCIONLabAS a core AS
 	Label       string           // Optional label for this AS (can be chosen by the user)
-	Status      uint8            `orm:"default(0)"` // Status of the AS: ACTIVE, CREATE, ...
-	Type        uint8            `orm:"default(0)"` // Type of the AS: BOX, VM, DEDICATED, ...
+	Status      uint8            `orm:"default(0)"` // Status of the AS: Active, Create, ...
+	Type        uint8            `orm:"default(0)"` // Type of the AS: Box, VM, Dedicated, ...
 	AP          *AttachmentPoint `orm:"null;reverse(one)"`
 	Credits     int64            // Credits in virtual credit system
 	Branch      string           `orm:"default(scionlab)"` // Update branch the AS is tracking ("scionlab", "scionlab_testing", "none")
@@ -134,10 +134,10 @@ func (as *SCIONLabAS) String() string {
 // This function determines the IP address that are used for different SCION servers (CS, BS, PS)
 func (as *SCIONLabAS) ServerIP() string {
 	switch as.Type {
-	case INFRASTRUCTURE, DEDICATED:
+	case Infrastructure, Dedicated:
 		return as.PublicIP
 	case VM:
-		return config.VM_LOCAL_IP
+		return config.VMLocalIP
 	default:
 		return "127.0.0.1"
 	}
@@ -217,7 +217,7 @@ func (as *SCIONLabAS) GetPortNumberFromBRID(brID uint16) uint16 {
 func (as *SCIONLabAS) GetFreeBRID() (uint16, error) {
 	cns, err := as.GetConnectionInfo()
 	if err != nil {
-		return 0, fmt.Errorf("Error finding connections of AS %v: %v", as.IA(), err)
+		return 0, fmt.Errorf("error finding connections of AS %v: %v", as.IA(), err)
 	}
 	length := len(cns)
 	brIDs := make([]int, length)
@@ -225,10 +225,10 @@ func (as *SCIONLabAS) GetFreeBRID() (uint16, error) {
 		brIDs[i] = int(cn.BRID)
 	}
 	minBRID := 1
-	if as.Type == INFRASTRUCTURE {
-		minBRID += config.RESERVED_BRS_INFRASTRUCTURE
+	if as.Type == Infrastructure {
+		minBRID += config.ReservedBRsInfrastructure
 	}
-	id, err := utility.GetAvailableID(brIDs, minBRID, config.MAX_BR_ID)
+	id, err := utility.GetAvailableID(brIDs, minBRID, config.BaxBRID)
 	return uint16(id), err
 }
 
@@ -236,9 +236,9 @@ func (as *SCIONLabAS) GetFreeBRID() (uint16, error) {
 func (as *SCIONLabAS) GetFreeVPNIP() (string, error) {
 	cns, err := as.getRespondConnections()
 	if err != nil {
-		return "", fmt.Errorf("Error finding connections of AP %v: %v", as.IA(), err)
+		return "", fmt.Errorf("error finding connections of AP %v: %v", as.IA(), err)
 	}
-	vpnIPs := []int{}
+	var vpnIPs []int
 	for _, cn := range cns {
 		if cn.IsVPN {
 			vpnIPs = append(vpnIPs, int(utility.IPToInt(cn.JoinIP)))
@@ -311,7 +311,7 @@ func (as *SCIONLabAS) GetJoinConnectionInfo() ([]ConnectionInfo, error) {
 		respondAS := cn.getRespondAS()
 		joinAS := cn.getJoinAS()
 		// If the connection has been removed continue
-		if cn.JoinStatus == REMOVED {
+		if cn.JoinStatus == Removed {
 			continue
 		}
 		cnInfo = ConnectionInfo{
@@ -330,7 +330,7 @@ func (as *SCIONLabAS) GetJoinConnectionInfo() ([]ConnectionInfo, error) {
 			Linktype:             cn.Linktype,
 			IsVPN:                cn.IsVPN,
 			Status:               cn.JoinStatus,
-			KeepASStatusOnUpdate: cn.RespondStatus == REMOVE && cn.JoinStatus == REMOVE,
+			KeepASStatusOnUpdate: cn.RespondStatus == Remove && cn.JoinStatus == Remove,
 		}
 		cnInfos = append(cnInfos, cnInfo)
 	}
@@ -348,12 +348,12 @@ func (as *SCIONLabAS) GetRespondConnectionInfo() ([]ConnectionInfo, error) {
 	for _, cn := range cns {
 		respondAS := cn.getRespondAS()
 		joinAS := cn.getJoinAS()
-		if cn.RespondStatus == REMOVED {
+		if cn.RespondStatus == Removed {
 			continue
 		}
 		linktype := cn.Linktype
-		if cn.Linktype == PARENT {
-			linktype = CHILD
+		if cn.Linktype == Parent {
+			linktype = Child
 		}
 		cnInfo = ConnectionInfo{
 			ID:                   cn.ID,
@@ -371,7 +371,7 @@ func (as *SCIONLabAS) GetRespondConnectionInfo() ([]ConnectionInfo, error) {
 			Linktype:             linktype,
 			IsVPN:                cn.IsVPN,
 			Status:               cn.RespondStatus,
-			KeepASStatusOnUpdate: cn.RespondStatus == REMOVE && cn.JoinStatus == REMOVE,
+			KeepASStatusOnUpdate: cn.RespondStatus == Remove && cn.JoinStatus == Remove,
 		}
 		cnInfos = append(cnInfos, cnInfo)
 	}
@@ -582,7 +582,7 @@ type ASInfo struct {
 
 func (asInfo *ASInfo) Insert() error {
 	if asInfo.Account == nil || asInfo.Account.Users == nil || len(asInfo.Account.Users) == 0 {
-		return errors.New("No user found")
+		return errors.New("no user found")
 	}
 	user := asInfo.Account.Users[0] // using first user associated with account
 	newAS := SCIONLabAS{
@@ -593,8 +593,8 @@ func (asInfo *ASInfo) Insert() error {
 		Credits:   asInfo.Credits,
 		PublicIP:  "",
 		StartPort: 50000,
-		Status:    INACTIVE,
-		Type:      INFRASTRUCTURE,
+		Status:    Inactive,
+		Type:      Infrastructure,
 	}
 	return newAS.Insert()
 }
@@ -688,18 +688,18 @@ func (as *SCIONLabAS) DeleteConnectionFromDB(cnInfo *ConnectionInfo) error {
 func (as *SCIONLabAS) FlagAllConnectionsToApToBeDeleted(apIA string) error {
 	cns, err := as.GetJoinConnectionInfo()
 	if err != nil {
-		return fmt.Errorf("Error looking up connections of SCIONLab AS for AS %v: %v", as.IA(), err)
+		return fmt.Errorf("error looking up connections of SCIONLab AS for AS %v: %v", as.IA(), err)
 	}
 	// all connections from an AS flagged as new connection and oldAP need to end up (localST, remoteST) = (REMOVE,REMOVE)
 	for _, cn := range cns {
 		if utility.IAString(cn.NeighborISD, cn.NeighborAS) != apIA {
 			continue
 		}
-		cn.Status = REMOVE
-		cn.NeighborStatus = REMOVE
+		cn.Status = Remove
+		cn.NeighborStatus = Remove
 		err = as.UpdateDBConnection(&cn)
 		if err != nil {
-			return fmt.Errorf("Error updating previous connection ID %v: %v", cn.ID, err)
+			return fmt.Errorf("error updating previous connection ID %v: %v", cn.ID, err)
 		}
 	}
 	return nil

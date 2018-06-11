@@ -24,8 +24,8 @@ import (
 
 func LoggingHandler(next http.Handler) http.Handler {
 	// Log to a file
-	if config.LOG_FILE != "" {
-		logFile, err := os.OpenFile(config.LOG_FILE, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	if config.LogFile != "" {
+		logFile, err := os.OpenFile(config.LogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 		if err != nil {
 			// we can panic here, because it means there is a wrong config.
 			panic(err)

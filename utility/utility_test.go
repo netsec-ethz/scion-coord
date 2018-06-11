@@ -47,10 +47,10 @@ type brTest struct {
 
 func TestIPFunctions(t *testing.T) {
 	ipComparisonTests := []ipComparisonTest{
-		ipComparisonTest{"0.0.0.0", "0.0.0.1", -1},
-		ipComparisonTest{"0.0.0.0", "0.0.0.0", 0},
-		ipComparisonTest{"0.0.0.1", "0.0.0.0", 1},
-		ipComparisonTest{"0.1.0.0", "0.0.0.0", 1},
+		{"0.0.0.0", "0.0.0.1", -1},
+		{"0.0.0.0", "0.0.0.0", 0},
+		{"0.0.0.1", "0.0.0.0", 1},
+		{"0.1.0.0", "0.0.0.0", 1},
 	}
 
 	for _, ipComp := range ipComparisonTests {
@@ -61,11 +61,11 @@ func TestIPFunctions(t *testing.T) {
 	}
 
 	ipConvertTests := []ipConvertTest{
-		ipConvertTest{"0.0.0.0", 0},
-		ipConvertTest{"0.0.0.1", 1},
-		ipConvertTest{"0.0.1.0", 256},
-		ipConvertTest{"0.1.0.0", 65536},
-		ipConvertTest{"1.0.0.0", 16777216},
+		{"0.0.0.0", 0},
+		{"0.0.0.1", 1},
+		{"0.0.1.0", 256},
+		{"0.1.0.0", 65536},
+		{"1.0.0.0", 16777216},
 	}
 
 	for _, ipConv := range ipConvertTests {
@@ -75,8 +75,8 @@ func TestIPFunctions(t *testing.T) {
 	}
 
 	ipIncrementTests := []ipIncrementTest{
-		ipIncrementTest{"192.168.1.1", "192.168.1.3", 2},
-		ipIncrementTest{"255.255.255.255", "0.0.0.0", 1},
+		{"192.168.1.1", "192.168.1.3", 2},
+		{"255.255.255.255", "0.0.0.0", 1},
 	}
 
 	for _, ipInc := range ipIncrementTests {
@@ -90,9 +90,9 @@ func TestIPFunctions(t *testing.T) {
 
 func TestBRIDFromString(t *testing.T) {
 	brTests := []brTest{
-		brTest{"br1-2-1", false, 1},
-		brTest{"br123", true, 0}, // conversion should fail and return 0
-		brTest{"br3-4-0", false, 0},
+		{"br1-2-1", false, 1},
+		{"br123", true, 0}, // conversion should fail and return 0
+		{"br3-4-0", false, 0},
 	}
 
 	for _, brT := range brTests {

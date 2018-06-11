@@ -63,7 +63,7 @@ func (c *customImage) MarshalJSON() ([]byte, error) {
 	m := make(map[string]string)
 	m["image"] = c.Device
 	m["id"] = c.JobId
-	m["download_link"] = config.IMG_BUILD_ADDRESS_PUBLIC + "/download/" + c.JobId
+	m["download_link"] = config.IMGBuilderAddressPublic + "/download/" + c.JobId
 	if c.Status == READY {
 		m["status"] = "ready"
 	} else {
@@ -118,7 +118,7 @@ func (u *userJobs) isRateLimited() bool {
 	defer u.userJobLock.Unlock()
 
 	duration := time.Since(u.LastBuildRequest)
-	return duration.Minutes() < float64(config.IMG_BUILD_BUILD_DELAY)
+	return duration.Minutes() < float64(config.IMGBuilderBuildDelay)
 }
 
 func (u *userJobs) addImage(image *customImage) {
@@ -157,7 +157,7 @@ func (u *userJobs) removeImage(jobId string) {
 }
 
 func (s *SCIONImgBuildController) GetAvailableDevices(w http.ResponseWriter, r *http.Request) {
-	resp, err := http.Get(config.IMG_BUILD_ADDRESS_INTERNAL + "/get-images")
+	resp, err := http.Get(config.IMGBuilderAddressInternal + "/get-images")
 	if err != nil {
 		s.Error500(w, err, "Error contacting remote image building service!")
 		return
@@ -183,14 +183,14 @@ func (s *SCIONImgBuildController) GenerateImage(w http.ResponseWriter, r *http.R
 	vars := mux.Vars(r)
 	asID := vars["as_id"]
 	as, err := models.FindSCIONLabASByUserEmailAndASID(uSess.Email, asID)
-	if err != nil || as.Status == models.INACTIVE || as.Status == models.REMOVE {
+	if err != nil || as.Status == models.Inactive || as.Status == models.Remove {
 		log.Printf("No active configuration found for user %v with asId %v\n", uSess.Email, asID)
 		s.BadRequest(w, nil, "No active configuration found for user %v",
 			uSess.Email)
 		return
 	}
 
-	if as.Type != models.DEDICATED {
+	if as.Type != models.Dedicated {
 		log.Printf("Configuration for selected AS is not made for dedicated system\n")
 		s.BadRequest(w, nil, "You must reconfigure your AS to use dedicated system configuration")
 		return
@@ -201,7 +201,7 @@ func (s *SCIONImgBuildController) GenerateImage(w http.ResponseWriter, r *http.R
 
 	// Get build request
 	if err := r.ParseForm(); err != nil {
-		s.BadRequest(w, fmt.Errorf("Error parsing the form: %v", err), "Error parsing form")
+		s.BadRequest(w, fmt.Errorf("error parsing the form: %v", err), "Error parsing form")
 		return
 	}
 	var bRequest buildRequest
@@ -216,7 +216,7 @@ func (s *SCIONImgBuildController) GenerateImage(w http.ResponseWriter, r *http.R
 	// Start build job
 	buildJobs := s.getUserBuildJobs(uSess.Email)
 	if buildJobs.isRateLimited() {
-		s.BadRequest(w, fmt.Errorf("Rate limited request"), "You have exceeded all build jobs, please wait and try again later")
+		s.BadRequest(w, fmt.Errorf("rate limited request"), "You have exceeded all build jobs, please wait and try again later")
 		return
 	}
 
@@ -236,7 +236,7 @@ func startBuildJob(configFileName, configFilePath string, bRequest buildRequest,
 
 	data, err := ioutil.ReadFile(configFilePath)
 	if err != nil {
-		return fmt.Errorf("Error reading configuration file [%s] %v", configFileName, err)
+		return fmt.Errorf("error reading configuration file [%s] %v", configFileName, err)
 	}
 	body := new(bytes.Buffer)
 	writer := multipart.NewWriter(body)
@@ -246,10 +246,10 @@ func startBuildJob(configFileName, configFilePath string, bRequest buildRequest,
 	}
 	part.Write(data)
 
-	writer.WriteField("token", config.IMG_BUILD_SECRET_TOKEN)
+	writer.WriteField("token", config.IMGBuilderSecretToken)
 	writer.Close()
 
-	url := config.IMG_BUILD_ADDRESS_INTERNAL + "/create/" + bRequest.ImageName
+	url := config.IMGBuilderAddressInternal + "/create/" + bRequest.ImageName
 	req, err := http.NewRequest(http.MethodPost, url, body)
 	log.Printf("Sending request to: %s", url)
 	req.Header.Add("Content-Type", writer.FormDataContentType())
@@ -266,7 +266,7 @@ func startBuildJob(configFileName, configFilePath string, bRequest buildRequest,
 		// Server returned an error!
 		buf := new(bytes.Buffer)
 		buf.ReadFrom(resp.Body)
-		return fmt.Errorf("Server returned %d error: %s", resp.StatusCode, buf.String())
+		return fmt.Errorf("server returned %d error: %s", resp.StatusCode, buf.String())
 	}
 
 	responseBody, err := ioutil.ReadAll(resp.Body)
@@ -328,7 +328,7 @@ func getJson(url string, target interface{}) error {
 
 func getJobStatus(id string) (bool, bool, error) {
 	status := &jobStatus{}
-	err := getJson(config.IMG_BUILD_ADDRESS_INTERNAL+"/status/"+id, status)
+	err := getJson(config.IMGBuilderAddressInternal+"/status/"+id, status)
 	if err != nil {
 		return false, false, err
 	}
