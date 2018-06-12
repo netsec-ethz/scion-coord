@@ -16,13 +16,12 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
-
-	"errors"
 
 	"github.com/gorilla/mux"
 	"github.com/netsec-ethz/scion-coord/config"
@@ -68,7 +67,7 @@ func (s *SCIONLabASController) checkAuthorization(r *http.Request) (apIA string,
 			return
 		}
 	}
-	err = fmt.Errorf("The Attachment Point %v does not belong to the specified account", apIA)
+	err = fmt.Errorf("the Attachment Point %v does not belong to the specified account", apIA)
 	return
 }
 
@@ -117,9 +116,9 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 		s.Error500(w, err, "Error looking up SCIONLab ASes from DB")
 		return
 	}
-	cnsCreateResp := []APConnectionInfo{}
-	cnsUpdateResp := []APConnectionInfo{}
-	cnsRemoveResp := []APConnectionInfo{}
+	var cnsCreateResp []APConnectionInfo
+	var cnsUpdateResp []APConnectionInfo
+	var cnsRemoveResp []APConnectionInfo
 	for _, cn := range cnInfos {
 		cnInfo := APConnectionInfo{
 			ASID:      utility.IAString(as.ISD, cn.NeighborAS),
@@ -131,11 +130,11 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 			APBRID:    cn.BRID,
 		}
 		switch cn.Status {
-		case models.CREATE:
+		case models.Create:
 			cnsCreateResp = append(cnsCreateResp, cnInfo)
-		case models.UPDATE:
+		case models.Update:
 			cnsUpdateResp = append(cnsUpdateResp, cnInfo)
-		case models.REMOVE:
+		case models.Remove:
 			cnsRemoveResp = append(cnsRemoveResp, cnInfo)
 		}
 	}
@@ -198,9 +197,9 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 		s.BadRequest(w, err, "Error looking up owned ASes")
 	}
 
-	failedConfirmations := []string{}
+	var failedConfirmations []string
 
-	rejectedIAs := []rejectedAS{}
+	var rejectedIAs []rejectedAS
 	for ia, event := range updateLists {
 		_, isAuthorized := ownedASes[ia]
 		if !isAuthorized {
@@ -221,7 +220,7 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 		}
 
 		for action, cns := range event {
-			successIAs := []string{}
+			var successIAs []string
 			for _, conn := range cns {
 				if conn.Success {
 					successIAs = append(successIAs, conn.IA)
@@ -251,8 +250,8 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 		IA     string
 		action string
 	}
-	failedConfirmations := []string{}
-	successEmails := []emailConfirmation{}
+	var failedConfirmations []string
+	var successEmails []emailConfirmation
 	for _, ia := range cns {
 		// find the connection to the SCIONLabAS. e.g. ia=1-1001
 		IA, err := addr.IAFromString(ia)
@@ -293,10 +292,10 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 		cnInfo := workingSet[0]
 		switch action {
 		case CREATED, UPDATED:
-			cnInfo.Status = models.ACTIVE
+			cnInfo.Status = models.Active
 		case REMOVED:
 			if cnInfo.IsCurrentConnection() {
-				cnInfo.Status = models.INACTIVE
+				cnInfo.Status = models.Inactive
 				cnInfo.BRID = 0 // Set BRID to 0 for inactive connections
 			} else {
 				// this means to remove the connection entry but don't update the AS status
@@ -322,7 +321,8 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 			// just checking for consistency
 			if action != REMOVED {
 				// logic error! print failed assertion but don't quit this update
-				log.Printf("Logic error confirming updates for AS %v to AP %v. The connection is inactive but the action %v != REMOVED",
+				log.Printf("Logic error confirming updates for AS %v to AP %v. "+
+					"The connection is inactive but the action %v != REMOVED",
 					ia, apAS.IA(), action)
 			}
 		}
@@ -339,7 +339,7 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 // processRejectedUpdatesFromAP will receive a list of AS with rejected updates,
 // will notify the ScionLab administrators, and remove the pending change.
 func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejectedAS) []string {
-	failedNotifications := []string{}
+	var failedNotifications []string
 	// for each rejected AS, send an email to the admin and user
 	for _, rejectedAS := range rejections {
 		as, err := models.FindSCIONLabASByIAString(rejectedAS.IA)
@@ -369,7 +369,7 @@ func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejecte
 
 		// now, clear the rejected AS, as the AP went out of sync with the Coordinator
 		for _, cn := range asCns {
-			if cn.Status != models.CREATE && cn.Status != models.UPDATE && cn.Status != models.REMOVE {
+			if cn.Status != models.Create && cn.Status != models.Update && cn.Status != models.Remove {
 				// if we don't have pending actions, skip completely
 				continue
 			}
@@ -382,7 +382,7 @@ func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejecte
 		}
 
 		// fix the status of the AS entry, if needed:
-		if as.Status == models.UPDATE || as.Status == models.REMOVE {
+		if as.Status == models.Update || as.Status == models.Remove {
 			// only case where a rejected connection could keep the Status out of sync
 			cns, err := as.GetJoinConnectionInfo()
 			if err != nil {
@@ -392,7 +392,7 @@ func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejecte
 			}
 			switch len(cns) {
 			case 0:
-				as.Status = models.INACTIVE
+				as.Status = models.Inactive
 			case 1:
 				as.Status = cns[0].Status
 			default:
@@ -438,7 +438,7 @@ func sendConfirmationEmail(userEmail, IA, action string) error {
 	}{
 		FirstName:   user.FirstName,
 		LastName:    user.LastName,
-		HostAddress: config.HTTP_HOST_ADDRESS,
+		HostAddress: config.HTTPHostAddress,
 		Message:     message,
 	}
 	log.Printf("Sending confirmation email to user %v.", userEmail)
@@ -446,7 +446,7 @@ func sendConfirmationEmail(userEmail, IA, action string) error {
 }
 
 // sends an email notifying of a failure to synchronize the attachment point with the user AS.\
-// Also notifies an admin in netsec
+// Also notifies an admin in NetSec
 func sendRejectedEmail(userEmail string, userIA, action, attachmentPointIA string) error {
 	user, err := models.FindUserByEmail(userEmail)
 	if err != nil {
@@ -464,7 +464,7 @@ func sendRejectedEmail(userEmail string, userIA, action, attachmentPointIA strin
 	}{
 		FirstName:   user.FirstName,
 		LastName:    user.LastName,
-		HostAddress: config.HTTP_HOST_ADDRESS,
+		HostAddress: config.HTTPHostAddress,
 		AS:          userIA,
 		Operation:   action,
 		AP:          attachmentPointIA,

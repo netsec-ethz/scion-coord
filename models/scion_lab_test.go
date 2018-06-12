@@ -30,15 +30,15 @@ var (
 		StartPort: 50000,
 		ISD:       1,
 		ASID:      1,
-		Status:    ACTIVE,
-		Type:      BOX,
+		Status:    Active,
+		Type:      Box,
 	}
 	as2 = &SCIONLabAS{
 		UserEmail: u2Email,
 		StartPort: 50000,
 		ISD:       1,
 		ASID:      2,
-		Status:    INACTIVE,
+		Status:    Inactive,
 		Type:      VM,
 	}
 	as3 = &SCIONLabAS{
@@ -47,8 +47,8 @@ var (
 		StartPort: 50000,
 		ISD:       2,
 		ASID:      5,
-		Status:    UPDATE,
-		Type:      DEDICATED,
+		Status:    Update,
+		Type:      Dedicated,
 		Core:      true,
 	}
 
@@ -74,10 +74,10 @@ var (
 		RespondAP:     ap1,
 		JoinBRID:      2,
 		RespondBRID:   6,
-		Linktype:      PARENT,
+		Linktype:      Parent,
 		IsVPN:         true,
-		JoinStatus:    CREATE,
-		RespondStatus: ACTIVE,
+		JoinStatus:    Create,
+		RespondStatus: Active,
 	}
 	cn2 = Connection{
 		JoinIP:        as1.PublicIP,
@@ -86,10 +86,10 @@ var (
 		RespondAP:     ap2,
 		JoinBRID:      2,
 		RespondBRID:   1,
-		Linktype:      PARENT,
+		Linktype:      Parent,
 		IsVPN:         false,
-		JoinStatus:    REMOVE,
-		RespondStatus: REMOVED,
+		JoinStatus:    Remove,
+		RespondStatus: Removed,
 	}
 	cn3 = Connection{
 		JoinIP:        "62.0.0.53",
@@ -98,10 +98,10 @@ var (
 		RespondAP:     ap2,
 		JoinBRID:      4,
 		RespondBRID:   7,
-		Linktype:      PARENT,
+		Linktype:      Parent,
 		IsVPN:         true,
-		JoinStatus:    ACTIVE,
-		RespondStatus: CREATE,
+		JoinStatus:    Active,
+		RespondStatus: Create,
 	}
 )
 
@@ -228,27 +228,27 @@ func TestSCIONLabAS(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, cn := range cns1 {
-			t.Log("Connection s1: %v", cn)
+			t.Logf("Connection s1: %v", cn)
 		}
 		cns2, err := s2.GetConnectionInfo()
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, cn := range cns2 {
-			t.Log("Connection s2: %v", cn)
+			t.Logf("Connection s2: %v", cn)
 		}
 		cns3, err := s3.GetConnectionInfo()
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, cn := range cns3 {
-			t.Log("Connection s3: %v", cn)
+			t.Logf("Connection s3: %v", cn)
 		}
 
 		// Test UpdateDBConnection
 		s1.PublicIP = "CONNECTIONTEST"
 		cns1[0].BRID = 60000
-		cns1[0].Status = UPDATE
+		cns1[0].Status = Update
 		err = s1.Update()
 		if err != nil {
 			t.Fatal(err)
@@ -259,7 +259,7 @@ func TestSCIONLabAS(t *testing.T) {
 		}
 		s2.PublicIP = "CONNECTIONTEST"
 		cns2[0].BRID = 60000
-		cns2[0].Status = UPDATE
+		cns2[0].Status = Update
 		err = s2.Update()
 		if err != nil {
 			t.Fatal(err)
@@ -273,21 +273,21 @@ func TestSCIONLabAS(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, cn := range cns1 {
-			t.Log("Connection s1: %v", cn)
+			t.Logf("Connection s1: %v", cn)
 		}
 		cns2, err = s2.GetConnectionInfo()
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, cn := range cns2 {
-			t.Log("Connection s2: %v", cn)
+			t.Logf("Connection s2: %v", cn)
 		}
 		cns3, err = s3.GetConnectionInfo()
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, cn := range cns3 {
-			t.Log("Connection s3: %v", cn)
+			t.Logf("Connection s3: %v", cn)
 		}
 	})
 

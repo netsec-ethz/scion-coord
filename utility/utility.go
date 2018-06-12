@@ -35,16 +35,16 @@ func CopyFile(source string, dest string) (err error) {
 		return err
 	}
 	defer sourcefile.Close()
-	destfile, err := os.Create(dest)
+	destFile, err := os.Create(dest)
 	if err != nil {
 		return err
 	}
-	defer destfile.Close()
-	_, err = io.Copy(destfile, sourcefile)
+	defer destFile.Close()
+	_, err = io.Copy(destFile, sourcefile)
 	if err == nil {
-		sourceinfo, _ := os.Stat(source)
+		sourceInfo, _ := os.Stat(source)
 		// TODO(jonghoonkwon): do proper error logging!
-		err = os.Chmod(dest, sourceinfo.Mode())
+		err = os.Chmod(dest, sourceInfo.Mode())
 	}
 	return
 }
@@ -54,11 +54,11 @@ func CopyFile(source string, dest string) (err error) {
 func CopyPath(src, dst string) error {
 	srcDir, err := os.Open(src)
 	if err != nil {
-		return fmt.Errorf("Failed to open directory %v: %v", src, err)
+		return fmt.Errorf("failed to open directory %v: %v", src, err)
 	}
 	objects, err := srcDir.Readdir(-1)
 	if err != nil {
-		return fmt.Errorf("Error listing directory %v: %v", src, err)
+		return fmt.Errorf("error listing directory %v: %v", src, err)
 	}
 	for _, obj := range objects {
 		if obj.IsDir() {
@@ -66,10 +66,10 @@ func CopyPath(src, dst string) error {
 			subDirDst := filepath.Join(dst, obj.Name())
 			srcStat, err := os.Stat(subDirSrc)
 			if err != nil {
-				return fmt.Errorf("Error stating %v: %v", subDirSrc, err)
+				return fmt.Errorf("error stating %v: %v", subDirSrc, err)
 			}
 			if err := os.Mkdir(subDirDst, srcStat.Mode()); err != nil {
-				return fmt.Errorf("Error creating directory %v: %v", subDirDst, err)
+				return fmt.Errorf("error creating directory %v: %v", subDirDst, err)
 			}
 			if err := CopyPath(subDirSrc, subDirDst); err != nil {
 				return err
@@ -123,18 +123,13 @@ func IAString(isd, as interface{}) string {
 func BRIDFromString(s string) (uint16, error) {
 	parts := strings.Split(s, "-")
 	if len(parts) != 3 {
-		return 0, fmt.Errorf("Invalid BR name structure: %v", s)
+		return 0, fmt.Errorf("invalid BR name structure: %v", s)
 	}
 	id, err := strconv.ParseInt(parts[2], 10, 16)
 	if err != nil {
-		return 0, fmt.Errorf("Unable to parse BRID: %v", err)
+		return 0, fmt.Errorf("unable to parse BRID: %v", err)
 	}
 	return uint16(id), nil
-}
-
-// Creates BR name from IA string and BRID
-func BRString(ia string, id uint16) string {
-	return fmt.Sprintf("br%v-%v", ia, id)
 }
 
 // Returns the smallest integer in the range [min, max] that is not present in the given ids
@@ -148,7 +143,7 @@ func GetAvailableID(ids []int, min, max int) (int, error) {
 		res = x + 1
 	}
 	if res > max {
-		return 0, errors.New("No free ID found")
+		return 0, errors.New("no free ID found")
 	}
 	return res, nil
 }
@@ -158,17 +153,17 @@ func GetAvailableID(ids []int, min, max int) (int, error) {
 func FillTemplateAndSave(templatePath string, data interface{}, savePath string) error {
 	t, err := template.ParseFiles(templatePath)
 	if err != nil {
-		return fmt.Errorf("Error parsing template %v: %v", templatePath, err)
+		return fmt.Errorf("error parsing template %v: %v", templatePath, err)
 	}
 	f, err := os.Create(savePath)
 	if err != nil {
-		return fmt.Errorf("Error creating file %v: %v", savePath, err)
+		return fmt.Errorf("error creating file %v: %v", savePath, err)
 	}
 	err = t.Execute(f, data)
 	f.Close()
 
 	if err != nil {
-		return fmt.Errorf("Error executing template file %v: %v", templatePath, err)
+		return fmt.Errorf("error executing template file %v: %v", templatePath, err)
 	}
 	return nil
 }

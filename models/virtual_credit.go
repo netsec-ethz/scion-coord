@@ -19,14 +19,11 @@ import (
 	"github.com/scionproto/scion/go/lib/addr"
 )
 
+const bandwidthPerCredit = 10000
+
 // Converts a bandwidth into credits (10 MegaBits/s=1 Credit)
 func BandwidthToCredits(bandwidthInKilobits uint64) int64 {
-	return int64(bandwidthInKilobits) / 10000
-}
-
-// Converts credits into bandwidth (1 Credit=10 MegaBits/s)
-func CreditsToBandwidthInBandwidthInKilobits(credits uint64) int64 {
-	return int64(credits) * 10000
+	return int64(bandwidthInKilobits) / bandwidthPerCredit
 }
 
 // Stores the connection info from an AS to another AS
@@ -46,7 +43,7 @@ func (asInfo *ASInfo) ListConnections() ([]ConnectionWithCredits, error) {
 
 	// Outgoing ones (this AS pays for)
 	var outGoings []ConnRequest
-	_, err := o.QueryTable(new(ConnRequest)).Filter("Status", APPROVED).Filter("RequestIA",
+	_, err := o.QueryTable(new(ConnRequest)).Filter("Status", Approved).Filter("RequestIA",
 		isdas).All(&outGoings)
 	if err != nil {
 		return connections, err
@@ -65,7 +62,7 @@ func (asInfo *ASInfo) ListConnections() ([]ConnectionWithCredits, error) {
 
 	// Incoming ones (this AS gets Credits for)
 	var inComings []ConnRequest
-	_, err = o.QueryTable(new(ConnRequest)).Filter("Status", APPROVED).Filter("RespondIA",
+	_, err = o.QueryTable(new(ConnRequest)).Filter("Status", Approved).Filter("RespondIA",
 		isdas).All(&inComings)
 	if err != nil {
 		return connections, err

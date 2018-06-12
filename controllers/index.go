@@ -21,8 +21,9 @@ import (
 	"github.com/netsec-ethz/scion-coord/config"
 )
 
-// Index is the starting point of the webserver, the index page contains references to all the resources needed
+// Index is the starting point of the web server
+// the index page contains references to all the resources needed
 func Index(w http.ResponseWriter, r *http.Request) {
 	t, _ := template.ParseFiles("public/index.html")
-	t.Execute(w, struct{ TutorialsLink string }{config.TUTORIALS_URL})
+	t.Execute(w, struct{ TutorialsLink string }{config.TutorialsURL})
 }

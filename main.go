@@ -38,19 +38,18 @@ import (
 
 // initialize ISD location mapping
 func initializeISD() error {
-	raw, err := ioutil.ReadFile(config.ISD_LOCATION_MAPPING)
+	raw, err := ioutil.ReadFile(config.ISDLocationMapping)
 	if err != nil {
-		fmt.Errorf("ERROR: Cannot access ISD location mapping json file:"+
-			" %v", err)
+		fmt.Errorf("ERROR: Cannot access ISD location mapping json file: %v", err)
 	}
-	var isd_loc []struct {
+	var isdLocs []struct {
 		ISD       int
 		Country   string
 		Continent string
 	}
-	json.Unmarshal(raw, &isd_loc)
+	json.Unmarshal(raw, &isdLocs)
 
-	for _, ISD := range isd_loc {
+	for _, ISD := range isdLocs {
 		_, err = models.FindISDbyID(ISD.ISD)
 		if err == orm.ErrNoRows {
 			isd := models.ISDLocation{
@@ -267,8 +266,8 @@ func main() {
 	router.PathPrefix("/public/").Handler(xsrfChain.Then(static))
 
 	// serve website using https or standard http
-	if config.HTTP_ENABLE_HTTPS {
-		fmt.Printf("Serving website on %v over HTTPS\n", config.HTTP_HOST_ADDRESS)
+	if config.HTTPEnableHTTPS {
+		fmt.Printf("Serving website on %v over HTTPS\n", config.HTTPHostAddress)
 		// redirect HTTP traffic to HTTPS
 		go http.ListenAndServe(":80", http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -277,11 +276,11 @@ func main() {
 
 		// listen to HTTPS requests
 		log.Fatal(http.Serve(autocert.NewListener(
-			config.HTTP_HOST_ADDRESS), handlers.CompressHandler(router)))
+			config.HTTPHostAddress), handlers.CompressHandler(router)))
 	} else {
-		fmt.Printf("Serving website on %v over HTTP\n", config.HTTP_HOST_ADDRESS)
+		fmt.Printf("Serving website on %v over HTTP\n", config.HTTPHostAddress)
 		log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d",
-			config.HTTP_BIND_ADDRESS, config.HTTP_BIND_PORT), handlers.CompressHandler(router)))
+			config.HTTPBindAddress, config.HTTPBindPort), handlers.CompressHandler(router)))
 	}
 
 }

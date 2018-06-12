@@ -56,7 +56,7 @@ type HTTPController struct {
 var Verbosity func(err error, format string, a ...interface{}) string
 
 func init() {
-	if config.LOG_DEBUG_MODE {
+	if config.LogDebugMode {
 		Verbosity = func(err error, format string, a ...interface{}) string {
 			if err != nil {
 				return fmt.Sprintf(format+": %v", append(a, err)...)
@@ -135,11 +135,11 @@ func (c HTTPController) Forbidden(w http.ResponseWriter, err error, desc string,
 	http.Error(w, Verbosity(err, desc, a...), http.StatusForbidden)
 }
 
-func (C HTTPController) Render(tpl *template.Template, data interface{}, w http.ResponseWriter, r *http.Request) {
+func (c HTTPController) Render(tpl *template.Template, data interface{}, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
 	tpl.Execute(w, data)
 }
 
-func (C HTTPController) Redirect(code int, url string, w http.ResponseWriter, r *http.Request) {
+func (c HTTPController) Redirect(code int, url string, w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, url, code)
 }

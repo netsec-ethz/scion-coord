@@ -52,19 +52,15 @@ var (
 	pythonPath      = filepath.Join(scionPath, "python")
 	vagrantPath     = filepath.Join(scionCoordPath, "vagrant")
 	auxFilesPath    = filepath.Join(scionCoordPath, "files")
-	PackagePath     = config.PACKAGE_DIRECTORY
+	PackagePath     = config.PackageDirectory
 	BoxPackagePath  = filepath.Join(PackagePath, "SCIONBox")
 	credentialsPath = filepath.Join(scionCoordPath, "credentials")
 	EasyRSAPath     = filepath.Join(PackagePath, "easy-rsa")
 	RSAKeyPath      = filepath.Join(EasyRSAPath, "keys")
 	CACertPath      = filepath.Join(RSAKeyPath, "ca.crt")
-	HeartBeatPeriod = time.Duration(config.HB_PERIOD)
-	HeartBeatLimit  = time.Duration(config.HB_LIMIT)
+	HeartBeatPeriod = time.Duration(config.HeartbeatPeriod)
+	HeartBeatLimit  = time.Duration(config.HeartbeatLimit)
 )
-
-func UserPackagePath(email string) string {
-	return filepath.Join(PackagePath, email)
-}
 
 // TODO(mlegner): We need to find a better way to handle all the credential files.
 func CredentialFile(isd int, ending string) string {
@@ -153,10 +149,10 @@ func (s *SCIONLabASController) GenerateNewSCIONLabAS(w http.ResponseWriter, r *h
 	}
 	newAS := models.SCIONLabAS{
 		UserEmail: uSess.Email,
-		StartPort: config.BR_START_PORT,
+		StartPort: config.BRStartPort,
 		ASID:      asID,
 		Type:      models.VM,
-		Credits:   config.VIRTUAL_CREDIT_START_CREDITS,
+		Credits:   config.VirtualCreditStartCredits,
 	}
 	if err := newAS.Insert(); err != nil {
 		log.Printf("Error inserting new AS for %v: %v", uSess.Email, err)
@@ -268,12 +264,12 @@ func (s *SCIONLabASController) parseRequestParameters(r *http.Request) (
 	slReq.UserEmail = uSess.Email
 	// check that ServerIA is not empty
 	if slReq.ServerIA == "" {
-		err = errors.New("Server IA cannot be empty.")
+		err = errors.New("server IA cannot be empty")
 		return
 	}
 	// check that valid type is given
-	if slReq.Type != models.VM && slReq.Type != models.DEDICATED {
-		err = errors.New("Invalid AS type given.")
+	if slReq.Type != models.VM && slReq.Type != models.Dedicated {
+		err = errors.New("invalid AS type given")
 		return
 	}
 	// check that IP address is not empty for nonVPN setup
@@ -290,13 +286,13 @@ func (s *SCIONLabASController) canConfigure(userEmail string, asID int) error {
 	if err != nil {
 		return err
 	}
-	if (as.Status == models.ACTIVE) || (as.Status == models.INACTIVE) {
-		if as.Type == models.INFRASTRUCTURE {
-			return errors.New("Cannot modify infrastructure ASes")
+	if (as.Status == models.Active) || (as.Status == models.Inactive) {
+		if as.Type == models.Infrastructure {
+			return errors.New("cannot modify infrastructure ASes")
 		}
 		return nil
 	}
-	return errors.New("The given AS has a pending update request")
+	return errors.New("the given AS has a pending update request")
 }
 
 // Checks that no other AS exists with same IP address
@@ -307,7 +303,7 @@ func (s *SCIONLabASController) checkRequest(slReq SCIONLabRequest) error {
 	}
 	ases, err := models.FindSCIONLabASesByIP(slReq.IP)
 	if err != nil {
-		return fmt.Errorf("Error looking up ASes: %v", err)
+		return fmt.Errorf("error looking up ASes: %v", err)
 	}
 	l := len(ases)
 
@@ -315,7 +311,7 @@ func (s *SCIONLabASController) checkRequest(slReq SCIONLabRequest) error {
 		return nil
 	}
 
-	return fmt.Errorf("There exists another AS with the same public IP address %v", slReq.IP)
+	return fmt.Errorf("there exists another AS with the same public IP address %v", slReq.IP)
 }
 
 // Populates and returns a SCIONLabASInfo struct, which contains the necessary information
@@ -328,12 +324,12 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 	// See if this user already has an AS
 	as, err := models.FindSCIONLabASByUserEmailAndASID(slReq.UserEmail, slReq.ASID)
 	if err != nil {
-		return nil, fmt.Errorf("Error looking up SCIONLab AS for user %v: %v",
+		return nil, fmt.Errorf("error looking up SCIONLab AS for user %v: %v",
 			slReq.UserEmail, err)
 	}
 	cns, err := as.GetJoinConnectionInfo()
 	if err != nil {
-		return nil, fmt.Errorf("Error looking up connections of SCIONLab AS for user %v: %v",
+		return nil, fmt.Errorf("error looking up connections of SCIONLab AS for user %v: %v",
 			slReq.UserEmail, err)
 	}
 	// look for an existing connection to the same AP:
@@ -354,13 +350,13 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 
 	remoteAS, err := models.FindSCIONLabASByIAString(slReq.ServerIA)
 	if err != nil {
-		return nil, fmt.Errorf("Error while retrieving AttachmentPoint %v: %v", slReq.ServerIA, err)
+		return nil, fmt.Errorf("error while retrieving AttachmentPoint %v: %v", slReq.ServerIA, err)
 	}
 
 	// Different settings depending on whether it is a VPN or standard setup
 	if slReq.IsVPN {
 		if !remoteAS.AP.HasVPN {
-			return nil, errors.New("The Attachment Point does not have an openVPN server running")
+			return nil, errors.New("the AttachmentPoint does not have an openVPN server running")
 		}
 		if !newConnection && cn.IsVPN {
 			ip = cn.LocalIP
@@ -380,7 +376,7 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 		log.Printf("IP address of AttachementPoint = %v", remoteIP)
 	}
 
-	if int(brID) < config.RESERVED_BRS_INFRASTRUCTURE {
+	if int(brID) < config.ReservedBRsInfrastructure {
 		brID, err = remoteAS.GetFreeBRID()
 		if err != nil {
 			return nil, err
@@ -392,10 +388,10 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 		as.StartPort = slReq.Port
 	}
 	as.Type = slReq.Type
-	if as.Status == models.INACTIVE {
-		as.Status = models.CREATE
+	if as.Status == models.Inactive {
+		as.Status = models.Create
 	} else {
-		as.Status = models.UPDATE
+		as.Status = models.Update
 	}
 	as.PublicIP = slReq.IP
 	as.ISD = ia.I
@@ -434,19 +430,19 @@ func (s *SCIONLabASController) updateDB(asInfo *SCIONLabASInfo) error {
 			RespondAP:     asInfo.RemoteAS.AP,
 			JoinBRID:      1,
 			RespondBRID:   asInfo.RemoteBRID,
-			Linktype:      models.PARENT,
+			Linktype:      models.Parent,
 			IsVPN:         asInfo.IsVPN,
-			JoinStatus:    models.ACTIVE,
-			RespondStatus: models.CREATE,
+			JoinStatus:    models.Active,
+			RespondStatus: models.Create,
 		}
 		if err := newCn.Insert(); err != nil {
-			return fmt.Errorf("Error inserting new Connection for user %v: %v",
+			return fmt.Errorf("error inserting new Connection for user %v: %v",
 				userEmail, err)
 		}
 		// update the AS database table
 		if err := asInfo.LocalAS.Update(); err != nil {
 			newCn.Delete()
-			return fmt.Errorf("Error updating SCIONLabAS database table for user %v: %v",
+			return fmt.Errorf("error updating SCIONLabAS database table for user %v: %v",
 				userEmail, err)
 		}
 	} else {
@@ -454,13 +450,13 @@ func (s *SCIONLabASController) updateDB(asInfo *SCIONLabASInfo) error {
 		// Update the Connections Table
 		cns, err := asInfo.LocalAS.GetJoinConnectionInfoToAS(asInfo.RemoteIA)
 		if err != nil {
-			return fmt.Errorf("Error finding existing connection of user %v: %v",
+			return fmt.Errorf("error finding existing connection of user %v: %v",
 				userEmail, err)
 		}
 		cns = models.OnlyCurrentConnections(cns)
 		if len(cns) != 1 {
 			// we've failed our assertion that there's only one active connection. Complain.
-			return fmt.Errorf("Error updating SCIONLabAS AS %v to AP %v: we expected 1 connection and found %v",
+			return fmt.Errorf("error updating SCIONLabAS AS %v to AP %v: we expected 1 connection and found %v",
 				asInfo.LocalAS.IA(), asInfo.RemoteIA, len(cns))
 		}
 		cn := cns[0]
@@ -469,9 +465,9 @@ func (s *SCIONLabASController) updateDB(asInfo *SCIONLabASInfo) error {
 		cn.LocalIP = asInfo.IP
 		cn.NeighborIP = asInfo.RemoteIP
 		cn.NeighborStatus = asInfo.LocalAS.Status
-		cn.Status = models.ACTIVE
+		cn.Status = models.Active
 		if err := asInfo.LocalAS.UpdateASAndConnection(&cn); err != nil {
-			return fmt.Errorf("Error updating database tables for user %v: %v",
+			return fmt.Errorf("error updating database tables for user %v: %v",
 				userEmail, err)
 		}
 	}
@@ -486,7 +482,7 @@ func (s *SCIONLabASController) getNewSCIONLabASID() (int, error) {
 		return -1, err
 	}
 	// Base AS ID for SCIONLab is set in config file
-	asID := config.BASE_AS_ID
+	asID := config.BaseASID
 	for _, as := range ases {
 		if as.ASID > asID {
 			asID = as.ASID
@@ -507,20 +503,20 @@ func (s *SCIONLabASController) generateTopologyFile(asInfo *SCIONLabASInfo) erro
 	log.Printf("Generating topology file for SCIONLab AS")
 	t, err := template.ParseFiles("templates/simple_config_topo.tmpl")
 	if err != nil {
-		return fmt.Errorf("Error parsing topology template config for user %v: %v",
+		return fmt.Errorf("error parsing topology template config for user %v: %v",
 			asInfo.LocalAS.UserEmail, err)
 	}
 	f, err := os.Create(asInfo.topologyFile())
 	if err != nil {
-		return fmt.Errorf("Error creating topology file config for user %v: %v",
+		return fmt.Errorf("error creating topology file config for user %v: %v",
 			asInfo.LocalAS.UserEmail, err)
 	}
-	localIP := config.LOCALHOST_IP
+	localIP := config.LocalhostIP
 	if asInfo.LocalAS.Type == models.VM {
-		localIP = config.VM_LOCAL_IP
+		localIP = config.VMLocalIP
 	}
 
-	// Topo file parameters
+	// Topology file parameters
 	data := map[string]string{
 		"IP":           asInfo.IP,
 		"BIND_IP":      asInfo.LocalAS.BindIP(asInfo.IsVPN, asInfo.IP),
@@ -533,7 +529,7 @@ func (s *SCIONLabASController) generateTopologyFile(asInfo *SCIONLabASInfo) erro
 		"REMOTE_PORT":  strconv.Itoa(int(asInfo.RemotePort)),
 	}
 	if err = t.Execute(f, data); err != nil {
-		return fmt.Errorf("Error executing topology template file for user %v: %v",
+		return fmt.Errorf("error executing topology template file for user %v: %v",
 			asInfo.LocalAS.UserEmail, err)
 	}
 	f.Close()
@@ -551,9 +547,9 @@ func (s *SCIONLabASController) generateLocalGen(asInfo *SCIONLabASInfo) error {
 	userEmail := asInfo.LocalAS.UserEmail
 	log.Printf("Calling create local gen. ISD-ID: %v, AS-ID: %v, UserEmail: %v", isd, asID,
 		userEmail)
-	signingAs, haveit := config.SIGNING_ASES[isd]
+	signingAs, haveit := config.SigningASes[isd]
 	if !haveit {
-		return fmt.Errorf("Signing AS for ISD %v not configured", isd)
+		return fmt.Errorf("signing AS for ISD %v not configured", isd)
 	}
 
 	cmd := exec.Command("python3", localGenPath,
@@ -569,7 +565,7 @@ func (s *SCIONLabASController) generateLocalGen(asInfo *SCIONLabASInfo) error {
 	cmdOut, _ := cmd.StdoutPipe()
 	cmdErr, _ := cmd.StderrPipe()
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("Generate local gen command could not start for user %v: %v",
+		return fmt.Errorf("generate local gen command could not start for user %v: %v",
 			userEmail, err)
 	}
 	// read stdout and stderr
@@ -584,18 +580,18 @@ func (s *SCIONLabASController) addAuxiliaryFiles(asInfo *SCIONLabASInfo) error {
 	userEmail := asInfo.LocalAS.UserEmail
 	userPackagePath := asInfo.UserPackagePath()
 	log.Printf("Adding auxiliary files to the package %v", asInfo.UserPackageName())
-	if asInfo.LocalAS.Type == models.DEDICATED {
+	if asInfo.LocalAS.Type == models.Dedicated {
 		dedicatedAuxFiles := filepath.Join(auxFilesPath, "dedicated_box")
 		err := utility.CopyPath(dedicatedAuxFiles, userPackagePath)
 		if err != nil {
-			return fmt.Errorf("Failed to copy files for user %v: src: %v, dst: %v, %v",
+			return fmt.Errorf("failed to copy files for user %v: src: %v, dst: %v, %v",
 				userEmail, dedicatedAuxFiles, userPackagePath, err)
 		}
 	}
 	return nil
 }
 
-// TODO(mlegner): Add README for DEDICATED setup
+// TODO(mlegner): Add README for Dedicated setup
 // Packages the SCIONLab AS configuration as a tarball and returns the name of the
 // generated file.
 func (s *SCIONLabASController) packageConfiguration(asInfo *SCIONLabASInfo) error {
@@ -608,29 +604,26 @@ func (s *SCIONLabASController) packageConfiguration(asInfo *SCIONLabASInfo) erro
 	if asInfo.LocalAS.Type == models.VM {
 		vagrantDir, err := os.Open(vagrantPath)
 		if err != nil {
-			return fmt.Errorf("Failed to open directory. Path: %v, %v", vagrantPath, err)
+			return fmt.Errorf("failed to open directory. Path: %v, %v", vagrantPath, err)
 		}
 		objects, err := vagrantDir.Readdir(-1)
 		if err != nil {
-			return fmt.Errorf("Failed to read directory contents. Path: %v, %v", vagrantPath, err)
+			return fmt.Errorf("failed to read directory contents. Path: %v, %v", vagrantPath, err)
 		}
 		for _, obj := range objects {
 			src := filepath.Join(vagrantPath, obj.Name())
 			dst := filepath.Join(userPackagePath, obj.Name())
 			if !obj.IsDir() {
 				if err = utility.CopyFile(src, dst); err != nil {
-					return fmt.Errorf("Failed to copy files for user %v: src: %v, dst: %v, %v",
+					return fmt.Errorf("failed to copy files for user %v: src: %v, dst: %v, %v",
 						userEmail, src, dst, err)
 				}
 			}
 		}
 
-		type vagrantData struct {
-			PORT_FORWARDING string
-		}
-		data := vagrantData{}
+		data := map[string]string{}
 		if !asInfo.IsVPN {
-			data.PORT_FORWARDING = fmt.Sprintf("config.vm.network \"forwarded_port\", "+
+			data["PORT_FORWARDING"] = fmt.Sprintf("config.vm.network \"forwarded_port\", "+
 				"guest: %[1]v, host: %[1]v, protocol: \"udp\"", asInfo.LocalPort)
 		}
 		if err := utility.FillTemplateAndSave("templates/Vagrantfile.tmpl",
@@ -646,7 +639,7 @@ func (s *SCIONLabASController) packageConfiguration(asInfo *SCIONLabASInfo) erro
 		err = cmd.Wait()
 	}
 	if err != nil {
-		return fmt.Errorf("Failed to create SCIONLabAS tarball for user %v: %v", userEmail, err)
+		return fmt.Errorf("failed to create SCIONLabAS tarball for user %v: %v", userEmail, err)
 	}
 	return nil
 }
@@ -656,7 +649,7 @@ func (s *SCIONLabASController) createUserLoginConfiguration(asInfo *SCIONLabASIn
 	userEmail := asInfo.LocalAS.UserEmail
 	acc, err := models.FindAccountByUserEmail(userEmail)
 	if err != nil {
-		return fmt.Errorf("Failed to find account for email: %s. %v", userEmail, err)
+		return fmt.Errorf("failed to find account for email %s: %v", userEmail, err)
 	}
 
 	//TODO: maybe a better place for adding these files would be in generateLocalGen function?
@@ -665,20 +658,20 @@ func (s *SCIONLabASController) createUserLoginConfiguration(asInfo *SCIONLabASIn
 	accountId := []byte(acc.AccountID)
 	err = ioutil.WriteFile(filepath.Join(userGenDir, "account_id"), accountId, 0644)
 	if err != nil {
-		return fmt.Errorf("Failed to write account ID to file. %v", err)
+		return fmt.Errorf("failed to write account ID to file: %v", err)
 	}
 
 	accountSecret := []byte(acc.Secret)
 	err = ioutil.WriteFile(filepath.Join(userGenDir, "account_secret"), accountSecret, 0644)
 	if err != nil {
-		return fmt.Errorf("Failed to write account secret to file. %v", err)
+		return fmt.Errorf("failed to write account secret to file: %v", err)
 	}
 
 	ia := utility.IAString(asInfo.LocalAS.ISD, asInfo.LocalAS.ASID)
 	iaString := []byte(ia)
 	err = ioutil.WriteFile(filepath.Join(userGenDir, "ia"), iaString, 0644)
 	if err != nil {
-		return fmt.Errorf("Failed to write IA to file. %v", err)
+		return fmt.Errorf("failed to write IA to file: %v", err)
 	}
 
 	return nil
@@ -695,7 +688,7 @@ func (s *SCIONLabASController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 	vars := mux.Vars(r)
 	asID := vars["as_id"]
 	as, err := models.FindSCIONLabASByUserEmailAndASID(uSess.Email, asID)
-	if err != nil || as.Status == models.INACTIVE || as.Status == models.REMOVE {
+	if err != nil || as.Status == models.Inactive || as.Status == models.Remove {
 		log.Printf("No active configuration found for user %v\n", uSess.Email)
 		s.BadRequest(w, nil, "No active configuration found for user %v",
 			uSess.Email)
@@ -739,9 +732,9 @@ func (s *SCIONLabASController) RemoveSCIONLabAS(w http.ResponseWriter, r *http.R
 		s.BadRequest(w, nil, "You currently do not have an active SCIONLab AS.")
 		return
 	}
-	as.Status = models.REMOVE
-	cn.NeighborStatus = models.REMOVE
-	cn.Status = models.INACTIVE
+	as.Status = models.Remove
+	cn.NeighborStatus = models.Remove
+	cn.Status = models.Inactive
 	if err := as.UpdateASAndConnection(cn); err != nil {
 		log.Printf("Error marking AS and Connection as removed for user %v: %v",
 			userEmail, err)
@@ -754,7 +747,7 @@ func (s *SCIONLabASController) RemoveSCIONLabAS(w http.ResponseWriter, r *http.R
 }
 
 // Check if the user's AS is already removed or in the process of being removed.
-// Can remove a AS only if it is in the ACTIVE state.
+// Can remove a AS only if it is in the Active state.
 func (s *SCIONLabASController) canRemove(userEmail, asID string) (bool, *models.SCIONLabAS,
 	*models.ConnectionInfo, error) {
 	as, err := models.FindSCIONLabASByUserEmailAndASID(userEmail, asID)
@@ -765,13 +758,13 @@ func (s *SCIONLabASController) canRemove(userEmail, asID string) (bool, *models.
 			return false, nil, nil, err
 		}
 	}
-	if as.Status == models.ACTIVE {
-		if as.Type == models.INFRASTRUCTURE {
-			return false, nil, nil, errors.New("Cannot remove infrastructure ASes")
+	if as.Status == models.Active {
+		if as.Type == models.Infrastructure {
+			return false, nil, nil, errors.New("cannot remove infrastructure ASes")
 		}
 		cns, err := as.GetJoinConnectionInfo()
 		if err != nil {
-			return false, nil, nil, fmt.Errorf("Error looking up connections: %v", err)
+			return false, nil, nil, fmt.Errorf("error looking up connections: %v", err)
 		}
 		cns = models.OnlyCurrentConnections(cns)
 		l := len(cns)
@@ -804,7 +797,7 @@ func (s *SCIONLabASController) getIAParameter(r *http.Request) (as *models.SCION
 			return
 		}
 	}
-	err = fmt.Errorf("The AS %v does not belong to the specified account", ia)
+	err = fmt.Errorf("the AS %v does not belong to the specified account", ia)
 	return
 }
 

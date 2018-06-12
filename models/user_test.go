@@ -20,7 +20,7 @@ import (
 
 func TestCreateUser(t *testing.T) {
 	email := "sebastian.cogno@swisscom.com"
-	password := "this is my password nobidy should copy it"
+	password := "this is my password nobody should copy it"
 
 	_, err := RegisterUser("scion", "Scion Test-Bed", email, password, "Jon", "Doe")
 	if err != nil {
@@ -70,7 +70,7 @@ func TestCreateUser(t *testing.T) {
 	}
 
 	// check authentication
-	if err := user.Authenticate(password); err.Error() != "Email is not verified" {
+	if err := user.Authenticate(password); err.Error() != "email is not verified" {
 		t.Error(err)
 	}
 

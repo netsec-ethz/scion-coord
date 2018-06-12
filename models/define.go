@@ -16,26 +16,41 @@ package models
 
 // States in which a SCIONLabAS or connection can be.
 const (
-	INACTIVE = iota // 0
-	ACTIVE
-	CREATE
-	UPDATE
-	REMOVE
-	REMOVED
+	Inactive = iota // 0
+	Active
+	Create
+	Update
+	Remove
+	Removed
 )
 
-// Linktypes
+// Link types
 const (
-	PARENT = iota // 0
-	CHILD
-	CORE
-	PEER
+	Parent = iota // 0
+	Child
+	Core
+	Peer
 )
+
+func LinkTypeString(linkType uint8) string {
+	switch linkType {
+	case Parent:
+		return "PARENT"
+	case Child:
+		return "CHILD"
+	case Core:
+		return "CORE"
+	case Peer:
+		return "PEER"
+	default:
+		return ""
+	}
+}
 
 // Types of SCIONLabASes
 const (
-	INFRASTRUCTURE = iota // 0
+	Infrastructure = iota // 0
 	VM
-	DEDICATED
-	BOX
+	Dedicated
+	Box
 )

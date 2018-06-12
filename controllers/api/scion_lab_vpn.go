@@ -38,18 +38,18 @@ func (s *SCIONLabASController) generateVPNConfig(asInfo *SCIONLabASInfo) error {
 	var caCert, clientCert, clientKey []byte
 	caCert, err := ioutil.ReadFile(CACertPath)
 	if err != nil {
-		return fmt.Errorf("Error reading CA certificate file: %v", err)
+		return fmt.Errorf("error reading CA certificate file: %v", err)
 	}
 	clientCert, err = ioutil.ReadFile(s.vpnCertPath(userEmail, userASID))
 	if err != nil {
-		return fmt.Errorf("Error reading VPN certificate file for user %v: %v",
+		return fmt.Errorf("error reading VPN certificate file for user %v: %v",
 			userEmail, err)
 	}
 	clientCertStr := string(clientCert)
 	startCert := strings.Index(clientCertStr, "-----BEGIN CERTIFICATE-----")
 	clientKey, err = ioutil.ReadFile(s.vpnKeyPath(userEmail, userASID))
 	if err != nil {
-		return fmt.Errorf("Error reading VPN key file for user %v: %v",
+		return fmt.Errorf("error reading VPN key file for user %v: %v",
 			userEmail, err)
 	}
 

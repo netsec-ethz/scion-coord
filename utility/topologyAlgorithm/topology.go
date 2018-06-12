@@ -21,22 +21,22 @@ import (
 
 // performance score thresholds
 const (
-	BW1  = 0.05
-	BW2  = 0.1
-	BW3  = 0.5
-	RTT1 = 10
-	RTT2 = 50
-	RTT3 = 100
+	bw1  = 0.05
+	bw2  = 0.1
+	bw3  = 0.5
+	rtt1 = 10
+	rtt2 = 50
+	rtt3 = 100
 )
 
 // number of neighbors chosen for each AS
 const (
-	CHOSEN_NEIGHBORS uint16 = 3
+	chosenNeighbors uint16 = 3
 )
 
 // maximal number of neighbors chosen for each AS
 const (
-	MAX_NEIGHBORS = 6
+	maxNeighbors = 6
 )
 
 type Neighbor struct {
@@ -52,7 +52,7 @@ func ChooseNeighbors(potentialneighbors []Neighbor, freePorts uint16) []Neighbor
 	var neighbors []Neighbor
 	var counter uint16 = 0
 	// compute number of new neighbors that will be chosen
-	newNeighbors := CHOSEN_NEIGHBORS
+	newNeighbors := chosenNeighbors
 	if freePorts < newNeighbors {
 		newNeighbors = freePorts
 	}
@@ -76,11 +76,11 @@ func chooseBestNeighbor(potentialneighbors []Neighbor) (Neighbor, int) {
 	var bestNb = potentialneighbors[0]
 	var index = 0
 	for i, nb := range potentialneighbors {
-		if bestNb.getDegree() >= MAX_NEIGHBORS {
+		if bestNb.getDegree() >= maxNeighbors {
 			bestNb = nb
 			index = i
 		}
-		if nb.getDegree() >= MAX_NEIGHBORS {
+		if nb.getDegree() >= maxNeighbors {
 			continue
 		}
 		if bestNb.getPF() > nb.getPF() {
@@ -124,45 +124,45 @@ func chooseBestNeighbor(potentialneighbors []Neighbor) (Neighbor, int) {
 
 // Compute the Performance Class of a neighbors connection
 // Four PF classes 1: best ,.. 4: worst
-// Returns 5 if not classable (Error has occured)
+// Returns 5 if not classable (Error has occurred)
 func (nb Neighbor) getPF() int {
 	if nb.BW == -1 || nb.RTT == -1 {
 		return 5
 	}
 	var bw = nb.BW
 	var rtt = nb.RTT
-	if bw > BW3 {
+	if bw > bw3 {
 		return 4
 	}
-	if BW3 >= bw && bw > BW2 {
-		if rtt <= RTT3 {
+	if bw3 >= bw && bw > bw2 {
+		if rtt <= rtt3 {
 			return 3
 		} else {
 			return 4
 		}
 	}
-	if BW2 >= bw && bw > BW1 {
-		if rtt > RTT3 {
+	if bw2 >= bw && bw > bw1 {
+		if rtt > rtt3 {
 			return 4
 		}
-		if RTT3 >= rtt && rtt > RTT2 {
+		if rtt3 >= rtt && rtt > rtt2 {
 			return 3
 		}
-		if RTT2 >= rtt {
+		if rtt2 >= rtt {
 			return 2
 		}
 	}
-	if BW1 >= bw {
-		if rtt > RTT3 {
+	if bw1 >= bw {
+		if rtt > rtt3 {
 			return 4
 		}
-		if RTT3 >= rtt && rtt > RTT2 {
+		if rtt3 >= rtt && rtt > rtt2 {
 			return 3
 		}
-		if RTT2 >= rtt && rtt > RTT1 {
+		if rtt2 >= rtt && rtt > rtt1 {
 			return 2
 		}
-		if RTT1 >= rtt {
+		if rtt1 >= rtt {
 			return 1
 		}
 	}

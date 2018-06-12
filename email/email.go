@@ -26,7 +26,7 @@ import (
 	"github.com/netsec-ethz/scion-coord/config"
 )
 
-var EMAIL_TEMPLATES_PATH = "email/templates"
+const mailTemplatesPath = "email/templates"
 
 type Email struct {
 	From    string
@@ -36,22 +36,22 @@ type Email struct {
 	Tag     string
 }
 
-type EmailData struct {
+type MailData struct {
 	FirstName        string
 	LastName         string
 	HostAddress      string
 	VerificationUUID string
 }
 
-func EmailTemplatePath(template string) string {
-	return filepath.Join(EMAIL_TEMPLATES_PATH, template)
+func MailTemplatePath(template string) string {
+	return filepath.Join(mailTemplatesPath, template)
 }
 
 // construct builds an email to the user specified by
 // their userEmail by filling in the specified template with the given subject
 // and information in the data object
 func construct(emailTemplate, subject string, data interface{}, tag, userEmail string) (*Email, error) {
-	tmpl, err := template.ParseFiles(EmailTemplatePath(emailTemplate))
+	tmpl, err := template.ParseFiles(MailTemplatePath(emailTemplate))
 	if err != nil {
 		log.Printf("Parsing template %v failed: %v", emailTemplate, err)
 		return nil, err
@@ -62,7 +62,7 @@ func construct(emailTemplate, subject string, data interface{}, tag, userEmail s
 	body := buf.String()
 
 	mail := new(Email)
-	mail.From = config.EMAIL_FROM
+	mail.From = config.EmailFrom
 	mail.To = []string{userEmail}
 	mail.Subject = subject
 	mail.Body = body
@@ -72,7 +72,7 @@ func construct(emailTemplate, subject string, data interface{}, tag, userEmail s
 
 // Send connects to the PostMark email API and sends the email
 func Send(mail *Email) error {
-	client := postmark.NewClient(config.EMAIL_PM_SERVER_TOKEN, config.EMAIL_PM_ACCOUNT_TOKEN)
+	client := postmark.NewClient(config.EmailPMServerToken, config.EmailPMAccountToken)
 
 	email := postmark.Email{
 		From:       mail.From,
@@ -108,10 +108,10 @@ func ConstructAndSendEmail(emailTemplate string, subject string, data interface{
 	}
 
 	if alsoToAdmins {
-		mail.To = config.EMAIL_ADMINS
+		mail.To = config.EmailAdmins
 		mail.Subject = "[SCIONLab ADMIN]" + mail.Subject
 		if err = Send(mail); err != nil {
-			log.Printf("Sending email to %v failed: %v", config.EMAIL_ADMINS, err)
+			log.Printf("Sending email to %v failed: %v", config.EmailAdmins, err)
 			return err
 		}
 	}
@@ -126,9 +126,9 @@ func ConstructAndSendEmailToAdmins(emailTemplate string, subject string, data in
 		log.Printf("ConstructAndSend failed in Construct: %v", err)
 		return err
 	}
-	mail.To = config.EMAIL_ADMINS
+	mail.To = config.EmailAdmins
 	if err = Send(mail); err != nil {
-		log.Printf("Sending email to %v failed: %v", config.EMAIL_ADMINS, err)
+		log.Printf("Sending email to %v failed: %v", config.EmailAdmins, err)
 		return err
 	}
 	return nil

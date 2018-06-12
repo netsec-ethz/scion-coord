@@ -29,14 +29,14 @@ import (
 )
 
 var (
-	store = sessions.NewFilesystemStore(config.SESSION_PATH,
-		[]byte(config.SESSION_VERIFICATION_KEY), []byte(config.SESSION_ENCRYPTION_KEY)) // random value to validate the session
-	sessionName              = "session"                                            // cookie name
-	ScionSessionName         = "scion-session"                                      // key name in the session map
-	tokenSize                = 16                                                   // size of the token
-	xsrfTokenGenerationError = errors.New("Could not generate a valid XSRF token.") // error in case the RAND function fails
-	emptyArray               = make([]byte, tokenSize)                              // empty array to double check the result of the rand function
-	formXSRFParameter        = "xsrf"                                               // the expected name of the XSRF parameter
+	store = sessions.NewFilesystemStore(config.SessionPath,
+		[]byte(config.SessionVerificationKey), []byte(config.SessionEncryptionKey)) // random value to validate the session
+	sessionName              = "session"                                           // cookie name
+	ScionSessionName         = "scion-session"                                     // key name in the session map
+	tokenSize                = 16                                                  // size of the token
+	xsrfTokenGenerationError = errors.New("could not generate a valid XSRF token") // error in case the RAND function fails
+	emptyArray               = make([]byte, tokenSize)                             // empty array to double check the result of the rand function
+	formXSRFParameter        = "xsrf"                                              // the expected name of the XSRF parameter
 	xsrfHeaderName           = "X-Xsrf-Token"
 	//sessionCache             = make(map[string]*models.Session)                     // caches the user session in memory, for later use in different handlers. It's filled in only here
 	//sessionMutex             = sync.Mutex{}
@@ -164,14 +164,15 @@ func GetUserSession(r *http.Request) (*sessions.Session, *models.Session, error)
 
 	requestSession, err := store.Get(r, sessionName)
 	if err != nil {
-		return nil, nil, errors.New("Could not get or generate a new session. Most likely a session configration problem. Check the session path if it exists.")
+		return nil, nil, errors.New("could not get or generate a new session. " +
+			"Most likely a session configuration problem. Check the session path if it exists")
 	}
 
 	// this should always be true, but just in case double check it
 	if userSession, present := requestSession.Values[ScionSessionName]; present {
 		if sess, ok := userSession.(*models.Session); !ok {
 			// Handle the case that it's not an expected type
-			return nil, nil, errors.New("Could not deserialize SCION session")
+			return nil, nil, errors.New("could not deserialize SCION session")
 		} else {
 			// otherwise return the user session
 			return requestSession, sess, nil

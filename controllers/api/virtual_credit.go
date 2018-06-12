@@ -27,7 +27,7 @@ import (
 )
 
 // Dummy error to return if the virtual credit system is disabled
-var systemDisabledError error = errors.New(
+var systemDisabledError = errors.New(
 	"VirtualCredit system disabled. This error should be ignored")
 
 // REST resource to list the payed connections from one AS (identified by the parameter 'ia')
@@ -50,7 +50,7 @@ var systemDisabledError error = errors.New(
 //}
 
 func (c *ASInfoController) ListASesConnectionsWithCredits(w http.ResponseWriter, r *http.Request) {
-	if config.VIRTUAL_CREDIT_ENABLE == false {
+	if config.VirtualCreditEnable == false {
 		c.NotFound(w, nil, systemDisabledError.Error())
 		return
 	}
@@ -106,20 +106,20 @@ func (c *ASInfoController) ListASesConnectionsWithCredits(w http.ResponseWriter,
 func (c *ASInfoController) checkAndUpdateCredits(w http.ResponseWriter, r *http.Request,
 	cr *ConnRequest) error {
 
-	if config.VIRTUAL_CREDIT_ENABLE == false {
+	if config.VirtualCreditEnable == false {
 		return systemDisabledError
 	}
 
 	as, err := models.FindASInfoByIA(cr.RequestIA)
 	if err != nil {
 		log.Printf("Error: Unkown AS: %v, %v", r.Body, err)
-		c.BadRequest(w, err, "Error: Unkown AS: %v", r.Body)
+		c.BadRequest(w, err, "Error: Unknown AS: %v", r.Body)
 		return err
 	}
 
 	var creditsNeeded = models.BandwidthToCredits(cr.Bandwidth)
 	if (as.Credits - creditsNeeded) <= 0 {
-		err = fmt.Errorf("Error: Not enough credits to create a connection request! "+
+		err = fmt.Errorf("error: Not enough credits to create a connection request! "+
 			"You need %v, but have only %v", creditsNeeded, as.Credits)
 		log.Printf("Info: Not enough credits! AS: %v, Request: %v, Error: %v", as, r.Body, err)
 		c.BadRequest(w, err, "Info: Not enough credits! AS: %v, Request: %v", as, r.Body)
@@ -145,14 +145,14 @@ func (c *ASInfoController) checkAndUpdateCredits(w http.ResponseWriter, r *http.
 func (c *ASInfoController) checkAndUpdateCreditsAtResponse(w http.ResponseWriter, r *http.Request,
 	cr *models.ConnRequest, reply ConnReply) error {
 
-	if !config.VIRTUAL_CREDIT_ENABLE == false {
+	if !config.VirtualCreditEnable == false {
 		return systemDisabledError
 	}
 
 	as, _ := models.FindASInfoByIA(cr.RequestIA)
 	credits := models.BandwidthToCredits(cr.Bandwidth)
 	// If the connection is approved, add credits to the responding AS
-	if cr.Status == models.APPROVED {
+	if cr.Status == models.Approved {
 		otherAS, err := models.FindASInfoByIA(cr.RespondIA)
 		if err != nil {
 			log.Printf("Error finding the RespondIA. Request ID: %v RequestIA: %v, RespondIA: %v, %v",
@@ -167,10 +167,10 @@ func (c *ASInfoController) checkAndUpdateCreditsAtResponse(w http.ResponseWriter
 			return err
 		}
 		// If the connection request is denied, release the reserved credits for the connection
-	} else if cr.Status != models.PENDING {
+	} else if cr.Status != models.Pending {
 		if err := as.UpdateCurrency(credits); err != nil {
-			log.Printf("Error: Readding credits! ThisAS: %v, Request: %v, Error: %v", as, r.Body, err)
-			c.Error500(w, err, "Error: Readding credits! ThisAS: %v, Request: %v", as, r.Body)
+			log.Printf("Error: Re-adding credits! ThisAS: %v, Request: %v, Error: %v", as, r.Body, err)
+			c.Error500(w, err, "Error: Re-adding credits! ThisAS: %v, Request: %v", as, r.Body)
 			return err
 		}
 	}
@@ -184,14 +184,14 @@ func (c *ASInfoController) checkAndUpdateCreditsAtResponse(w http.ResponseWriter
 //	If everything was fine, the function returns nil.
 //
 func (c *ASInfoController) rollBackCreditUpdate(w http.ResponseWriter, r *http.Request, cr *ConnRequest) {
-	if !config.VIRTUAL_CREDIT_ENABLE {
+	if !config.VirtualCreditEnable {
 		return
 	}
 
 	as, err := models.FindASInfoByIA(cr.RequestIA)
 	if err != nil {
 		log.Printf("Error: Unkown AS: %v, %v", r.Body, err)
-		c.BadRequest(w, err, "Error: Unkown AS: %v", r.Body)
+		c.BadRequest(w, err, "Error: Unknown AS: %v", r.Body)
 		return
 	}
 

@@ -26,15 +26,15 @@ var (
 	o orm.Ormer
 )
 
-func (u *SCIONLabAS) TableName() string {
+func (as *SCIONLabAS) TableName() string {
 	return "scion_lab_as"
 }
 
-func (u *SCIONBox) TableName() string {
+func (sb *SCIONBox) TableName() string {
 	return "scion_box"
 }
 
-func (u *ISDLocation) TableName() string {
+func (il *ISDLocation) TableName() string {
 	return "isd_location"
 }
 
@@ -42,8 +42,8 @@ func init() {
 	orm.RegisterDriver("mysql", orm.DRMySQL)
 	orm.RegisterDataBase("default", "mysql",
 		fmt.Sprintf("%s:%s@(%s:%d)/%s?charset=utf8&parseTime=true",
-			config.DB_USER, config.DB_PASS, config.DB_HOST, config.DB_PORT, config.DB_NAME),
-		config.DB_MAX_CONNECTIONS, config.DB_MAX_IDLE)
+			config.DBUser, config.DBPassword, config.DBHost, config.DBPort, config.DBName),
+		config.DBMaxConnections, config.DBMaxIdle)
 
 	// prints the queries
 	orm.Debug = false

@@ -84,15 +84,15 @@ type ConnReply struct {
 }
 
 func FindAccountByRequest(r *http.Request) (*models.Account, error) {
-	account_id := mux.Vars(r)["account_id"]
+	accountID := mux.Vars(r)["account_id"]
 
-	// get the account from the account_id and secret
-	if account_id == "" {
-		account_id = r.URL.Query().Get("account_id")
+	// get the account from the accountID and secret
+	if accountID == "" {
+		accountID = r.URL.Query().Get("account_id")
 	}
 
 	// find the account belonging to the request
-	return models.FindAccountByAccountID(account_id)
+	return models.FindAccountByAccountID(accountID)
 }
 
 func ValidateAccountOwnsIA(account *models.Account, ia string) (bool, error) {
@@ -164,40 +164,40 @@ func (c *ASInfoController) UploadJoinRequest(w http.ResponseWriter, r *http.Requ
 		c.Error500(w, err, "Error finding account for request")
 		return
 	}
-	isd_to_join := request.ISDToJoin
+	isdToJoin := request.ISDToJoin
 	// find core AS in the ISD to join
-	core_ases, err := models.FindCoreASInfosByISD(isd_to_join)
+	coreASes, err := models.FindCoreASInfosByISD(isdToJoin)
 	if err != nil {
 		c.BadRequest(w, err, "Error finding core AS in ISD to join")
 		return
 	}
-	if len(core_ases) == 0 {
+	if len(coreASes) == 0 {
 		log.Printf("ISD %v not found or no core ASes exist for this ISD. Account: %v",
-			isd_to_join, account)
+			isdToJoin, account)
 		c.Error500(w, err, "ISD not found or no core ASes exist for this ISD")
 		return
 	}
 	// TODO(ercanucan): Send the request to ALL core ASes in this ISD.
-	core_as := core_ases[0]
-	join_request := models.JoinRequest{
+	coreAS := coreASes[0]
+	joinRequest := models.JoinRequest{
 		RequestID:     request.RequestID,
 		Info:          request.Info,
 		ISDToJoin:     request.ISDToJoin,
 		JoinAsACoreAS: request.JoinAsACoreAS,
 		RequesterID:   mux.Vars(r)["account_id"],
-		RespondIA:     core_as.String(),
+		RespondIA:     coreAS.String(),
 		SigPubKey:     request.SigPubKey,
 		EncPubKey:     request.EncPubKey,
-		Status:        models.PENDING,
+		Status:        models.Pending,
 	}
 	// insert into the join_requests table in the database
-	if err := join_request.Insert(); err != nil {
-		log.Printf("Error inserting join request for core AS %v: %v", core_as, err)
+	if err := joinRequest.Insert(); err != nil {
+		log.Printf("Error inserting join request for core AS %v: %v", coreAS, err)
 		c.Error500(w, err, "Error inserting join request")
 		return
 	}
 	log.Printf("Join request successfully received. ISDToJoin: %v Account: %v "+
-		"RequesterID: %v", isd_to_join, account, join_request.RequesterID)
+		"RequesterID: %v", isdToJoin, account, joinRequest.RequesterID)
 	fmt.Fprintln(w, "{}")
 }
 
@@ -232,16 +232,16 @@ func (c *ASInfoController) UploadJoinReply(w http.ResponseWriter, r *http.Reques
 		c.Error500(w, err, "Error inserting join reply")
 		return
 	}
-	// Change the join req's status to approved/rejected.
-	join_req, err := models.FindJoinRequest(account.AccountID, joinReply.RequestID)
+	// Change the join request's status to approved/rejected.
+	joinRequest, err := models.FindJoinRequest(account.AccountID, joinReply.RequestID)
 	if err != nil {
 		log.Printf("Error finding join req. Account: %v Request ID: %v ISD-AS: %v, %v",
 			account, joinReply.RequestID, reply.RespondIA, err)
 		c.Error500(w, err, "Error finding join request")
 		return
 	}
-	join_req.Status = reply.Status
-	if err := join_req.Update(); err != nil {
+	joinRequest.Status = reply.Status
+	if err := joinRequest.Update(); err != nil {
 		log.Printf("Error updating join req. Account: %v Request ID: %v ISD-AS: %v, %v",
 			account, joinReply.RequestID, reply.RespondIA, err)
 		c.Error500(w, err, "Error updating join request")
@@ -249,23 +249,23 @@ func (c *ASInfoController) UploadJoinReply(w http.ResponseWriter, r *http.Reques
 	}
 	log.Printf("Received a join reply. Account: %v Request ID: %v ISD-AS: %v Status: %v",
 		account, joinReply.RequestID, reply.RespondIA, reply.Status)
-	if reply.Status == models.APPROVED {
+	if reply.Status == models.Approved {
 		ia, err := addr.IAFromString(joinReply.JoiningIA)
 		if err != nil {
 			log.Printf("Error parsing ISD-AS %v, %v ", joinReply.JoiningIA, err)
 			c.Error500(w, err, "Error parsing ISD-AS")
 			return
 		}
-		new_as := models.ASInfo{
+		newAS := models.ASInfo{
 			ISD:     ia.I,
 			ASID:    ia.A,
 			Core:    joinReply.IsCore,
 			Account: account,
 			Created: time.Now().UTC(),
 		}
-		if dbErr := new_as.Insert(); dbErr != nil {
+		if dbErr := newAS.Insert(); dbErr != nil {
 			log.Printf("Error inserting new AS: %v Account: %v Request ID: %v, %v",
-				new_as.String(), account, reply.RequestID, err)
+				newAS.String(), account, reply.RequestID, err)
 			c.Error500(w, dbErr, "Error inserting new AS")
 			return
 		}
@@ -358,7 +358,7 @@ func (c *ASInfoController) UploadConnRequest(w http.ResponseWriter, r *http.Requ
 		Timestamp:            cr.Timestamp,
 		Signature:            cr.Signature,
 		RequesterCertificate: cr.Certificate,
-		Status:               models.PENDING,
+		Status:               models.Pending,
 	}
 	if err := connRequest.Insert(); err != nil {
 		log.Printf("Error inserting connection request. Account %v AS %v: %v", account,
@@ -408,7 +408,7 @@ func (c *ASInfoController) UploadConnReply(w http.ResponseWriter, r *http.Reques
 		c.BadRequest(w, err, "Error inserting connection reply")
 		return
 	}
-	// Change the conn req's status to approved/rejected.
+	// Change the connection request's status to approved/rejected.
 	cr, err := models.FindConnRequest(account, reply.RequestID)
 	if err != nil {
 		log.Printf("Error finding conn req. Account: %v Request ID: %v ISD-AS: %v, %v",
@@ -425,8 +425,8 @@ func (c *ASInfoController) UploadConnReply(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Add / subtract the credits for the request depending on the ConnReply.Status
-	// APPROVED = add credits to the receiver
-	// DENIED = give credits back to the initiator
+	// Approved = add credits to the receiver
+	// Denied = give credits back to the initiator
 	if err := c.checkAndUpdateCreditsAtResponse(w, r, cr, reply); err != nil {
 		// The function itself takes care of logging eventual errors and writing back the response
 		return
@@ -606,7 +606,7 @@ func (c *ASInfoController) ListASes(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Error while retrieving list of ASes. Account: %v, ISD-AS: %v", account,
 			req.IA)
-		c.BadRequest(w, err, "Error while retreiving list of ASes")
+		c.BadRequest(w, err, "Error while retrieving list of ASes")
 		return
 	}
 	resp := c.prepASListResponse(ases)

@@ -68,7 +68,7 @@ func passwordsAreValid(password, passwordConfirmation string) error {
 func (r *registrationRequest) isValid() error {
 
 	//check recaptcha
-	rc := recaptcha.R{Secret: config.CAPTCHA_SECRET_KEY}
+	rc := recaptcha.R{Secret: config.CaptchaSecretKey}
 	if !rc.VerifyResponse(r.Captcha) {
 		return fmt.Errorf("ReCaptcha error: %s", strings.Join(rc.LastError()[1:], ", "))
 	}
@@ -112,10 +112,10 @@ func (c *RegistrationController) ResetPassword(w http.ResponseWriter, r *http.Re
 		c.BadRequest(w, err, "Error resetting password")
 		return
 	}
-	data := email.EmailData{
+	data := email.MailData{
 		FirstName:        u.FirstName,
 		LastName:         u.LastName,
-		HostAddress:      config.HTTP_HOST_ADDRESS,
+		HostAddress:      config.HTTPHostAddress,
 		VerificationUUID: u.VerificationUUID,
 	}
 	if err = email.ConstructAndSendEmail(
@@ -273,7 +273,7 @@ func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request
 }
 
 func (c *RegistrationController) LoadCaptchaSiteKey(w http.ResponseWriter, r *http.Request) {
-	c.Plain(config.CAPTCHA_SITE_KEY, w, r)
+	c.Plain(config.CaptchaSiteKey, w, r)
 }
 
 func (c *RegistrationController) ResendActivationLink(w http.ResponseWriter, r *http.Request) {
@@ -307,10 +307,10 @@ func sendVerificationEmail(userID uint64) error {
 		return err
 	}
 
-	data := email.EmailData{
+	data := email.MailData{
 		FirstName:        user.FirstName,
 		LastName:         user.LastName,
-		HostAddress:      config.HTTP_HOST_ADDRESS,
+		HostAddress:      config.HTTPHostAddress,
 		VerificationUUID: user.VerificationUUID,
 	}
 

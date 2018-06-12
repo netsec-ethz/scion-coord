@@ -73,7 +73,7 @@ type userPageData struct {
 // generates the structs containing information about the user's AS and the
 // configuration of UI buttons
 func populateASStatusButtons(userEmail string) ([]asInfo, map[string]apInfo, error) {
-	asInfos := []asInfo{}
+	var asInfos []asInfo
 	apInfos := map[string]apInfo{}
 	ases, err := models.FindSCIONLabASesByUserEmail(userEmail)
 	if err != nil {
@@ -137,27 +137,27 @@ func populateASStatusButtons(userEmail string) ([]asInfo, map[string]apInfo, err
 		}
 
 		switch asI.Status {
-		case models.INACTIVE:
+		case models.Inactive:
 			asI.ASText = "This AS is currently inactive."
 			buttons.Configure.Text = "Create and Download SCIONLab AS Configuration"
 			buttons.Configure.Disable = false
 			buttons.Download.Hide = true
 			buttons.Disconnect.Hide = true
 			asI.StatusStr = "Inactive"
-		case models.ACTIVE:
+		case models.Active:
 			asI.ASText = "This AS is currently active."
 			buttons.Configure.Disable = false
 			buttons.Disconnect.Disable = false
 			asI.StatusStr = "Active"
-		case models.CREATE:
+		case models.Create:
 			asI.ASText = "You have a pending creation request for your SCIONLab AS."
-		case models.UPDATE:
+		case models.Update:
 			asI.ASText = "You have a pending update request for your SCIONLab AS."
-		case models.REMOVE:
+		case models.Remove:
 			asI.ASText = "Your SCIONLab AS configuration is currently scheduled for removal."
 			buttons.Download.Disable = true
 		}
-		if asI.Type == models.INFRASTRUCTURE {
+		if asI.Type == models.Infrastructure {
 			buttons.Configure.Hide = true
 			buttons.Download.Hide = true
 			buttons.Disconnect.Hide = true
@@ -226,7 +226,7 @@ func (c *LoginController) UserInformation(w http.ResponseWriter, r *http.Request
 		MaxASes:     config.MaxASes(user.IsAdmin),
 		ASInfos:     asInfo,
 		APs:         aps,
-		GrafanaLink: config.GRAFANA_URL,
+		GrafanaLink: config.GrafanaURL,
 	}
 
 	c.JSON(&userData, w, r)

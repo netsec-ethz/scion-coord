@@ -19,7 +19,7 @@ import "net/http"
 
 // A constructor for a piece of middleware.
 // Some middleware use this constructor out of the box,
-// so in most cases you can just pass somepackage.New
+// so in most cases you can just pass `somepackage.New`
 type Constructor func(http.Handler) http.Handler
 
 // Chain acts as a list of http.Handler constructors.
