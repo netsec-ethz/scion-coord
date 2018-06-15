@@ -262,7 +262,7 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 		}
 		as, err := models.FindSCIONLabASByASID(IA.A)
 		if err != nil {
-			log.Printf("Error finding SCIONLabAS %v: %v", ia, err)
+			log.Printf("Error finding SCIONLabAS with AS ID %v: %v", IA.A, err)
 			failedConfirmations = append(failedConfirmations, ia)
 			continue
 		}
@@ -342,28 +342,44 @@ func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejecte
 	var failedNotifications []string
 	// for each rejected AS, send an email to the admin and user
 	for _, rejectedAS := range rejections {
-		as, err := models.FindSCIONLabASByIAString(rejectedAS.IA)
+		IA, err := addr.IAFromString(rejectedAS.IA)
 		if err != nil {
-			log.Printf("Error finding SCIONLabAS %v: %v", rejectedAS.IA, err)
+			log.Printf("Error converting IA (%v) to its components: %v", rejectedAS.IA, err)
 			failedNotifications = append(failedNotifications, rejectedAS.IA)
 			continue
 		}
-		ap, err := models.FindSCIONLabASByIAString(rejectedAS.AP)
+		// the original IA may only be used to communicate to the user, as the real
+		// one may be re-attached to a different AP, and thus, different. The ASID is the same though
+		originalIA := rejectedAS.IA
+		as, err := models.FindSCIONLabASByASID(IA.A)
 		if err != nil {
-			log.Printf("Error finding SCIONLabAS %v: %v", rejectedAS.AP, err)
-			failedNotifications = append(failedNotifications, rejectedAS.IA)
+			log.Printf("Error finding SCIONLabAS with AS ID %v: %v", IA.A, err)
+			failedNotifications = append(failedNotifications, originalIA)
 			continue
 		}
-		asCns, err := ap.GetRespondConnectionInfoToAS(rejectedAS.IA)
+		IA, err = addr.IAFromString(rejectedAS.AP)
 		if err != nil {
-			log.Printf("Error finding the connection to SCIONLabAS %v: %v", rejectedAS.IA, err)
-			failedNotifications = append(failedNotifications, rejectedAS.IA)
+			log.Printf("Error converting IA (%v) to its components: %v", rejectedAS.AP, err)
+			failedNotifications = append(failedNotifications, rejectedAS.AP)
 			continue
 		}
-		err = sendRejectedEmail(as.UserEmail, rejectedAS.IA, rejectedAS.action, rejectedAS.AP)
+		ap, err := models.FindSCIONLabASByASID(IA.A)
 		if err != nil {
-			log.Printf("Error sending email about rejected AS %v: %v", rejectedAS.IA, err)
-			failedNotifications = append(failedNotifications, rejectedAS.IA)
+			log.Printf("Error finding SCIONLabAS with AS ID %v: %v", IA.A, err)
+			failedNotifications = append(failedNotifications, originalIA)
+			continue
+		}
+		asCns, err := ap.GetRespondConnectionInfoToAS(as.IA())
+		if err != nil {
+			log.Printf("Error finding the connection to SCIONLabAS %v: %v", as.IA(), err)
+			failedNotifications = append(failedNotifications, originalIA)
+			continue
+		}
+
+		err = sendRejectedEmail(as.UserEmail, originalIA, rejectedAS.action, rejectedAS.AP)
+		if err != nil {
+			log.Printf("Error sending email about rejected AS old IA: %v, new IA: %v: %v", originalIA, as.IA(), err)
+			failedNotifications = append(failedNotifications, originalIA)
 			continue
 		}
 
