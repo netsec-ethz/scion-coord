@@ -424,7 +424,7 @@ func getSCIONLabASInfoFromDB(conn *models.Connection) (*SCIONLabASInfo, error) {
 	asInfo := SCIONLabASInfo{
 		IsNewConnection: false,
 		IsVPN:           conn.IsVPN,
-		RemoteIA:        conn.RespondAP.AS.IA(),
+		RemoteIA:        conn.RespondAP.AS.IAString(),
 		IP:              conn.JoinIP,
 		LocalPort:       conn.JoinAS.StartPort,
 		OldAP:           "",
@@ -481,8 +481,8 @@ func (s *SCIONLabASController) updateDB(asInfo *SCIONLabASInfo) error {
 		cns = models.OnlyCurrentConnections(cns)
 		if len(cns) != 1 {
 			// we've failed our assertion that there's only one active connection. Complain.
-			return fmt.Errorf("error updating SCIONLabAS AS %v to AP %v: we expected 1 connection and found %v",
-				asInfo.LocalAS.IA(), asInfo.RemoteIA, len(cns))
+			return fmt.Errorf("Error updating SCIONLabAS AS %v to AP %v: we expected 1 connection and found %v",
+				asInfo.LocalAS.IAString(), asInfo.RemoteIA, len(cns))
 		}
 		cn := cns[0]
 		cn.BRID = 1
@@ -522,7 +522,7 @@ func (s *SCIONLabASController) getNewSCIONLabASID() (addr.AS, error) {
 
 // Generates the path to the temporary topology file
 func (asInfo *SCIONLabASInfo) topologyFile() string {
-	iaForFile := asInfo.LocalAS.IA()
+	iaForFile := asInfo.LocalAS.IAString()
 	// iaForFile :=
 	return filepath.Join(TempPath, iaForFile+"_topology.json")
 }
@@ -930,7 +930,7 @@ func (s *SCIONLabASController) RemapASDownloadGen(w http.ResponseWriter, r *http
 		utility.SendJSONError(answer, w)
 		return
 	}
-	fmt.Println("So far so good, ", as.IA())
+	fmt.Println("So far so good, ", as.IAString())
 	fmt.Println(challengeSolution)
 	fmt.Println(request)
 	// TODO: check challenge solution against DB

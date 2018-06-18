@@ -266,7 +266,7 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 			failedConfirmations = append(failedConfirmations, ia)
 			continue
 		}
-		asCns, err := as.GetJoinConnectionInfoToAS(apAS.IA())
+		asCns, err := as.GetJoinConnectionInfoToAS(apAS.IAString())
 		if err != nil {
 			log.Printf("Error finding the connection to SCIONLabAS %v: %v", ia, err)
 			failedConfirmations = append(failedConfirmations, ia)
@@ -285,7 +285,7 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 		if len(workingSet) != 1 {
 			// we've failed our axiom that there's only one active connection. Complain
 			log.Printf("Error confirming updates for AS %v: we expected 1 connection to %v and found %v",
-				ia, apAS.IA(), len(workingSet))
+				ia, apAS.IAString(), len(workingSet))
 			failedConfirmations = append(failedConfirmations, ia)
 			continue
 		}
@@ -301,7 +301,7 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 				// this means to remove the connection entry but don't update the AS status
 				err = as.DeleteConnectionFromDB(&cnInfo)
 				if err != nil {
-					log.Printf("Error removing connection between AS %v and AP %v: %v", ia, apAS.IA(), err)
+					log.Printf("Error removing connection between AS %v and AP %v: %v", ia, apAS.IAString(), err)
 					continue
 				}
 			}
@@ -313,7 +313,7 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 		if cnInfo.IsCurrentConnection() {
 			as.Status = cnInfo.Status
 			if err = as.UpdateASAndConnection(&cnInfo); err != nil {
-				log.Printf("Error updating database tables for AS %v: %v", as.IA(), err)
+				log.Printf("Error updating database tables for AS %v: %v", as.IAString(), err)
 				failedConfirmations = append(failedConfirmations, ia)
 				continue
 			}
@@ -321,12 +321,11 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 			// just checking for consistency
 			if action != REMOVED {
 				// logic error! print failed assertion but don't quit this update
-				log.Printf("Logic error confirming updates for AS %v to AP %v. "+
-					"The connection is inactive but the action %v != REMOVED",
-					ia, apAS.IA(), action)
+				log.Printf("Logic error confirming updates for AS %v to AP %v. The connection is inactive but the action %v != REMOVED",
+					ia, apAS.IAString(), action)
 			}
 		}
-		successEmails = append(successEmails, emailConfirmation{as.UserEmail, as.IA(), action})
+		successEmails = append(successEmails, emailConfirmation{as.UserEmail, as.IAString(), action})
 	}
 	for _, e := range successEmails {
 		if err := sendConfirmationEmail(e.user, e.IA, e.action); err != nil {

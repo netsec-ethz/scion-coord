@@ -90,7 +90,7 @@ func populateASStatusButtons(userEmail string) ([]asInfo, map[string]apInfo, err
 			Label:  ap.String(),
 			HasVPN: ap.AP.HasVPN,
 		}
-		apInfos[ap.IA()] = apI
+		apInfos[ap.IAString()] = apI
 	}
 	for _, as := range ases {
 		buttons := uiButtons{

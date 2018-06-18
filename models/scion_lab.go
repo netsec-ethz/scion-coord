@@ -117,7 +117,7 @@ func OnlyNotCurrentConnections(cns []ConnectionInfo) []ConnectionInfo {
 	return filterConnectionsByBeingCurrentStatus(cns, false)
 }
 
-func (as *SCIONLabAS) IA() string {
+func (as *SCIONLabAS) IAString() string {
 	if as.ISD < 1 {
 		return fmt.Sprintf("%v", as.ASID)
 	}
@@ -125,9 +125,9 @@ func (as *SCIONLabAS) IA() string {
 }
 
 func (as *SCIONLabAS) String() string {
-	res := as.IA()
+	res := as.IAString()
 	if as.Label != "" {
-		res = fmt.Sprintf("%v (%v)", as.IA(), as.Label)
+		res = fmt.Sprintf("%v (%v)", as.IAString(), as.Label)
 	}
 	return res
 }
@@ -218,7 +218,7 @@ func (as *SCIONLabAS) GetPortNumberFromBRID(brID uint16) uint16 {
 func (as *SCIONLabAS) GetFreeBRID() (uint16, error) {
 	cns, err := as.GetConnectionInfo()
 	if err != nil {
-		return 0, fmt.Errorf("error finding connections of AS %v: %v", as.IA(), err)
+		return 0, fmt.Errorf("Error finding connections of AS %v: %v", as.IAString(), err)
 	}
 	length := len(cns)
 	brIDs := make([]int, length)
@@ -237,7 +237,7 @@ func (as *SCIONLabAS) GetFreeBRID() (uint16, error) {
 func (as *SCIONLabAS) GetFreeVPNIP() (string, error) {
 	cns, err := as.GetRespondConnections()
 	if err != nil {
-		return "", fmt.Errorf("error finding connections of AP %v: %v", as.IA(), err)
+		return "", fmt.Errorf("Error finding connections of AP %v: %v", as.IAString(), err)
 	}
 	var vpnIPs []int
 	for _, cn := range cns {
@@ -544,7 +544,7 @@ func FindSCIONLabASesByAccountID(accountID string) (asStrings []string, err erro
 			return
 		}
 		for _, as := range ases {
-			asStrings = append(asStrings, as.IA())
+			asStrings = append(asStrings, as.IAString())
 		}
 	}
 	return
@@ -700,7 +700,7 @@ func (as *SCIONLabAS) DeleteConnectionFromDB(cnInfo *ConnectionInfo) error {
 func (as *SCIONLabAS) FlagAllConnectionsToApToBeDeleted(apIA string) error {
 	cns, err := as.GetJoinConnectionInfo()
 	if err != nil {
-		return fmt.Errorf("error looking up connections of SCIONLab AS for AS %v: %v", as.IA(), err)
+		return fmt.Errorf("Error looking up connections of SCIONLab AS for AS %v: %v", as.IAString(), err)
 	}
 	// all connections from an AS flagged as new connection and oldAP need to end up (localST, remoteST) = (REMOVE,REMOVE)
 	for _, cn := range cns {
