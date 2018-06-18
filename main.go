@@ -201,16 +201,15 @@ func main() {
 		scionLabASController.ReturnTarball))
 	router.Handle("/api/as/remapId/{as_id}", loggingChain.ThenFunc(
 		scionLabASController.RemapASIdentityChallengeAndSolution)).Methods(http.MethodGet, http.MethodPost)
-	router.Handle("/api/as/remapIdDownloadGen/{as_id}/{challenge_solution}", loggingChain.ThenFunc(
+	router.Handle("/api/as/remapIdDownloadGen/{as_id}", loggingChain.ThenFunc(
 		scionLabASController.RemapASDownloadGen)).Methods(http.MethodPost)
-
 	router.Handle("/api/as/getUpdatesForAP/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabASController.GetUpdatesForAP))
 	router.Handle("/api/as/confirmUpdatesFromAP/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabASController.ConfirmUpdatesFromAP))
 	router.Handle("/api/as/queryUpdateBranch/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabASController.QueryUpdateBranch))
-	router.Handle("/api/as/confirmUpdate/{account_id}/{secret}",
+	router.Handle("/api/as/confirmUpdate/{account_id}",
 		apiChain.ThenFunc(scionLabASController.ConfirmUpdate)).Methods(http.MethodPost)
 
 	//SCIONBox API

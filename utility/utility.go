@@ -132,6 +132,11 @@ func IAString(isd, as interface{}) string {
 	return fmt.Sprintf("%v-%v", isd, as)
 }
 
+func IAFilename(I addr.ISD, A addr.AS) string {
+	ia := addr.IA{I: I, A: A}
+	return ia.FileFmt(false)
+}
+
 // Parses a BR name and returns the BRID
 func BRIDFromString(s string) (uint16, error) {
 	parts := strings.Split(s, "-")

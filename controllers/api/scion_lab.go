@@ -522,7 +522,9 @@ func (s *SCIONLabASController) getNewSCIONLabASID() (addr.AS, error) {
 
 // Generates the path to the temporary topology file
 func (asInfo *SCIONLabASInfo) topologyFile() string {
-	return filepath.Join(TempPath, asInfo.LocalAS.IA()+"_topology.json")
+	iaForFile := asInfo.LocalAS.IA()
+	// iaForFile :=
+	return filepath.Join(TempPath, iaForFile+"_topology.json")
 }
 
 // Generates the topology file for the SCIONLab AS AS. It uses the template file
@@ -883,6 +885,7 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 				// TODO: send gen folder
 				answer["ia"], err = RemapASIDComputeNewGenFolder(as)
 				fmt.Println("Loooooooooooooooooooooooooooooook!!!!!")
+				delete(answer, "challenge")
 				if err != nil {
 					// TODO: this is actually very bad, do we delete the AS entry here? what do we do?
 					answer["error"] = true
@@ -892,19 +895,6 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 					utility.SendJSONError(answer, w)
 					return
 				}
-				delete(answer, "challenge")
-				// fileName := "netsec.test.email@gmail.com_1-1001.tar.gz"
-				// filePath := "/home/juan/scionLabConfigs/netsec.test.email@gmail.com_1-1001.tar.gz"
-				// data, err := ioutil.ReadFile(filePath)
-				// if err != nil {
-				// 	// TODO
-
-				// 	return
-				// }
-				// w.Header().Set("Content-Type", "application/gzip")
-				// w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
-				// w.Header().Set("Content-Transfer-Encoding", "binary")
-				// http.ServeContent(w, r, fileName, time.Now(), bytes.NewReader(data))
 			}
 		}
 	} else {
@@ -919,31 +909,54 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 }
 
 func (s *SCIONLabASController) RemapASDownloadGen(w http.ResponseWriter, r *http.Request) {
-	// answer := make(map[string]interface{})
-	// answer["error"] = false
-	// vars := mux.Vars(r)
-	// asID := vars["as_id"]
-	// challengeSolution := vars["challenge_solution"]
-	// as, err := models.FindSCIONLabASByIAString(asID)
-	// if err != nil {
-	// 	answer["error"] = true
-	// 	answer["msg"] = fmt.Sprintf("Could not find AS with IA %v", asID)
-	// 	utility.SendJSONError(answer, w)
-	// 	return
-	// }
+	answer := make(map[string]interface{})
+	answer["error"] = false
+	vars := mux.Vars(r)
+	asID := vars["as_id"]
+	request := make(map[string]interface{})
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		answer["error"] = true
+		answer["msg"] = fmt.Sprintf("Could not read JSON in the request: %v", err)
+		utility.SendJSONError(answer, w)
+		return
+	}
+	json.Unmarshal(body, &request)
+	challengeSolution := request["challenge_solution"]
+	as, err := models.FindSCIONLabASByIAString(asID)
+	if err != nil {
+		answer["error"] = true
+		answer["msg"] = fmt.Sprintf("Could not find AS with IA %v", asID)
+		utility.SendJSONError(answer, w)
+		return
+	}
+	fmt.Println("So far so good, ", as.IA())
+	fmt.Println(challengeSolution)
+	fmt.Println(request)
+	// TODO: check challenge solution against DB
 
-	// fileName := UserPackageName(as.UserEmail, I, A)
-	// filePath := filepath.Join(PackagePath, fileName)
-	// data, err := ioutil.ReadFile(filePath)
-	// if err != nil {
-	// 	log.Printf("Error reading the tarball. FileName: %v, %v", fileName, err)
-	// 	s.Error500(w, err, "Error reading tarball")
-	// 	return
-	// }
-	// w.Header().Set("Content-Type", "application/gzip")
-	// w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
-	// w.Header().Set("Content-Transfer-Encoding", "binary")
-	// http.ServeContent(w, r, fileName, time.Now(), bytes.NewReader(data))
+	mappedIAStr := request["ia"].(string)
+
+	mappedIA, err := addr.IAFromString(mappedIAStr)
+	fmt.Println("Mapped ia=", mappedIAStr, ". binary=", mappedIA)
+	if err != nil {
+		answer["error"] = true
+		answer["msg"] = fmt.Sprintf("Error parsing IA %v: %v", asID, err)
+		utility.SendJSONError(answer, w)
+		return
+	}
+	fileName := UserPackageName(as.UserEmail, mappedIA.I, mappedIA.A)
+	filePath := filepath.Join(PackagePath, fileName)
+	data, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		log.Printf("Error reading the tarball. FileName: %v, %v", fileName, err)
+		s.Error500(w, err, "Error reading tarball")
+		return
+	}
+	w.Header().Set("Content-Type", "application/gzip")
+	w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
+	w.Header().Set("Content-Transfer-Encoding", "binary")
+	http.ServeContent(w, r, fileName, time.Now(), bytes.NewReader(data))
 }
 
 // The handler function to remove a SCIONLab AS for the given user.
