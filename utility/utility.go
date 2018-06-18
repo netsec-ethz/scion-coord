@@ -28,6 +28,8 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+
+	"github.com/scionproto/scion/go/lib/addr"
 )
 
 const (
@@ -201,11 +203,11 @@ func SendJSONError(object interface{}, w http.ResponseWriter) error {
 // the old one. E.g. (1,1001) -> (17, ffaa:0001:0000)
 // The convention for scionlab user ASes is to start from exactly ffaa:0001:0000, meaning
 // we reserve ffaa:0000:0000 to ffaa:0000:ffff for infrastructure.
-func MapOldIAToNewOne(ISDid, ASid int) (uint, uint) {
-	if ISDid < 1 || ISDid > 8 || ASid < 1001 || ASid > 2000 {
+func MapOldIAToNewOne(ISDid addr.ISD, ASid addr.AS) (addr.ISD, addr.AS) {
+	if ISDid < 1 || ISDid > 8 || ASid < 1001 || ASid > 10000 {
 		// invalid request for scionlab
 		return 0, 0
 	}
 
-	return uint(ISDid) + ScionLabISDOffsetAddr - 1, uint(ASid) - 1001 + ScionlabUserASOffsetAddr
+	return addr.ISD(ISDid) + ScionLabISDOffsetAddr - 1, addr.AS(ASid) - 1001 + ScionlabUserASOffsetAddr
 }

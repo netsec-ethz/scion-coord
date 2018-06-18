@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/sec51/goconf"
 )
 
@@ -59,7 +60,7 @@ var (
 	ReservedBRsInfrastructure, _ = goconf.AppConf.Int("reserved_brs_infrastructure")
 	ASesPerUser, _               = goconf.AppConf.Int("ases_per_user")
 	ASesPerAdmin, _              = goconf.AppConf.Int("ases_per_admin")
-	SigningASes                  = make(map[int]int) // map[ISD]=signing_as
+	SigningASes                  = make(map[addr.ISD]int) // map[ISD]=signing_as
 	MTU, _                       = goconf.AppConf.Int("mtu")
 	BRStartPort                  uint16
 	BRInternalStartPort          uint16
@@ -106,7 +107,11 @@ func init() {
 			fmt.Println("Error parsing section signing_ases:", err)
 			os.Exit(1)
 		}
-		SigningASes[ki] = vi
+		if ki < 0 || ki > addr.MaxISD {
+			fmt.Println("Invalid value for ISD: ", k)
+			os.Exit(1)
+		}
+		SigningASes[addr.ISD(ki)] = vi
 	}
 	// we don't validate the email addresses, we just trim them in case they had leading/trailing spaces
 	for i, admin := range EmailAdmins {

@@ -23,11 +23,12 @@ import (
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/models"
 	"github.com/netsec-ethz/scion-coord/utility"
+	"github.com/scionproto/scion/go/lib/addr"
 )
 
 type asInfo struct {
-	ASID      int       // AS ID of the user's SCIONLab AS
-	ISD       int       // Current ISD of the user's SCIONLab AS
+	ISD       addr.ISD  // Current ISD of the user's SCIONLab AS
+	ASID      addr.AS   // AS ID of the user's SCIONLab AS
 	Label     string    // Label of the AS
 	IALabel   string    // ISD-AS string + Label of the AS
 	Status    uint8     // Current status of the AS

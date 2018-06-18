@@ -45,8 +45,8 @@ type SCIONLabAS struct {
 	UserEmail   string           // Owner of the AS
 	PublicIP    string           `orm:"column(public_ip)"` // IP address of the AS; can be empty in case of VPN-based setups
 	StartPort   uint16           // First port used for border routers
-	ISD         int              `orm:"column(isd);default(0)"` // 0 means no ISD is joined
-	ASID        int              `orm:"column(as_id)"`
+	ISD         addr.ISD         `orm:"column(isd);default(0)"` // 0 means no ISD is joined
+	ASID        addr.AS          `orm:"column(as_id)"`
 	Core        bool             `orm:"default(false)"` // Is this SCIONLabAS a core AS
 	Label       string           // Optional label for this AS (can be chosen by the user)
 	Status      uint8            `orm:"default(0)"` // Status of the AS: Active, Create, ...
@@ -79,8 +79,8 @@ type Connection struct {
 // Contains all info needed to populate the topology file
 type ConnectionInfo struct {
 	ID                   uint64 // Used to find the BorderRouter
-	NeighborISD          int
-	NeighborAS           int
+	NeighborISD          addr.ISD
+	NeighborAS           addr.AS
 	NeighborIP           string
 	NeighborUser         string
 	NeighborStatus       uint8
@@ -331,8 +331,8 @@ func (as *SCIONLabAS) GetJoinConnectionInfo() ([]ConnectionInfo, error) {
 		}
 		cnInfo = ConnectionInfo{
 			ID:                   cn.ID,
-			NeighborISD:          respondAS.ISD,
-			NeighborAS:           respondAS.ASID,
+			NeighborISD:          addr.ISD(respondAS.ISD),
+			NeighborAS:           addr.AS(respondAS.ASID),
 			NeighborIP:           cn.RespondIP,
 			NeighborUser:         respondAS.UserEmail,
 			NeighborStatus:       respondAS.Status,
@@ -372,8 +372,8 @@ func (as *SCIONLabAS) GetRespondConnectionInfo() ([]ConnectionInfo, error) {
 		}
 		cnInfo = ConnectionInfo{
 			ID:                   cn.ID,
-			NeighborISD:          joinAS.ISD,
-			NeighborAS:           joinAS.ASID,
+			NeighborISD:          addr.ISD(joinAS.ISD),
+			NeighborAS:           addr.AS(joinAS.ASID),
 			NeighborIP:           cn.JoinIP,
 			NeighborUser:         joinAS.UserEmail,
 			NeighborStatus:       joinAS.Status,
@@ -496,7 +496,7 @@ func GetAllAPs() ([]*SCIONLabAS, error) {
 }
 
 // Returns all Attachment Point ASes in the given ISD
-func FindAllAPsByISD(isd int) ([]*SCIONLabAS, error) {
+func FindAllAPsByISD(isd addr.ISD) ([]*SCIONLabAS, error) {
 	var aps []*AttachmentPoint
 	var ases []*SCIONLabAS
 	_, err := o.QueryTable(new(AttachmentPoint)).RelatedSel().All(&aps)
@@ -560,11 +560,11 @@ func FindSCIONLabASByIAString(ia string) (*SCIONLabAS, error) {
 }
 
 // Find SCIONLabAS by the ISD AS int
-func FindSCIONLabASByIAInt(isd int, asID int) (*SCIONLabAS, error) {
+func FindSCIONLabASByIAInt(isd addr.ISD, asID addr.AS) (*SCIONLabAS, error) {
 	return FindSCIONLabASByASID(asID)
 }
 
-func FindSCIONLabASByASID(asID int) (*SCIONLabAS, error) {
+func FindSCIONLabASByASID(asID addr.AS) (*SCIONLabAS, error) {
 	as := new(SCIONLabAS)
 	err := o.QueryTable(as).Filter("ASID", asID).RelatedSel().One(as)
 	if err != nil {
@@ -584,8 +584,8 @@ func FindSCIONLabASesByIP(ip string) ([]SCIONLabAS, error) {
 
 // The following struct and functions are used in the mediation API functions
 type ASInfo struct {
-	ISD     int
-	ASID    int
+	ISD     addr.ISD
+	ASID    addr.AS
 	Core    bool
 	Account *Account
 	Credits int64
@@ -617,8 +617,8 @@ func convertSCIONLabASToASInfo(as *SCIONLabAS) (*ASInfo, error) {
 		return nil, err
 	}
 	asInfo := ASInfo{
-		ISD:     as.ISD,
-		ASID:    as.ASID,
+		ISD:     addr.ISD(as.ISD),
+		ASID:    addr.AS(as.ASID),
 		Core:    as.Core,
 		Account: account,
 		Credits: as.Credits,
@@ -648,7 +648,7 @@ func FindCoreASInfosByISD(isd int) ([]ASInfo, error) {
 	return convertSCIONLabASesToASInfos(ases)
 }
 
-func FindASInfosByISD(isd int) ([]ASInfo, error) {
+func FindASInfosByISD(isd addr.ISD) ([]ASInfo, error) {
 	var ases []SCIONLabAS
 	_, err := o.QueryTable(new(SCIONLabAS)).Filter("ISD", isd).All(&ases)
 	if err != nil {

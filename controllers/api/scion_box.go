@@ -44,6 +44,8 @@ type SCIONBoxController struct {
 	controllers.HTTPController
 }
 
+const BASE_ASID_FOR_SCIONBOX = utility.ScionlabUserASOffsetAddr + 0x000000F00000
+
 // API Endpoint which the box calls when it starts up and has no credentials and
 // gen folder.
 // Receives a Post Request with json:
@@ -200,7 +202,7 @@ type initReply struct {
 	ID                 string
 	SECRET             string
 	UserEmail          string
-	ISDID              int
+	ISDID              addr.ISD
 }
 
 // Sends a list of potential neighbors and credentials to the SCION-Box.
@@ -238,23 +240,23 @@ func (s *SCIONBoxController) sendPotentialNeighbors(sb *models.SCIONBox, ip stri
 // Returns a list of potential Neighbors: active attachment point SCIONLabAses in the same ISD
 // Also returns the assigned ISD
 func (s *SCIONBoxController) getPotentialNeighbors(ip string,
-	mac string) ([]topologyAlgorithm.Neighbor, int, error) {
+	mac string) ([]topologyAlgorithm.Neighbor, addr.ISD, error) {
 	// run IP geolocation
 	var potentialNeighbors []topologyAlgorithm.Neighbor
 	country, continent, err := geolocation.IPGeolocation(ip)
 	if err != nil {
-		return potentialNeighbors, -1, err
+		return potentialNeighbors, 0, err
 	}
 	log.Printf("New Box is in %s, %s,", continent, country)
 	// check in which ISD the box is.
 	isd, err := geolocation.Location2ISD(country, continent)
 	if err != nil {
-		return potentialNeighbors, -1, err
+		return potentialNeighbors, 0, err
 	}
 	// look trough database for ASes in the same isd
 	pns, err := models.FindPotentialNeighbors(isd)
 	if err != nil {
-		return potentialNeighbors, -1, err
+		return potentialNeighbors, 0, err
 	}
 	for _, pn := range pns {
 		newnb := topologyAlgorithm.Neighbor{
@@ -342,7 +344,7 @@ func (s *SCIONBoxController) ConnectNewBox(w http.ResponseWriter, r *http.Reques
 
 // this function inserts a new SCIONBox into the database
 func (s *SCIONBoxController) updateDBnewSB(sb *models.SCIONBox,
-	neighbors []topologyAlgorithm.Neighbor, isd int, ip string) (*models.SCIONLabAS, error) {
+	neighbors []topologyAlgorithm.Neighbor, isd addr.ISD, ip string) (*models.SCIONLabAS, error) {
 	as, err := s.getNewSCIONBoxASID(isd)
 	if err != nil {
 		return nil, fmt.Errorf("error looking for new AS-ID %v: %v", sb.UserEmail, err)
@@ -456,13 +458,15 @@ func (s *SCIONBoxController) getSourceIP(r *http.Request) (string, error) {
 }
 
 //  Provides a new AS ID for the newly connected SCION box.
-func (s *SCIONBoxController) getNewSCIONBoxASID(isd int) (int, error) {
+func (s *SCIONBoxController) getNewSCIONBoxASID(isd addr.ISD) (addr.AS, error) {
 	ases, err := models.FindSCIONLabAsesByISD(isd)
 	if err != nil {
-		return -1, err
+		return 0, err
 	}
 	// Base AS ID for SCION boxes starts from 2000
-	asID := 2000
+	// TODO: replace with the other line below:
+	asID := addr.AS(2000)
+	// asID := addr.AS(BASE_ASID_FOR_SCIONBOX)
 	for _, as := range ases {
 		if as.ASID > asID {
 			asID = as.ASID
@@ -548,14 +552,16 @@ func (s *SCIONBoxController) generateTopologyFile(slas *models.SCIONLabAS) error
 	brs = models.OnlyCurrentConnections(brs)
 	for i, br := range brs {
 		log.Printf("adding BR objects in topology generation")
-		ia := addr.ISD_AS{
+		ia := addr.IA{
 			I: br.NeighborISD,
 			A: br.NeighborAS,
 		}
 		linktype := models.LinkTypeString(br.Linktype)
 		bro := BR{
-			ISD_ID:       strconv.Itoa(slas.ISD),
-			AS_ID:        strconv.Itoa(slas.ASID),
+			// TODO, question: I guess we want a decimal conversion here, until we adapt the scripts
+			// on the other side? Then we'll use string(slas.ISD) etc
+			ISD_ID:       strconv.FormatInt(int64(slas.ISD), 10),
+			AS_ID:        strconv.FormatInt(int64(slas.ASID), 10),
 			REMOTE_ADDR:  br.NeighborIP,
 			REMOTE_PORT:  fmt.Sprintf("%v", br.NeighborPort),
 			LOCAL_PORT:   fmt.Sprintf("%v", br.LocalPort),
@@ -578,8 +584,8 @@ func (s *SCIONBoxController) generateTopologyFile(slas *models.SCIONLabAS) error
 		borderrouters = append(borderrouters, bro)
 	}
 	topo := Topo{
-		ISD_ID:   strconv.Itoa(slas.ISD),
-		AS_ID:    strconv.Itoa(slas.ASID),
+		ISD_ID:   strconv.FormatInt(int64(slas.ISD), 10),
+		AS_ID:    strconv.FormatInt(int64(slas.ASID), 10),
 		BRs:      borderrouters,
 		IP:       slas.PublicIP,
 		IP_LOCAL: sb.InternalIP,
@@ -608,8 +614,8 @@ func (s *SCIONBoxController) generateCredentialsFile(slas *models.SCIONLabAS) er
 		ID       string
 		SECRET   string
 		IP       string
-		ISD      int
-		AS       int
+		ISD      addr.ISD
+		AS       addr.AS
 		USERMAIL string
 	}
 	// find Account
@@ -637,8 +643,8 @@ func (s *SCIONBoxController) generateCredentialsFile(slas *models.SCIONLabAS) er
 // functions in order to generate the certificate, AS keys etc.
 func (s *SCIONBoxController) generateGenFolder(slas *models.SCIONLabAS) error {
 	log.Printf("Creating gen folder for SCIONBox")
-	asID := strconv.Itoa(slas.ASID)
-	isdID := strconv.Itoa(slas.ISD)
+	asID := strconv.FormatInt(int64(slas.ASID), 10)
+	isdID := strconv.FormatInt(int64(slas.ISD), 10)
 	userEmail := slas.UserEmail
 	CoreCredentialsPath := ISDCoreCredentialsPath(isdID)
 	log.Printf("Calling create local gen. ISD-ID: %v, AS-ID: %v, UserEmail: %v", isdID, asID,
@@ -725,8 +731,7 @@ type CurrentCn struct {
 }
 
 type IA struct {
-	ISD         int
-	AS          int
+	addr.IA
 	Connections []CurrentCn
 }
 
@@ -742,8 +747,7 @@ type HBResponse struct {
 }
 
 type ResponseIA struct {
-	ISD         int
-	AS          int
+	addr.IA
 	Connections []models.ConnectionInfo
 }
 
@@ -772,7 +776,7 @@ func (s *SCIONBoxController) HeartBeatFunction(w http.ResponseWriter, r *http.Re
 	var needGen = false
 	var slasList []*models.SCIONLabAS
 	for _, ia := range req.IAList {
-		slas, err := models.FindSCIONLabASByIAInt(ia.ISD, ia.AS)
+		slas, err := models.FindSCIONLabASByIAInt(ia.I, ia.A)
 		if err != nil {
 			if err == orm.ErrNoRows {
 				// no row found AS is not a SCIONLabAS
@@ -842,8 +846,9 @@ func (s *SCIONBoxController) HeartBeatFunction(w http.ResponseWriter, r *http.Re
 				return
 			}
 			ia := ResponseIA{
-				ISD:         slas.ISD,
-				AS:          slas.ASID,
+				IA: addr.IA{
+					I: slas.ISD,
+					A: slas.ASID},
 				Connections: models.OnlyCurrentConnections(cns),
 			}
 			iaList = append(iaList, ia)
@@ -956,7 +961,7 @@ func findCnInNbs(cn models.ConnectionInfo, neighbors []CurrentCn) bool {
 
 // goroutine that periodically checks the time between the time the SLAS called the Heartbeat API
 // if the time is 10 times the HeartbeatPeriod, the SLAS' status is set to Inactive
-func (s *SCIONBoxController) checkHBStatus(isd int, As int) {
+func (s *SCIONBoxController) checkHBStatus(isd addr.ISD, As addr.AS) {
 	time.Sleep(HeartBeatPeriod * time.Second)
 	for true {
 		slas, err := models.FindSCIONLabASByIAInt(isd, As)

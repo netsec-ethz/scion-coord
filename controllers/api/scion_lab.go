@@ -41,9 +41,9 @@ import (
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/models"
 	"github.com/netsec-ethz/scion-coord/utility"
-	"github.com/netsec-ethz/scion/go/lib/crypto/cert"
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/crypto"
+	"github.com/scionproto/scion/go/lib/crypto/cert"
 )
 
 var (
@@ -69,23 +69,23 @@ var (
 )
 
 // TODO(mlegner): We need to find a better way to handle all the credential files.
-func CredentialFile(isd int, ending string) string {
+func CredentialFile(isd addr.ISD, ending string) string {
 	return filepath.Join(credentialsPath, fmt.Sprintf("ISD%d.%s", isd, ending))
 }
 
-func CoreCertFile(isd int) string {
+func CoreCertFile(isd addr.ISD) string {
 	return CredentialFile(isd, "crt")
 }
 
-func CoreSigKey(isd int) string {
+func CoreSigKey(isd addr.ISD) string {
 	return CredentialFile(isd, "key")
 }
 
-func TrcFile(isd int) string {
+func TrcFile(isd addr.ISD) string {
 	return CredentialFile(isd, "trc")
 }
 
-func UserPackageName(email string, isd, as int) string {
+func UserPackageName(email string, isd addr.ISD, as addr.AS) string {
 	return fmt.Sprintf("%v_%v-%v", email, isd, as)
 }
 
@@ -118,14 +118,14 @@ type SCIONLabASInfo struct {
 }
 
 type SCIONLabRequest struct {
-	ASID      int    `json:"asID"`
-	UserEmail string `json:"userEmail"`
-	IsVPN     bool   `json:"isVPN"`
-	IP        string `json:"ip"`
-	ServerIA  string `json:"serverIA"`
-	Label     string `json:"label"`
-	Type      uint8  `json:"type"`
-	Port      uint16 `json:"port"`
+	ASID      addr.AS `json:"asID"`
+	UserEmail string  `json:"userEmail"`
+	IsVPN     bool    `json:"isVPN"`
+	IP        string  `json:"ip"`
+	ServerIA  string  `json:"serverIA"`
+	Label     string  `json:"label"`
+	Type      uint8   `json:"type"`
+	Port      uint16  `json:"port"`
 }
 
 // This generates a new AS for the user if they do not have too many already
@@ -287,7 +287,7 @@ func (s *SCIONLabASController) parseRequestParameters(r *http.Request) (
 }
 
 // Check if the user's AS is already in the process of being created or updated.
-func (s *SCIONLabASController) canConfigure(userEmail string, asID int) error {
+func (s *SCIONLabASController) canConfigure(userEmail string, asID addr.AS) error {
 	as, err := models.FindSCIONLabASByUserEmailAndASID(userEmail, asID)
 	if err != nil {
 		return err
@@ -423,18 +423,18 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 func getSCIONLabASInfoFromDB(conn *models.Connection) (*SCIONLabASInfo, error) {
 	asInfo := SCIONLabASInfo{
 		IsNewConnection: false,
-		IsVPN: conn.IsVPN,
-		RemoteIA: conn.RespondAP.AS.IA(),
-		IP: conn.JoinIP,
-		LocalPort: conn.JoinAS.StartPort,
-		OldAP: "",
-		RemoteIP: conn.RespondIP,
-		RemoteBRID: conn.RespondBRID,
-		RemotePort: conn.RespondAP.AS.GetPortNumberFromBRID(conn.RespondBRID),
-		VPNServerIP: conn.RespondAP.VPNIP,
-		VPNServerPort: conn.RespondAP.VPNPort,
-		LocalAS: conn.JoinAS,
-		RemoteAS: conn.RespondAP.AS,
+		IsVPN:           conn.IsVPN,
+		RemoteIA:        conn.RespondAP.AS.IA(),
+		IP:              conn.JoinIP,
+		LocalPort:       conn.JoinAS.StartPort,
+		OldAP:           "",
+		RemoteIP:        conn.RespondIP,
+		RemoteBRID:      conn.RespondBRID,
+		RemotePort:      conn.RespondAP.AS.GetPortNumberFromBRID(conn.RespondBRID),
+		VPNServerIP:     conn.RespondAP.VPNIP,
+		VPNServerPort:   conn.RespondAP.VPNPort,
+		LocalAS:         conn.JoinAS,
+		RemoteAS:        conn.RespondAP.AS,
 	}
 	return &asInfo, nil
 }
@@ -501,13 +501,17 @@ func (s *SCIONLabASController) updateDB(asInfo *SCIONLabASInfo) error {
 
 // Provides a new AS ID for the newly created SCIONLab AS AS.
 // TODO(mlegner): Should we maybe use the lowest unused ID instead?
-func (s *SCIONLabASController) getNewSCIONLabASID() (int, error) {
+// TODO: this function is too expensive: we retrieve all AS and convert them to ASInfo, only to
+// ensure the ID is bigger than the biggest of them! FIXME now!! (reviewer, tell me to fix it now)
+func (s *SCIONLabASController) getNewSCIONLabASID() (addr.AS, error) {
 	ases, err := models.FindAllASInfos()
 	if err != nil {
-		return -1, err
+		return 0, err
 	}
 	// Base AS ID for SCIONLab is set in config file
-	asID := config.BaseASID
+	// leave it as this for now:
+	asID := addr.AS(config.BaseASID)
+	// asID := addr.AS(utility.ScionlabUserASOffsetAddr)
 	for _, as := range ases {
 		if as.ASID > asID {
 			asID = as.ASID
@@ -542,11 +546,12 @@ func generateTopologyFile(asInfo *SCIONLabASInfo) error {
 	}
 
 	// Topology file parameters
+	// TODO, question: do we want to write the file with AS IDs as decimal?:
 	data := map[string]string{
 		"IP":           asInfo.IP,
 		"BIND_IP":      asInfo.LocalAS.BindIP(asInfo.IsVPN, asInfo.IP),
-		"ISD_ID":       strconv.Itoa(asInfo.LocalAS.ISD),
-		"AS_ID":        strconv.Itoa(asInfo.LocalAS.ASID),
+		"ISD_ID":       strconv.FormatInt(int64(asInfo.LocalAS.ISD), 10),
+		"AS_ID":        strconv.FormatInt(int64(asInfo.LocalAS.ASID), 10),
 		"LOCAL_ADDR":   localIP,
 		"LOCAL_PORT":   strconv.Itoa(int(asInfo.LocalPort)),
 		"TARGET_ISDAS": asInfo.RemoteIA,
@@ -926,8 +931,7 @@ func (s *SCIONLabASController) RemapASDownloadGen(w http.ResponseWriter, r *http
 	// 	utility.SendJSONError(answer, w)
 	// 	return
 	// }
-	
-	
+
 	// fileName := UserPackageName(as.UserEmail, I, A)
 	// filePath := filepath.Join(PackagePath, fileName)
 	// data, err := ioutil.ReadFile(filePath)
@@ -1059,15 +1063,15 @@ func (s *SCIONLabASController) ConfirmUpdate(w http.ResponseWriter, r *http.Requ
 // RemapASIDComputeNewGenFolder creates a new gen folder using a valid remapped ID
 // e.g. 17-ffaa:0:1 . This does not change IDs in the DB but recomputes topologies and certificates.
 // After finishing, there will be a new tgz file ready to download using the mapped ID.
-func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.ISD_AS, error) {
+func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	I, A := utility.MapOldIAToNewOne(as.ISD, as.ASID)
 	if I == 0 || A == 0 {
 		return nil, fmt.Errorf("Invalid source address to map: (%d, %d)", as.ISD, as.ASID)
 	}
-	ia := addr.ISD_AS{I: int(I), A: int(A)}
+	ia := addr.IA{I: I, A: A}
 	// replace IDs in the AS entry, but don't save in DB:
-	as.ISD = int(I)
-	as.ASID = int(A)
+	as.ISD = I
+	as.ASID = A
 	// retrieve connection:
 	conns, err := as.GetJoinConnections()
 	if err != nil {

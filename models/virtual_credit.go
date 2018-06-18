@@ -28,12 +28,12 @@ func BandwidthToCredits(bandwidthInKilobits uint64) int64 {
 
 // Stores the connection info from an AS to another AS
 type ConnectionWithCredits struct {
-	ISD           int    // ISD of the other AS
-	AS            int    // the other AS
-	CreditBalance int64  // How much credits the connection costs / yields
-	Bandwidth     uint64 // The bandwidth in kb/s
-	IsOutgoing    bool   // false = the other AS has to pay, true = the other AS gets credits
-	Timestamp     string // The creation time of the connection
+	ISD           addr.ISD // ISD of the other AS
+	AS            addr.AS  // the other AS
+	CreditBalance int64    // How much credits the connection costs / yields
+	Bandwidth     uint64   // The bandwidth in kb/s
+	IsOutgoing    bool     // false = the other AS has to pay, true = the other AS gets credits
+	Timestamp     string   // The creation time of the connection
 }
 
 // Look for all connection to and from this AS and calculates the necessary credits for it

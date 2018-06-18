@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/netsec-ethz/scion-coord/utility"
+	"github.com/scionproto/scion/go/lib/addr"
 )
 
 // Generates client keys and configuration necessary for a VPN-based setup
@@ -103,21 +104,21 @@ func generateVPNKeys(asInfo *SCIONLabASInfo) error {
 }
 
 // Constructs the userID used as a common name for the VPN keys and certificates
-func vpnUserID(userEmail string, asID int) string {
+func vpnUserID(userEmail string, asID addr.AS) string {
 	return fmt.Sprintf("%v_%v", userEmail, asID)
 }
 
 // Path for client key and certificate; fileExt can be "key" or "cert"
-func vpnKeyCertPath(userEmail string, asID int, fileExt string) string {
+func vpnKeyCertPath(userEmail string, asID addr.AS, fileExt string) string {
 	return filepath.Join(RSAKeyPath, vpnUserID(userEmail, asID)+"."+fileExt)
 }
 
 // Path for client key
-func vpnKeyPath(userEmail string, asID int) string {
+func vpnKeyPath(userEmail string, asID addr.AS) string {
 	return vpnKeyCertPath(userEmail, asID, "key")
 }
 
 // Path for client certificate
-func vpnCertPath(userEmail string, asID int) string {
+func vpnCertPath(userEmail string, asID addr.AS) string {
 	return vpnKeyCertPath(userEmail, asID, "crt")
 }

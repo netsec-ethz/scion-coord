@@ -21,6 +21,7 @@ import (
 	"github.com/astaxie/beego/orm"
 	"github.com/netsec-ethz/scion-coord/models"
 	"github.com/oschwald/geoip2-golang"
+	"github.com/scionproto/scion/go/lib/addr"
 )
 
 // IP address to ISO country & continent
@@ -37,7 +38,7 @@ func IPGeolocation(ipAddress string) (country string, continent string, err erro
 }
 
 // Get the ISD from ISO country & continent
-func Location2ISD(country string, continent string) (int, error) {
+func Location2ISD(country string, continent string) (addr.ISD, error) {
 	// look for isd in country
 	result, err := models.FindISDbyCountry(country)
 	if err != nil {
@@ -49,12 +50,12 @@ func Location2ISD(country string, continent string) (int, error) {
 					// no location found return default ISD 1
 					return 1, nil
 				} else {
-					return -1, err
+					return 0, err
 				}
 			}
 		} else {
-			return -1, err
+			return 0, err
 		}
 	}
-	return result.ISD, err
+	return addr.ISD(result.ISD), err
 }
