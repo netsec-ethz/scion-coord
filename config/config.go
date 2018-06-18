@@ -60,7 +60,7 @@ var (
 	ReservedBRsInfrastructure, _ = goconf.AppConf.Int("reserved_brs_infrastructure")
 	ASesPerUser, _               = goconf.AppConf.Int("ases_per_user")
 	ASesPerAdmin, _              = goconf.AppConf.Int("ases_per_admin")
-	SigningASes                  = make(map[addr.ISD]int) // map[ISD]=signing_as
+	SigningASes                  = make(map[addr.ISD]addr.AS) // map[ISD]=signing_as
 	MTU, _                       = goconf.AppConf.Int("mtu")
 	BRStartPort                  uint16
 	BRInternalStartPort          uint16
@@ -107,11 +107,15 @@ func init() {
 			fmt.Println("Error parsing section signing_ases:", err)
 			os.Exit(1)
 		}
-		if ki < 0 || ki > addr.MaxISD {
+		if ki < 1 || ki > addr.MaxISD {
 			fmt.Println("Invalid value for ISD: ", k)
 			os.Exit(1)
 		}
-		SigningASes[addr.ISD(ki)] = vi
+		if vi < 1 || vi > addr.MaxAS {
+			fmt.Println("Invalid value for Core AS ID: ", v)
+			os.Exit(1)
+		}
+		SigningASes[addr.ISD(ki)] = addr.AS(vi)
 	}
 	// we don't validate the email addresses, we just trim them in case they had leading/trailing spaces
 	for i, admin := range EmailAdmins {
