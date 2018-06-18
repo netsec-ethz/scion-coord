@@ -8,6 +8,7 @@ import sys
 import pathlib
 import re
 import glob
+import shutil
 
 from lib.crypto.certificate import Certificate
 from lib.crypto.certificate_chain import CertificateChain
@@ -23,20 +24,25 @@ def solve_challenge(challenge):
     """
     The parameter challenge comes in binary already
     """
+    global IA
     print ("solving challenge, len=", len(challenge))
     # 1) get the location of the certificates and keys
-    SC = os.environ["SC"] if "SC" in os.environ else os.path.join(str(pathlib.Path.home()), "go", "src", "github.com", "scionproto", "scion")
 
+
+
+    SC = os.environ["SC"] if "SC" in os.environ else os.path.join(str(pathlib.Path.home()), "go", "src", "github.com", "scionproto", "scion")
     SC = os.path.join(SC, "gen")
-    try:
-        with open(os.path.join(SC, "ia")) as f:
-            ia = f.readline()
-    except Exception as ex:
-        print(ex)
-        sys.exit(1)
-    m = re.match("^([0-9]+)-([0-9]+)$", ia)
+    # try:
+    #     with open(os.path.join(SC, "ia")) as f:
+    #         ia = f.readline()
+    # except Exception as ex:
+    #     print(ex)
+    #     sys.exit(1)
+
+
+    m = re.match("^([0-9]+)-([0-9]+)$", IA)
     if not m:
-        print ("ERROR: could not understand the IA from: ", ia)
+        print ("ERROR: could not understand the IA from: ", IA)
     I = m.group(1)
     A = m.group(2)
     filepath = os.path.join(SC, "ISD"+I, "AS"+A, "bs"+I+"-"+A+"-1")
@@ -143,6 +149,10 @@ def something_pending():
         content = {}
     print ("------------------------- Reply from Coordinator after solution: -----------------------")
     print (content)
+    if content['error']:
+        print("Error in the reply from the Coordinator after our solution to the challenge: ")
+        print(content['msg'])
+        sys.exit(2)
     # content["challenge"] = base64.standard_b64encode(challenge).decode("utf-8")
     content["challenge_solution"] = challenge_solution
     return True, content
@@ -152,12 +162,30 @@ def download_gen_folder(answer):
     mapped_ia = answer["ia"]
     # challenge = answer["challenge"]
     challenge_solution= answer["challenge_solution"]
-    url = SCION_COORD_URL + "/api/as/remapIdDownloadGen/" + IA + "/" + challenge_solution
+    print("challenge_solution:", challenge_solution)
+    url = SCION_COORD_URL + "/api/as/remapIdDownloadGen/" + IA
+
     try:
-        resp = requests.get(url)
+        while url:
+            resp = requests.post(url, json=answer, allow_redirects=False)
+            url = resp.next.url if resp.is_redirect and resp.next else None
     except requests.exceptions.ConnectionError as ex:
         print ("Error download Gen folder from Coordinator: ", ex)
-        return
+        sys.exit(1)
+    print("response:", resp)
+    print(dir(resp))
+    if resp.status_code != 200:
+        print("Failed downloading gen folder")
+        print(resp.body)
+        sys.exit(2)
+    # download a file with requests: https://stackoverflow.com/questions/16694907/how-to-download-large-file-in-python-with-requests-py
+    filename = '/tmp/gen-data.tgz'
+    with open(filename, 'wb') as f:
+        for chunk in resp.iter_content(chunk_size=1024*1024):
+            if chunk:
+                f.write(chunk)
+    print("Downloaded gen folder")
+    return filename
     
 
 
@@ -188,7 +216,8 @@ def main():
     if not pending:
         print ("Nothing is pending, out.")
         return 0
-    download_gen_folder(answer)
+    gen_file = download_gen_folder(answer)
+    
 
 
 

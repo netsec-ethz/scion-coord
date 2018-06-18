@@ -86,7 +86,7 @@ func TrcFile(isd addr.ISD) string {
 }
 
 func UserPackageName(email string, isd addr.ISD, as addr.AS) string {
-	return fmt.Sprintf("%v_%v-%v", email, isd, as)
+	return fmt.Sprintf("%s_%s", email, utility.IAFileName(isd, as))
 }
 
 func (asInfo *SCIONLabASInfo) UserPackageName() string {
@@ -522,8 +522,7 @@ func (s *SCIONLabASController) getNewSCIONLabASID() (addr.AS, error) {
 
 // Generates the path to the temporary topology file
 func (asInfo *SCIONLabASInfo) topologyFile() string {
-	iaForFile := asInfo.LocalAS.IAString()
-	// iaForFile :=
+	iaForFile := utility.IAFileName(asInfo.LocalAS.ISD, asInfo.LocalAS.ASID)
 	return filepath.Join(TempPath, iaForFile+"_topology.json")
 }
 
@@ -552,8 +551,8 @@ func generateTopologyFile(asInfo *SCIONLabASInfo) error {
 	data := map[string]string{
 		"IP":           asInfo.IP,
 		"BIND_IP":      asInfo.LocalAS.BindIP(asInfo.IsVPN, asInfo.IP),
-		"ISD_ID":       strconv.FormatInt(int64(asInfo.LocalAS.ISD), 10),
-		"AS_ID":        strconv.FormatInt(int64(asInfo.LocalAS.ASID), 10),
+		"ISD_ID":       fmt.Sprintf("%d", asInfo.LocalAS.ISD),
+		"AS_ID":        asInfo.LocalAS.ASID.String(),
 		"LOCAL_ADDR":   localIP,
 		"LOCAL_PORT":   strconv.Itoa(int(asInfo.LocalPort)),
 		"TARGET_ISDAS": asInfo.RemoteIA,
@@ -592,7 +591,18 @@ func generateLocalGen(asInfo *SCIONLabASInfo) error {
 		"--core_cert_file="+CoreCertFile(isd),
 		"--trc_file="+TrcFile(isd),
 		"--package_path="+PackagePath)
-	os.Setenv("PYTHONPATH", pythonPath+":"+scionPath+":"+scionUtilPath)
+	pyPaths := []string{}
+	if pythonPath != "" {
+		pyPaths = []string{pythonPath}
+	}
+	if scionPath != "" {
+		pyPaths = append(pyPaths, scionPath)
+	}
+	if scionUtilPath != "" {
+		pyPaths = append(pyPaths, scionUtilPath)
+	}
+	pyPath := strings.Join(pyPaths, ":")
+	os.Setenv("PYTHONPATH", pyPath)
 	cmd.Env = os.Environ()
 	cmdOut, _ := cmd.StdoutPipe()
 	cmdErr, _ := cmd.StderrPipe()
@@ -945,7 +955,7 @@ func (s *SCIONLabASController) RemapASDownloadGen(w http.ResponseWriter, r *http
 		utility.SendJSONError(answer, w)
 		return
 	}
-	fileName := UserPackageName(as.UserEmail, mappedIA.I, mappedIA.A)
+	fileName := UserPackageName(as.UserEmail, mappedIA.I, mappedIA.A) + ".tar.gz"
 	filePath := filepath.Join(PackagePath, fileName)
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
@@ -1077,6 +1087,7 @@ func (s *SCIONLabASController) ConfirmUpdate(w http.ResponseWriter, r *http.Requ
 // e.g. 17-ffaa:0:1 . This does not change IDs in the DB but recomputes topologies and certificates.
 // After finishing, there will be a new tgz file ready to download using the mapped ID.
 func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
+	oldIA := as.IA()
 	I, A := utility.MapOldIAToNewOne(as.ISD, as.ASID)
 	if I == 0 || A == 0 {
 		return nil, fmt.Errorf("Invalid source address to map: (%d, %d)", as.ISD, as.ASID)
@@ -1102,7 +1113,19 @@ func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	if err != nil {
 		return nil, err
 	}
+	// now duplicate the VPN keys, if some:
+	err = utility.CopyFile(vpnKeyPath(as.UserEmail, oldIA.A), vpnKeyPath(as.UserEmail, as.ASID))
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	err = utility.CopyFile(vpnCertPath(as.UserEmail, oldIA.A), vpnCertPath(as.UserEmail, as.ASID))
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+
 	// finally, generate the gen folder:
+	// TODO modify the paths to point to a new scionproto/scion/python place, and use that one
+	// for that, look at generateLocalGen when we do: os.Setenv("PYTHONPATH", pyPath)
 	err = generateGenForAS(asInfo)
 	if err != nil {
 		return nil, err

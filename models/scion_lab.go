@@ -117,6 +117,10 @@ func OnlyNotCurrentConnections(cns []ConnectionInfo) []ConnectionInfo {
 	return filterConnectionsByBeingCurrentStatus(cns, false)
 }
 
+func (as *SCIONLabAS) IA() addr.IA {
+	return addr.IA{I: as.ISD, A: as.ASID}
+}
+
 func (as *SCIONLabAS) IAString() string {
 	if as.ISD < 1 {
 		return fmt.Sprintf("%v", as.ASID)

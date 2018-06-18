@@ -128,13 +128,22 @@ func IPCompare(ip1, ip2 string) int8 {
 }
 
 // Create IA string from ISD and AS IDs
-func IAString(isd, as interface{}) string {
-	return fmt.Sprintf("%v-%v", isd, as)
+func IAStringStandard(isd addr.ISD, as addr.AS) string {
+	// return fmt.Sprintf("%v-%v", isd, as)
+	ia := addr.IA{I: isd, A: as}
+	return ia.String()
 }
 
-func IAFilename(I addr.ISD, A addr.AS) string {
-	ia := addr.IA{I: I, A: A}
+// IAFileName returns the IA to be used as a filename
+func IAFileName(isd addr.ISD, as addr.AS) string {
+	ia := addr.IA{I: isd, A: as}
 	return ia.FileFmt(false)
+}
+
+// IAString returns the ISD-AS in decimal. This doesn't follow the standard, but is very
+// compatible with the Coordinator's scripts
+func IAString(isd addr.ISD, as addr.AS) string {
+	return fmt.Sprintf("%d-%d", isd, as)
 }
 
 // Parses a BR name and returns the BRID

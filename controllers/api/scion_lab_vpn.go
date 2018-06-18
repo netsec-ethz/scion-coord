@@ -105,7 +105,8 @@ func generateVPNKeys(asInfo *SCIONLabASInfo) error {
 
 // Constructs the userID used as a common name for the VPN keys and certificates
 func vpnUserID(userEmail string, asID addr.AS) string {
-	return fmt.Sprintf("%v_%v", userEmail, asID)
+	ret := fmt.Sprintf("%s_%s", userEmail, asID.FileFmt())
+	return ret
 }
 
 // Path for client key and certificate; fileExt can be "key" or "cert"
