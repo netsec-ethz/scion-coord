@@ -867,8 +867,6 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 					sort.Sort(sort.Reverse(sort.StringSlice(possibleCerts)))
 					fmt.Println("DEBUG: possible certs: ", possibleCerts)
 					path = filepath.Join(path, possibleCerts[0])
-					// TODO: deleteme
-					path = "/home/juan/go/src/github.com/scionproto/scion/gen/ISD1/AS1010/bs1-1010-1/certs/ISD1-AS1010-V1.crt"
 					chainBytes, err := ioutil.ReadFile(path)
 					if err == nil {
 						chain, err = cert.ChainFromRaw(chainBytes, false)
@@ -889,23 +887,28 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 			fmt.Println("publickey: ", publicKey)
 			err = crypto.Verify(randomBytes, receivedSignature, publicKey, crypto.Ed25519)
 			fmt.Println("VERIFY ERROR?: ", err)
-			if err == nil {
-				answer["pending"] = false
-
-				// TODO: send gen folder
-				answer["ia"], err = RemapASIDComputeNewGenFolder(as)
-				fmt.Println("Loooooooooooooooooooooooooooooook!!!!!")
-				delete(answer, "challenge")
-				if err != nil {
-					// TODO: this is actually very bad, do we delete the AS entry here? what do we do?
-					answer["error"] = true
-					msg := fmt.Sprintf("ERROR in Coordinator: while mapping the ID, cannot generate a gen folder for the AS %s : %v", asID, err)
-					answer["msg"] = msg
-					log.Print(msg)
-					utility.SendJSONError(answer, w)
-					return
-				}
+			if err != nil {
+				answer["error"] = true
+				msg := fmt.Sprintf("ERROR verifying signature for AS %s: %s", asID, err)
+				answer["msg"] = msg
+				log.Print(msg)
+				utility.SendJSONError(answer, w)
+				return
 			}
+			answer["pending"] = false
+			answer["ia"], err = RemapASIDComputeNewGenFolder(as)
+			fmt.Println("Loooooooooooooooooooooooooooooook!!!!!")
+			delete(answer, "challenge")
+			if err != nil {
+				// TODO: this is actually very bad, do we delete the AS entry here? what do we do?
+				answer["error"] = true
+				msg := fmt.Sprintf("ERROR in Coordinator: while mapping the ID, cannot generate a gen folder for the AS %s : %v", asID, err)
+				answer["msg"] = msg
+				log.Print(msg)
+				utility.SendJSONError(answer, w)
+				return
+			}
+
 		}
 	} else {
 		answer["pending"] = false

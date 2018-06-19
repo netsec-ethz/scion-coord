@@ -54,6 +54,9 @@ def solve_challenge(challenge):
 
     # we don't need this: -------------------------
     certificate = os.path.join(filepath, "certs")
+    if not os.path.isdir(certificate):
+        print("AS %s: Cannot find the certificates directory in %s.\nAborting." % (IA, certificate))
+        sys.exit(1)
     certificates = [c for c in sorted(os.listdir(certificate), reverse=True) if c.endswith(".crt")]
     if len(certificates) < 1:
         print("ERROR: could not find a certificate under ", certificate)
