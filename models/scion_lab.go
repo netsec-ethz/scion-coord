@@ -290,31 +290,19 @@ func (as *SCIONLabAS) getAllConnections() ([]*Connection, error) {
 }
 
 func (cn *Connection) getJoinAS() *SCIONLabAS {
-	as := new(SCIONLabAS)
+	// as := new(SCIONLabAS)
+	// o.QueryTable(as).Filter("ID", cn.JoinAS.ID).RelatedSel().One(as)
+	// return as
 	// TODO, Question: if we have cn.JoinAS as the JoinAS, with the correct type, why
-	// do we need to query the DB again?
-	o.QueryTable(as).Filter("ID", cn.JoinAS.ID).RelatedSel().One(as)
-	return as
+	// do we need to query the DB again? Below is a simpler approach:
+	return cn.JoinAS
 }
 
 func (cn *Connection) GetRespondAS() *SCIONLabAS {
-	// ap := new(AttachmentPoint)
-	// if err := o.QueryTable(ap).Filter("ID", cn.RespondAP.ID).RelatedSel().One(ap); err != nil {
-	// 	return nil
-	// }
-	// o.LoadRelated(ap, "AS")
-	// return ap.AS
-
-	// TODO: Question: same as the above method
-	fmt.Println("####### 1 ", cn.RespondAP.ID)
-	fmt.Println("####### 2 ", cn.RespondAP.HasVPN)
-	fmt.Println("####### 2 ", cn.RespondAP.VPNPort)
-	fmt.Println("####### 3 ", cn.RespondAP.VPNIP)
-	fmt.Println("####### 4 ", cn.RespondAP.StartVPNIP)
-	fmt.Println("####### 5 ", cn.RespondAP.EndVPNIP)
-	fmt.Println("####### 6 ", cn.RespondAP.AS)
-	fmt.Println("####### 7 ", cn.RespondAP.Connections)
-	o.LoadRelated(cn.RespondAP, "AS")
+	// TODO: Question: same as the above method. Now we only ensure the AS is loaded:
+	if cn.RespondAP.AS == nil {
+		o.LoadRelated(cn.RespondAP, "AS")
+	}
 	return cn.RespondAP.AS
 }
 
