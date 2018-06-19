@@ -8,6 +8,9 @@ import sys
 import pathlib
 import re
 import glob
+import subprocess
+import tempfile
+import datetime
 import shutil
 
 from lib.crypto.certificate import Certificate
@@ -115,16 +118,16 @@ def something_pending():
         resp = requests.get(url)
     except requests.exceptions.ConnectionError as e:
         print ("Error querying Coordinator: ", e)
-        return False, None
+        sys.exit(1)
     content = resp.content.decode('utf-8')
     content = json.loads(content)
     print ("------------------------- ANS: -----------------------")
     print (content)
     if "pending" not in content:
         print("ERROR: Wrong answer, does not contain the pending key")
-        return False, None
+        sys.exit(1)
     if not content["pending"]:
-        return False, None
+        sys.exit(1)
 
 
     answer = {"challenge": content["challenge"]}
@@ -141,7 +144,7 @@ def something_pending():
             url = resp.next.url if resp.is_redirect and resp.next else None
     except requests.exceptions.ConnectionError as e:
         print ("Error querying Coordinator solving challenge: ", e)
-        return False, None
+        sys.exit(1)
     content = resp.content.decode('utf-8')
     try:
         content = json.loads(content)
@@ -188,6 +191,38 @@ def download_gen_folder(answer):
     return filename
     
 
+def install_gen(gen_filename):
+    """
+    Installs the new gen folder. It assumes SCION is stopped
+    """
+    SC = os.environ['SC']
+    with tempfile.TemporaryDirectory(prefix='gen-') as temp_dir:
+        subprocess.check_output(['tar', 'xf', gen_filename], cwd=temp_dir)
+        contents = os.listdir(temp_dir)
+        if len(contents) != 1:
+            print("Uncompressing file %s didn't return the right number of subdirectories" % (gen_filename,))
+            sys.exit(1)
+        p = os.path.join(temp_dir, contents[0])
+        contents = os.listdir(p)
+        if 'gen' not in contents:
+            print('Could not find the gen directory in the contents of %s' % gen_filename)
+            sys.exit(1)
+        newgen_dir = os.path.join(p, 'gen')
+        gen_dir = os.path.join(SC,'gen')
+        os.rename(gen_dir, os.path.join(SC, 'gen.' + datetime.datetime.now().strftime('%Y-%m-%dT%H-%M-%S')))
+        shutil.move(newgen_dir, gen_dir)
+
+def notify_coordinator_all_okay():
+    # TODO tell Coordinator we succeeded 
+    pass
+
+def stop_SCION():
+    # TODO
+    pass
+
+def start_SCION():
+    # TODO
+    pass
 
 def parse_command_line_args():
     # global IA, ACC_ID, ACC_PW
@@ -216,8 +251,11 @@ def main():
     if not pending:
         print ("Nothing is pending, out.")
         return 0
+    stop_SCION()
     gen_file = download_gen_folder(answer)
-    
+    install_gen(gen_file)
+    notify_coordinator_all_okay()
+    start_SCION()
 
 
 
