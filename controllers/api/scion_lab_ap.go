@@ -457,7 +457,7 @@ func sendConfirmationEmail(userEmail, IA, action string) error {
 		Message:     message,
 	}
 	log.Printf("Sending confirmation email to user %v.", userEmail)
-	return email.ConstructAndSendEmail("as_status.html", subject, data, "as-update", userEmail, false)
+	return email.ConstructFromTemplateAndSend("as_status.html", subject, data, "as-update", userEmail, false)
 }
 
 // sends an email notifying of a failure to synchronize the attachment point with the user AS.\
@@ -484,5 +484,5 @@ func sendRejectedEmail(userEmail string, userIA, action, attachmentPointIA strin
 		Operation:   action,
 		AP:          attachmentPointIA,
 	}
-	return email.ConstructAndSendEmail("as_failure.html", subject, data, "as-rejection", userEmail, true)
+	return email.ConstructFromTemplateAndSend("as_failure.html", subject, data, "as-rejection", userEmail, true)
 }
