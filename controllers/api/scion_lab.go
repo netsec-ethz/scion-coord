@@ -39,6 +39,7 @@ import (
 	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
+	"github.com/netsec-ethz/scion-coord/email"
 	"github.com/netsec-ethz/scion-coord/models"
 	"github.com/netsec-ethz/scion-coord/utility"
 	"github.com/scionproto/scion/go/lib/addr"
@@ -547,7 +548,6 @@ func generateTopologyFile(asInfo *SCIONLabASInfo) error {
 	}
 
 	// Topology file parameters
-	// TODO, question: do we want to write the file with AS IDs as decimal?:
 	data := map[string]string{
 		"IP":           asInfo.IP,
 		"BIND_IP":      asInfo.LocalAS.BindIP(asInfo.IsVPN, asInfo.IP),
@@ -861,13 +861,12 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 			delete(answer, "challenge")
 			answer["pending"] = false
 			answer["ia"], err = RemapASIDComputeNewGenFolder(as)
-			// fmt.Println("Loooooooooooooooooooooooooooooook!!!!!")
 			if err != nil {
-				// TODO: this is actually very bad, do we delete the AS entry here? what do we do?
 				answer["error"] = true
 				msg := fmt.Sprintf("ERROR in Coordinator: while mapping the ID, cannot generate a gen folder for the AS %s : %v", asID, err)
 				answer["msg"] = msg
 				log.Print(msg)
+				email.SendEmailToAdmins("ERROR in remap", msg)
 				utility.SendJSONError(answer, w)
 				return
 			}
@@ -910,13 +909,12 @@ func verifySignatureFromAS(as *models.SCIONLabAS, thingToSign, receivedSignature
 	}
 	chain, err = cert.ChainFromRaw(chainBytes, false)
 	if err != nil || chain == nil {
-		// TODO: this is actually very bad, do we delete the AS entry here? what do we do?
-		return fmt.Errorf("ERROR in Coordinator: cannot load the public certificate for AS %s : %v", as.IAString(), err)
+		msg := fmt.Sprintf("ERROR in Coordinator: cannot load the public certificate for AS %s : %v", as.IAString(), err)
+		email.SendEmailToAdmins("ERROR in remap", msg)
+		return errors.New(msg)
 	}
 	publicKey := chain.Leaf.SubjectSignKey
-	// fmt.Println("publickey: ", publicKey)
 	err = crypto.Verify(thingToSign, receivedSignature, publicKey, crypto.Ed25519)
-	// fmt.Println("VERIFY ERROR?: ", err)
 	return err
 }
 
@@ -962,6 +960,7 @@ func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	// finally, generate the gen folder:
 	// TODO modify the paths to point to a new scionproto/scion/python place, and use that one
 	// for that, look at generateLocalGen when we do: os.Setenv("PYTHONPATH", pyPath)
+	// Otherwise the generation of the gen directory will create wrong filenames
 	err = generateGenForAS(asInfo)
 	if err != nil {
 		return nil, err
