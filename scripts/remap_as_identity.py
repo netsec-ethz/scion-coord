@@ -182,7 +182,7 @@ def download_gen_folder(answer):
     print(dir(resp))
     if resp.status_code != 200:
         print("Failed downloading gen folder")
-        print(resp.body)
+        print(resp.content)
         sys.exit(2)
     # download a file with requests: https://stackoverflow.com/questions/16694907/how-to-download-large-file-in-python-with-requests-py
     filename = '/tmp/gen-data.tgz'

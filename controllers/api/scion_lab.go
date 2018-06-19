@@ -781,7 +781,6 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 		return
 	}
 	json.Unmarshal(body, &request)
-	fmt.Println(" ########### request: ", request)
 	if answeringChallenge {
 		// check we have the needed fields
 		_, havechallenge := request["challenge"]
@@ -850,43 +849,7 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 				utility.SendJSONError(answer, w)
 				return
 			}
-			path := filepath.Join(PackagePath, UserPackageName(as.UserEmail, as.ISD, as.ASID), "gen", fmt.Sprintf("ISD%d", as.ISD), fmt.Sprintf("AS%d", as.ASID),
-				fmt.Sprintf("bs%d-%d-1", as.ISD, as.ASID), "certs")
-			var chain *cert.Chain
-			fileInfos, err := ioutil.ReadDir(path)
-			if err == nil {
-				possibleCerts := []string{}
-				for _, f := range fileInfos {
-					if !f.IsDir() && strings.HasSuffix(strings.ToLower(f.Name()), ".crt") {
-						possibleCerts = append(possibleCerts, f.Name())
-					}
-				}
-				if len(possibleCerts) < 1 {
-					err = fmt.Errorf("Cannot find any .crt file for IA %v", asID)
-				} else {
-					sort.Sort(sort.Reverse(sort.StringSlice(possibleCerts)))
-					fmt.Println("DEBUG: possible certs: ", possibleCerts)
-					path = filepath.Join(path, possibleCerts[0])
-					chainBytes, err := ioutil.ReadFile(path)
-					if err == nil {
-						chain, err = cert.ChainFromRaw(chainBytes, false)
-					}
-				}
-			}
-			// we could assert that chain is not null iff err == nil, but we also test it istead:
-			if err != nil || chain == nil {
-				// TODO: this is actually very bad, do we delete the AS entry here? what do we do?
-				answer["error"] = true
-				msg := fmt.Sprintf("ERROR in Coordinator: cannot load the public certificate for AS %s : %v", asID, err)
-				answer["msg"] = msg
-				log.Print(msg)
-				utility.SendJSONError(answer, w)
-				return
-			}
-			publicKey := chain.Leaf.SubjectSignKey
-			fmt.Println("publickey: ", publicKey)
-			err = crypto.Verify(randomBytes, receivedSignature, publicKey, crypto.Ed25519)
-			fmt.Println("VERIFY ERROR?: ", err)
+			err = verifySignatureFromAS(as, randomBytes, receivedSignature)
 			if err != nil {
 				answer["error"] = true
 				msg := fmt.Sprintf("ERROR verifying signature for AS %s: %s", asID, err)
@@ -895,10 +858,10 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 				utility.SendJSONError(answer, w)
 				return
 			}
+			delete(answer, "challenge")
 			answer["pending"] = false
 			answer["ia"], err = RemapASIDComputeNewGenFolder(as)
-			fmt.Println("Loooooooooooooooooooooooooooooook!!!!!")
-			delete(answer, "challenge")
+			// fmt.Println("Loooooooooooooooooooooooooooooook!!!!!")
 			if err != nil {
 				// TODO: this is actually very bad, do we delete the AS entry here? what do we do?
 				answer["error"] = true
@@ -908,7 +871,6 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 				utility.SendJSONError(answer, w)
 				return
 			}
-
 		}
 	} else {
 		answer["pending"] = false
@@ -919,6 +881,43 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 		s.Error500(w, err, "Error during JSON marshaling")
 		return
 	}
+}
+
+func verifySignatureFromAS(as *models.SCIONLabAS, thingToSign, receivedSignature []byte) error {
+	path := filepath.Join(PackagePath, UserPackageName(as.UserEmail, as.ISD, as.ASID), "gen", fmt.Sprintf("ISD%d", as.ISD), fmt.Sprintf("AS%d", as.ASID),
+		fmt.Sprintf("bs%d-%d-1", as.ISD, as.ASID), "certs")
+	var chain *cert.Chain
+	fileInfos, err := ioutil.ReadDir(path)
+	if err != nil {
+		return err
+	}
+
+	possibleCerts := []string{}
+	for _, f := range fileInfos {
+		if !f.IsDir() && strings.HasSuffix(strings.ToLower(f.Name()), ".crt") {
+			possibleCerts = append(possibleCerts, f.Name())
+		}
+	}
+	if len(possibleCerts) < 1 {
+		return fmt.Errorf("Cannot find any .crt file for IA %v", as.IAString())
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(possibleCerts)))
+	// fmt.Println("DEBUG: possible certs: ", possibleCerts)
+	path = filepath.Join(path, possibleCerts[0])
+	chainBytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	chain, err = cert.ChainFromRaw(chainBytes, false)
+	if err != nil || chain == nil {
+		// TODO: this is actually very bad, do we delete the AS entry here? what do we do?
+		return fmt.Errorf("ERROR in Coordinator: cannot load the public certificate for AS %s : %v", as.IAString(), err)
+	}
+	publicKey := chain.Leaf.SubjectSignKey
+	// fmt.Println("publickey: ", publicKey)
+	err = crypto.Verify(thingToSign, receivedSignature, publicKey, crypto.Ed25519)
+	// fmt.Println("VERIFY ERROR?: ", err)
+	return err
 }
 
 // RemapASIDComputeNewGenFolder creates a new gen folder using a valid remapped ID
@@ -947,7 +946,6 @@ func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	conn.RespondAP.AS = conn.GetRespondAS()
 	asInfo, err := getSCIONLabASInfoFromDB(conn)
 	asInfo.LocalAS = as
-	fmt.Println("[DEBUG] ** 11")
 	if err != nil {
 		return nil, err
 	}
@@ -986,7 +984,16 @@ func (s *SCIONLabASController) RemapASDownloadGen(w http.ResponseWriter, r *http
 		return
 	}
 	json.Unmarshal(body, &request)
-	challengeSolution := request["challenge_solution"]
+	challengeSolution := request["challenge_solution"].(string)
+	receivedSignature, err := base64.StdEncoding.DecodeString(challengeSolution)
+	if err != nil {
+		answer["error"] = true
+		msg := fmt.Sprintf("Could not convert the received signature to bytes for AS %s", asID)
+		log.Print(msg)
+		answer["msg"] = msg
+		utility.SendJSONError(answer, w)
+		return
+	}
 	as, err := models.FindSCIONLabASByIAString(asID)
 	if err != nil {
 		answer["error"] = true
@@ -997,7 +1004,34 @@ func (s *SCIONLabASController) RemapASDownloadGen(w http.ResponseWriter, r *http
 	fmt.Println("So far so good, ", as.IAString())
 	fmt.Println(challengeSolution)
 	fmt.Println(request)
-	// TODO: check challenge solution against DB
+	storedInDB := make(map[string]interface{})
+	err = json.Unmarshal([]byte(as.RemapStatus), &storedInDB)
+	if err != nil {
+		log.Printf("There was an error recovering RemapStatus for %s: %v", asID, err)
+		answer["error"] = true
+		answer["msg"] = fmt.Sprintf("Could not find challenge stored for AS %s; check order of API calls", asID)
+		utility.SendJSONError(answer, w)
+		return
+	}
+	challenge, err := base64.StdEncoding.DecodeString(storedInDB["challenge"].(string))
+	if err != nil {
+		answer["error"] = true
+		msg := fmt.Sprintf("Could not convert the challenge to bytes for AS %s", asID)
+		log.Print(msg)
+		answer["msg"] = msg
+		utility.SendJSONError(answer, w)
+		return
+	}
+
+	err = verifySignatureFromAS(as, challenge, receivedSignature)
+	if err != nil {
+		answer["error"] = true
+		msg := fmt.Sprintf("Error verifying signature for AS %s: %v", asID, err)
+		log.Print(msg)
+		answer["msg"] = msg
+		utility.SendJSONError(answer, w)
+		return
+	}
 
 	mappedIAStr := request["ia"].(string)
 
