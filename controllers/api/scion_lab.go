@@ -918,6 +918,57 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 	}
 }
 
+// RemapASIDComputeNewGenFolder creates a new gen folder using a valid remapped ID
+// e.g. 17-ffaa:0:1 . This does not change IDs in the DB but recomputes topologies and certificates.
+// After finishing, there will be a new tgz file ready to download using the mapped ID.
+func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
+	oldIA := as.IA()
+	I, A := utility.MapOldIAToNewOne(as.ISD, as.ASID)
+	if I == 0 || A == 0 {
+		return nil, fmt.Errorf("Invalid source address to map: (%d, %d)", as.ISD, as.ASID)
+	}
+	ia := addr.IA{I: I, A: A}
+	// replace IDs in the AS entry, but don't save in DB:
+	as.ISD = I
+	as.ASID = A
+	// retrieve connection:
+	conns, err := as.GetJoinConnections()
+	if err != nil {
+		return nil, err
+	}
+	if len(conns) != 1 {
+		err = fmt.Errorf("User AS should have only 1 connection. %s has %d", ia, len(conns))
+		return nil, err
+	}
+	conn := conns[0]
+	conn.RespondAP.AS = conn.GetRespondAS()
+	asInfo, err := getSCIONLabASInfoFromDB(conn)
+	asInfo.LocalAS = as
+	fmt.Println("[DEBUG] ** 11")
+	if err != nil {
+		return nil, err
+	}
+	// now duplicate the VPN keys, if some:
+	err = utility.CopyFile(vpnKeyPath(as.UserEmail, oldIA.A), vpnKeyPath(as.UserEmail, as.ASID))
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	err = utility.CopyFile(vpnCertPath(as.UserEmail, oldIA.A), vpnCertPath(as.UserEmail, as.ASID))
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+
+	// finally, generate the gen folder:
+	// TODO modify the paths to point to a new scionproto/scion/python place, and use that one
+	// for that, look at generateLocalGen when we do: os.Setenv("PYTHONPATH", pyPath)
+	err = generateGenForAS(asInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ia, nil
+}
+
 func (s *SCIONLabASController) RemapASDownloadGen(w http.ResponseWriter, r *http.Request) {
 	answer := make(map[string]interface{})
 	answer["error"] = false
@@ -1081,55 +1132,4 @@ func (s *SCIONLabASController) ConfirmUpdate(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	as.Update()
-}
-
-// RemapASIDComputeNewGenFolder creates a new gen folder using a valid remapped ID
-// e.g. 17-ffaa:0:1 . This does not change IDs in the DB but recomputes topologies and certificates.
-// After finishing, there will be a new tgz file ready to download using the mapped ID.
-func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
-	oldIA := as.IA()
-	I, A := utility.MapOldIAToNewOne(as.ISD, as.ASID)
-	if I == 0 || A == 0 {
-		return nil, fmt.Errorf("Invalid source address to map: (%d, %d)", as.ISD, as.ASID)
-	}
-	ia := addr.IA{I: I, A: A}
-	// replace IDs in the AS entry, but don't save in DB:
-	as.ISD = I
-	as.ASID = A
-	// retrieve connection:
-	conns, err := as.GetJoinConnections()
-	if err != nil {
-		return nil, err
-	}
-	if len(conns) != 1 {
-		err = fmt.Errorf("User AS should have only 1 connection. %s has %d", ia, len(conns))
-		return nil, err
-	}
-	conn := conns[0]
-	conn.RespondAP.AS = conn.GetRespondAS()
-	asInfo, err := getSCIONLabASInfoFromDB(conn)
-	asInfo.LocalAS = as
-	fmt.Println("[DEBUG] ** 11")
-	if err != nil {
-		return nil, err
-	}
-	// now duplicate the VPN keys, if some:
-	err = utility.CopyFile(vpnKeyPath(as.UserEmail, oldIA.A), vpnKeyPath(as.UserEmail, as.ASID))
-	if err != nil && !os.IsNotExist(err) {
-		return nil, err
-	}
-	err = utility.CopyFile(vpnCertPath(as.UserEmail, oldIA.A), vpnCertPath(as.UserEmail, as.ASID))
-	if err != nil && !os.IsNotExist(err) {
-		return nil, err
-	}
-
-	// finally, generate the gen folder:
-	// TODO modify the paths to point to a new scionproto/scion/python place, and use that one
-	// for that, look at generateLocalGen when we do: os.Setenv("PYTHONPATH", pyPath)
-	err = generateGenForAS(asInfo)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ia, nil
 }
