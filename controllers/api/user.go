@@ -73,7 +73,7 @@ type userPageData struct {
 // generates the structs containing information about the user's AS and the
 // configuration of UI buttons
 func populateASStatusButtons(userEmail string) ([]asInfo, map[string]apInfo, error) {
-	var asInfos []asInfo
+	asInfos := []asInfo{}
 	apInfos := map[string]apInfo{}
 	ases, err := models.FindSCIONLabASesByUserEmail(userEmail)
 	if err != nil {
