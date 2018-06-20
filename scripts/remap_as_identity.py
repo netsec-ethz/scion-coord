@@ -220,32 +220,22 @@ def notify_coordinator_all_okay():
     pass
 
 def stop_SCION():
-    # TODO
-    pass
+    SC = os.environ['SC']
+    subprocess.check_output(['./scion.sh', 'stop'], cwd=SC)
 
 def start_SCION():
-    # TODO
-    pass
+    SC = os.environ['SC']
+    subprocess.check_output(['./scion.sh', 'start'], cwd=SC)
 
 def parse_command_line_args():
-    # global IA, ACC_ID, ACC_PW
     global IA
     parser = argparse.ArgumentParser(description="Update the SCION gen directory with new credentials, if needed")
     
     parser.add_argument("--ia", required=True, type=str,
                         help="The IA of this AS")
-    
-    # parser.add_argument("--accountId", required=True, type=str,
-    #                     help="The SCION Coordinator account ID that has permission to access this AS")
-    # parser.add_argument("--secret", required=True, type=str,
-    #                     help="The secret for the SCION Coordinator account that has permission to access this AS")
-    
     # The required arguments will be present, or parse_args will exit the application
     args = parser.parse_args()
-    
     IA = args.ia    
-    # ACC_ID = args.accountId
-    # ACC_PW = args.secret
 
 
 def main():
