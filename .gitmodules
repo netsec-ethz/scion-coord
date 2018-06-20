@@ -4,3 +4,4 @@
 [submodule "sub/scion"]
 	path = sub/scion
 	url = https://github.com/netsec-ethz/netsec-scion.git
+	branch = scionlab_nextversion
