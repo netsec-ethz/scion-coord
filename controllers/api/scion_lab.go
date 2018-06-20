@@ -552,7 +552,7 @@ func generateTopologyFile(asInfo *SCIONLabASInfo) error {
 		"IP":           asInfo.IP,
 		"BIND_IP":      asInfo.LocalAS.BindIP(asInfo.IsVPN, asInfo.IP),
 		"ISD_ID":       fmt.Sprintf("%d", asInfo.LocalAS.ISD),
-		"AS_ID":        asInfo.LocalAS.ASID.String(),
+		"AS_ID":        asInfo.LocalAS.ASID.FileFmt(),
 		"LOCAL_ADDR":   localIP,
 		"LOCAL_PORT":   strconv.Itoa(int(asInfo.LocalPort)),
 		"TARGET_ISDAS": asInfo.RemoteIA,
@@ -585,8 +585,8 @@ func generateLocalGen(asInfo *SCIONLabASInfo) error {
 
 	cmd := exec.Command("python3", localGenPath,
 		"--topo_file="+asInfo.topologyFile(), "--user_id="+asInfo.UserPackageName(),
-		"--joining_ia="+utility.IAString(isd, asID),
-		"--core_ia="+utility.IAString(isd, signingAs),
+		"--joining_ia="+utility.IAStringStandard(isd, asID),
+		"--core_ia="+utility.IAStringStandard(isd, signingAs),
 		"--core_sign_priv_key_file="+CoreSigKey(isd),
 		"--core_cert_file="+CoreCertFile(isd),
 		"--trc_file="+TrcFile(isd),
@@ -602,6 +602,7 @@ func generateLocalGen(asInfo *SCIONLabASInfo) error {
 		pyPaths = append(pyPaths, scionUtilPath)
 	}
 	pyPath := strings.Join(pyPaths, ":")
+	fmt.Println("PYTHONPATH:", pyPath)
 	os.Setenv("PYTHONPATH", pyPath)
 	cmd.Env = os.Environ()
 	cmdOut, _ := cmd.StdoutPipe()
@@ -958,9 +959,13 @@ func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	}
 
 	// finally, generate the gen folder:
-	// TODO modify the paths to point to a new scionproto/scion/python place, and use that one
-	// for that, look at generateLocalGen when we do: os.Setenv("PYTHONPATH", pyPath)
-	// Otherwise the generation of the gen directory will create wrong filenames
+	// modify the paths to point to a new scionproto/scion/python place, and use that one
+	setPyPath := func(oldScionPath string) {
+		scionPath = oldScionPath
+		pythonPath = filepath.Join(scionPath, "python")
+	}
+	defer setPyPath(scionPath)
+	setPyPath(config.NextVersionPythonPath)
 	err = generateGenForAS(asInfo)
 	if err != nil {
 		return nil, err
@@ -969,6 +974,8 @@ func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	return &ia, nil
 }
 
+// RemapASDownloadGen will accept a JSON object containing the query from a user AS to obtain the
+// new gen folder for a new ID after the remap on the IDs during the summer of 2018
 func (s *SCIONLabASController) RemapASDownloadGen(w http.ResponseWriter, r *http.Request) {
 	answer := make(map[string]interface{})
 	answer["error"] = false
