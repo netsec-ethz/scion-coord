@@ -203,6 +203,8 @@ func main() {
 		scionLabASController.RemapASIdentityChallengeAndSolution)).Methods(http.MethodGet, http.MethodPost)
 	router.Handle("/api/as/remapIdDownloadGen/{as_id}", loggingChain.ThenFunc(
 		scionLabASController.RemapASDownloadGen)).Methods(http.MethodPost)
+	router.Handle("/api/as/remapIdConfirmStatus/{as_id}", loggingChain.ThenFunc(
+		scionLabASController.RemapASConfirmStatus)).Methods(http.MethodPost)
 	router.Handle("/api/as/getUpdatesForAP/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabASController.GetUpdatesForAP))
 	router.Handle("/api/as/confirmUpdatesFromAP/{account_id}/{secret}",

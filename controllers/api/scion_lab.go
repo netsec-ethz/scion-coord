@@ -1062,6 +1062,90 @@ func (s *SCIONLabASController) RemapASDownloadGen(w http.ResponseWriter, r *http
 	http.ServeContent(w, r, fileName, time.Now(), bytes.NewReader(data))
 }
 
+func (s *SCIONLabASController) RemapASConfirmStatus(w http.ResponseWriter, r *http.Request) {
+	answer := make(map[string]interface{})
+	answer["error"] = false
+	vars := mux.Vars(r)
+	asID := vars["as_id"]
+	request := make(map[string]interface{})
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		answer["error"] = true
+		answer["msg"] = fmt.Sprintf("Could not read JSON in the request: %v", err)
+		utility.SendJSONError(answer, w)
+		return
+	}
+	json.Unmarshal(body, &request)
+	challengeSolution := request["challenge_solution"].(string)
+	receivedSignature, err := base64.StdEncoding.DecodeString(challengeSolution)
+	if err != nil {
+		answer["error"] = true
+		msg := fmt.Sprintf("Could not convert the received signature to bytes for AS %s", asID)
+		log.Print(msg)
+		answer["msg"] = msg
+		utility.SendJSONError(answer, w)
+		return
+	}
+	as, err := models.FindSCIONLabASByIAString(asID)
+	if err != nil {
+		answer["error"] = true
+		answer["msg"] = fmt.Sprintf("Could not find AS with IA %v", asID)
+		utility.SendJSONError(answer, w)
+		return
+	}
+	fmt.Println("So far so good, ", as.IAString())
+	fmt.Println(challengeSolution)
+	fmt.Println(request)
+	storedInDB := make(map[string]interface{})
+	err = json.Unmarshal([]byte(as.RemapStatus), &storedInDB)
+	if err != nil {
+		log.Printf("There was an error recovering RemapStatus for %s: %v", asID, err)
+		answer["error"] = true
+		answer["msg"] = fmt.Sprintf("Could not find challenge stored for AS %s; check order of API calls", asID)
+		utility.SendJSONError(answer, w)
+		return
+	}
+	challenge, err := base64.StdEncoding.DecodeString(storedInDB["challenge"].(string))
+	if err != nil {
+		answer["error"] = true
+		msg := fmt.Sprintf("Could not convert the challenge to bytes for AS %s", asID)
+		log.Print(msg)
+		answer["msg"] = msg
+		utility.SendJSONError(answer, w)
+		return
+	}
+
+	err = verifySignatureFromAS(as, challenge, receivedSignature)
+	if err != nil {
+		answer["error"] = true
+		msg := fmt.Sprintf("Error verifying signature for AS %s: %v", asID, err)
+		log.Print(msg)
+		answer["msg"] = msg
+		utility.SendJSONError(answer, w)
+		return
+	}
+
+	mappedIA := utility.MapOldIAToNewOne(as.ISD, as.ASID)
+	log.Printf("Confirmed Mapping for AS %s -> %s\n", asID, mappedIA)
+	as.ISD = mappedIA.I
+	as.ASID = mappedIA.A
+
+	answer["pending"] = false
+	answer["date"] = time.Now()
+	marshalled, _ := json.Marshal(answer)
+	as.RemapStatus = string(marshalled)
+	err = as.Update()
+	if err != nil {
+		answer["error"] = true
+		msg := fmt.Sprintf("Could not update mapping status for AS: %v", err)
+		answer["msg"] = msg
+		log.Print(msg)
+		utility.SendJSONError(answer, w)
+		return
+	}
+	log.Printf("Updated mapping for AS %v -> %v", asID, mappedIA)
+}
+
 // The handler function to remove a SCIONLab AS for the given user.
 // If successful, it will return a 200 status with an empty response.
 func (s *SCIONLabASController) RemoveSCIONLabAS(w http.ResponseWriter, r *http.Request) {
