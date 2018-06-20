@@ -924,14 +924,13 @@ func verifySignatureFromAS(as *models.SCIONLabAS, thingToSign, receivedSignature
 // After finishing, there will be a new tgz file ready to download using the mapped ID.
 func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	oldIA := as.IA()
-	I, A := utility.MapOldIAToNewOne(as.ISD, as.ASID)
-	if I == 0 || A == 0 {
+	ia := utility.MapOldIAToNewOne(as.ISD, as.ASID)
+	if ia.I == 0 || ia.A == 0 {
 		return nil, fmt.Errorf("Invalid source address to map: (%d, %d)", as.ISD, as.ASID)
 	}
-	ia := addr.IA{I: I, A: A}
 	// replace IDs in the AS entry, but don't save in DB:
-	as.ISD = I
-	as.ASID = A
+	as.ISD = ia.I
+	as.ASID = ia.A
 	// retrieve connection:
 	conns, err := as.GetJoinConnections()
 	if err != nil {
