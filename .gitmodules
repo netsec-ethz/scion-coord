@@ -2,6 +2,6 @@
 	path = sub/util
 	url = git@github.com:netsec-ethz/scion-utilities.git
 [submodule "sub/scion"]
-	path = sub/scion
+	path = sub/scion_nextversion
 	url = https://github.com/netsec-ethz/netsec-scion.git
 	branch = scionlab_nextversion
