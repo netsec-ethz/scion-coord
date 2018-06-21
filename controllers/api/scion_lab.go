@@ -1144,6 +1144,7 @@ func (s *SCIONLabASController) RemapASConfirmStatus(w http.ResponseWriter, r *ht
 		return
 	}
 	log.Printf("Updated mapping for AS %v -> %v", asID, mappedIA)
+	// TODO: test
 }
 
 // The handler function to remove a SCIONLab AS for the given user.

@@ -158,7 +158,7 @@ def something_pending():
     if content['error']:
         print("Error in the reply from the Coordinator after our solution to the challenge: ")
         print(content['msg'])
-        sys.exit(2)
+        sys.exit(1)
     # content["challenge"] = base64.standard_b64encode(challenge).decode("utf-8")
     content["challenge_solution"] = challenge_solution
     return True, content
@@ -183,7 +183,7 @@ def download_gen_folder(answer):
     if resp.status_code != 200:
         print("Failed downloading gen folder")
         print(resp.content)
-        sys.exit(2)
+        sys.exit(1)
     # download a file with requests: https://stackoverflow.com/questions/16694907/how-to-download-large-file-in-python-with-requests-py
     filename = '/tmp/gen-data.tgz'
     with open(filename, 'wb') as f:
@@ -215,17 +215,34 @@ def install_gen(gen_filename):
         os.rename(gen_dir, os.path.join(SC, 'gen.' + datetime.datetime.now().strftime('%Y-%m-%dT%H-%M-%S')))
         shutil.move(newgen_dir, gen_dir)
 
-def notify_coordinator_all_okay():
+def notify_coordinator_all_okay(answer):
     # TODO tell Coordinator we succeeded 
-    pass
+    # mapped_ia = answer["ia"]
+    challenge_solution= answer["challenge_solution"]
+    print("notify Coordinator; challenge_solution:", challenge_solution)
+    url = SCION_COORD_URL + "/api/as/remapIdConfirmStatus/" + IA
+    try:
+        while url:
+            resp = requests.post(url, json=answer, allow_redirects=False)
+            url = resp.next.url if resp.is_redirect and resp.next else None
+    except requests.exceptions.ConnectionError as ex:
+        print ("Error notifying Coordinator: ", ex)
+        sys.exit(1)
+    print("response:", resp)
+    print(dir(resp))
+    if resp.status_code != 200:
+        print("Failed notifying Coordinator")
+        print(resp.content)
+        sys.exit(1)
+    print('Coordinator notified of success.')
 
-def stop_SCION():
-    SC = os.environ['SC']
-    subprocess.check_output(['./scion.sh', 'stop'], cwd=SC)
+# def stop_SCION():
+#     SC = os.environ['SC']
+#     subprocess.check_output(['./scion.sh', 'stop'], cwd=SC)
 
-def start_SCION():
-    SC = os.environ['SC']
-    subprocess.check_output(['./scion.sh', 'start'], cwd=SC)
+# def start_SCION():
+#     SC = os.environ['SC']
+#     subprocess.check_output(['./scion.sh', 'start'], cwd=SC)
 
 def parse_command_line_args():
     global IA
@@ -244,11 +261,11 @@ def main():
     if not pending:
         print ("Nothing is pending, out.")
         return 0
-    stop_SCION()
+    # stop_SCION()
     gen_file = download_gen_folder(answer)
     install_gen(gen_file)
-    notify_coordinator_all_okay()
-    start_SCION()
+    notify_coordinator_all_okay(answer)
+    # start_SCION()
 
 
 
