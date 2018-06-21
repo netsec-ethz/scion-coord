@@ -631,7 +631,7 @@ func convertSCIONLabASesToASInfos(ases []SCIONLabAS) (asInfos []ASInfo, err erro
 	return
 }
 
-func FindCoreASInfosByISD(isd int) ([]ASInfo, error) {
+func FindCoreASInfosByISD(isd addr.ISD) ([]ASInfo, error) {
 	var ases []SCIONLabAS
 	_, err := o.QueryTable(new(SCIONLabAS)).Filter("ISD", isd).Filter("Core", true).All(&ases)
 	if err != nil {

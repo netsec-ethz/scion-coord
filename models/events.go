@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	"github.com/astaxie/beego/orm"
+	"github.com/scionproto/scion/go/lib/addr"
 )
 
 const (
@@ -26,15 +27,15 @@ const (
 )
 
 type JoinRequest struct {
-	ID            uint64 `orm:"column(id);auto;pk"`
-	RequestID     uint64 `orm:"column(request_id)"`
-	Info          string // free form text for the reply
-	ISDToJoin     int    `orm:"column(isd_to_join)"`       // the ISD that the sender wants to join
-	JoinAsACoreAS bool   `orm:"column(join_as_a_core_as)"` // whether to join the ISD as a core AS
-	RequesterID   string `orm:"column(requester_id)"`      // the key to identify which account made the request
-	RespondIA     string `orm:"column(respond_ia)"`        // the ISD-AS which should respond to the request
-	SigPubKey     string // signing public key
-	EncPubKey     string // encryption public key
+	ID            uint64   `orm:"column(id);auto;pk"`
+	RequestID     uint64   `orm:"column(request_id)"`
+	Info          string   // free form text for the reply
+	ISDToJoin     addr.ISD `orm:"column(isd_to_join)"`       // the ISD that the sender wants to join
+	JoinAsACoreAS bool     `orm:"column(join_as_a_core_as)"` // whether to join the ISD as a core AS
+	RequesterID   string   `orm:"column(requester_id)"`      // the key to identify which account made the request
+	RespondIA     string   `orm:"column(respond_ia)"`        // the ISD-AS which should respond to the request
+	SigPubKey     string   // signing public key
+	EncPubKey     string   // encryption public key
 	Status        string
 }
 

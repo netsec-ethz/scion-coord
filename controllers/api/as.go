@@ -32,12 +32,12 @@ import (
 
 type JoinRequest struct {
 	RequestID     uint64
-	Info          string // free form text motivation for the request
-	ISDToJoin     int    // the ISD that the sender wants to join
-	JoinAsACoreAS bool   // whether to join the ISD as a core AS
-	RequesterID   string // the string to identify which account made the request
-	SigPubKey     string // signing public key
-	EncPubKey     string // encryption public key
+	Info          string   // free form text motivation for the request
+	ISDToJoin     addr.ISD // the ISD that the sender wants to join
+	JoinAsACoreAS bool     // whether to join the ISD as a core AS
+	RequesterID   string   // the string to identify which account made the request
+	SigPubKey     string   // signing public key
+	EncPubKey     string   // encryption public key
 }
 
 type JoinReply struct {

@@ -72,8 +72,8 @@ func (sb *SCIONBox) Remove() error {
 }
 
 type ISDLocation struct {
-	ID        uint64 `orm:"column(id);auto;pk"`
-	ISD       int    `orm:"column(isd)"`
+	ID        uint64   `orm:"column(id);auto;pk"`
+	ISD       addr.ISD `orm:"column(isd)"`
 	Country   string
 	Continent string
 }
@@ -88,7 +88,7 @@ func (il *ISDLocation) Update() error {
 	return err
 }
 
-func FindISDbyID(id int) (*ISDLocation, error) {
+func FindISDbyID(id addr.ISD) (*ISDLocation, error) {
 	v := new(ISDLocation)
 	err := o.QueryTable(v).Filter("ISD", id).RelatedSel().One(v)
 	return v, err

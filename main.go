@@ -33,6 +33,7 @@ import (
 	"github.com/netsec-ethz/scion-coord/controllers/api"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/models"
+	"github.com/scionproto/scion/go/lib/addr"
 	"golang.org/x/crypto/acme/autocert"
 )
 
@@ -43,7 +44,7 @@ func initializeISD() error {
 		fmt.Errorf("ERROR: Cannot access ISD location mapping json file: %v", err)
 	}
 	var isdLocs []struct {
-		ISD       int
+		ISD       addr.ISD
 		Country   string
 		Continent string
 	}
