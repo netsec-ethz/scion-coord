@@ -28,52 +28,15 @@ def solve_challenge(challenge):
     The parameter challenge comes in binary already
     """
     global IA
-    print ("solving challenge, len=", len(challenge))
     # 1) get the location of the certificates and keys
-
-
-
     SC = os.environ["SC"] if "SC" in os.environ else os.path.join(str(pathlib.Path.home()), "go", "src", "github.com", "scionproto", "scion")
     SC = os.path.join(SC, "gen")
-    # try:
-    #     with open(os.path.join(SC, "ia")) as f:
-    #         ia = f.readline()
-    # except Exception as ex:
-    #     print(ex)
-    #     sys.exit(1)
-
-
     m = re.match("^([0-9]+)-([0-9]+)$", IA)
     if not m:
         print ("ERROR: could not understand the IA from: ", IA)
     I = m.group(1)
     A = m.group(2)
     filepath = os.path.join(SC, "ISD"+I, "AS"+A, "bs"+I+"-"+A+"-1")
-
-
-
-    # we don't need this: -------------------------
-    certificate = os.path.join(filepath, "certs")
-    if not os.path.isdir(certificate):
-        print("AS %s: Cannot find the certificates directory in %s.\nAborting." % (IA, certificate))
-        sys.exit(1)
-    certificates = [c for c in sorted(os.listdir(certificate), reverse=True) if c.endswith(".crt")]
-    if len(certificates) < 1:
-        print("ERROR: could not find a certificate under ", certificate)
-        sys.exit(1)
-    certificate = os.path.join(certificate, certificates[0])
-    print (certificate)
-    try:
-        with open(certificate) as f:
-            certificate = f.read()
-    except Exception as ex:
-        print("ERROR: could not read file %s: %s" % (certificate, ex))
-        sys.exit(1)
-    # -------------------------------------
-
-
-
-
     privkey = os.path.join(filepath, "keys")
     privkeys = [k for k in sorted(os.listdir(privkey), reverse=True) if k.endswith(".seed")]
     if len(privkeys) < 1:
@@ -88,27 +51,9 @@ def solve_challenge(challenge):
         sys.exit(1)
     privkey = base64.standard_b64decode(privkey)
     
-
-
     # 2) instantiate the private key and certificate and sign the challenge
     signed = sign(challenge, privkey)
-
-
-    # -------------------- we don't need this ------
-    print (certificate)
-    chain = CertificateChain.from_raw(certificate)
-    certificate = chain.as_cert
-    print (certificate)
-    publickey = certificate.subject_sig_key_raw
-
-    result = verify(challenge, signed, publickey)
-    print ("signature verified? ", result, ", using publickey: ", publickey)
-    # ----------------------------------------------
-
-
     return signed
-
-
 
 
 def something_pending():
@@ -124,7 +69,7 @@ def something_pending():
         sys.exit(1)
     content = resp.content.decode('utf-8')
     content = json.loads(content)
-    print ("------------------------- ANS: -----------------------")
+    print ("------------------------- Get Challenge, ANS: -----------------------")
     print (content)
     if "pending" not in content:
         print("ERROR: Wrong answer, does not contain the pending key")
@@ -132,15 +77,14 @@ def something_pending():
     if not content["pending"]:
         sys.exit(1)
 
-
-    answer = {"challenge": content["challenge"]}
-    challenge = base64.standard_b64decode(content["challenge"])
+    challenge_str = content["challenge"]
+    answer = {"challenge": challenge_str}
+    challenge = base64.standard_b64decode(challenge_str)
     solution = solve_challenge(challenge=challenge)
-    challenge_solution = base64.standard_b64encode(solution).decode("utf-8")
-    answer["challenge_solution"] = challenge_solution
+    challenge_solution_str = base64.standard_b64encode(solution).decode("utf-8")
+    answer["challenge_solution"] = challenge_solution_str
     print ("-------------- POST Solution to challenge: ---------------")
     print (answer)
-    
     try:
         while url:
             resp = requests.post(url, json=answer, allow_redirects=False)
@@ -159,18 +103,16 @@ def something_pending():
         print("Error in the reply from the Coordinator after our solution to the challenge: ")
         print(content['msg'])
         sys.exit(1)
-    # content["challenge"] = base64.standard_b64encode(challenge).decode("utf-8")
-    content["challenge_solution"] = challenge_solution
+    content["challenge"] = challenge_str
+    content["challenge_solution"] = challenge_solution_str
     return True, content
 
 
 def download_gen_folder(answer):
     mapped_ia = answer["ia"]
-    # challenge = answer["challenge"]
-    challenge_solution= answer["challenge_solution"]
-    print("challenge_solution:", challenge_solution)
     url = SCION_COORD_URL + "/api/as/remapIdDownloadGen/" + IA
-
+    print("-------------------- POST json to download GEN folder -------------------")
+    print(answer)
     try:
         while url:
             resp = requests.post(url, json=answer, allow_redirects=False)
@@ -236,14 +178,6 @@ def notify_coordinator_all_okay(answer):
         sys.exit(1)
     print('Coordinator notified of success.')
 
-# def stop_SCION():
-#     SC = os.environ['SC']
-#     subprocess.check_output(['./scion.sh', 'stop'], cwd=SC)
-
-# def start_SCION():
-#     SC = os.environ['SC']
-#     subprocess.check_output(['./scion.sh', 'start'], cwd=SC)
-
 def parse_command_line_args():
     global IA
     parser = argparse.ArgumentParser(description="Update the SCION gen directory with new credentials, if needed")
@@ -261,11 +195,9 @@ def main():
     if not pending:
         print ("Nothing is pending, out.")
         return 0
-    # stop_SCION()
     gen_file = download_gen_folder(answer)
     install_gen(gen_file)
     notify_coordinator_all_okay(answer)
-    # start_SCION()
 
 
 

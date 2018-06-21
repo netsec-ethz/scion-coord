@@ -15,6 +15,9 @@
 package models
 
 import (
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -737,4 +740,48 @@ func (as *SCIONLabAS) AreIDsFromScionLab() bool {
 		return false
 	}
 	return true
+}
+
+// GetMappingStatus returns the mapping status map that was stored in the DB for this AS
+func (as *SCIONLabAS) GetMappingStatus() (map[string]interface{}, error) {
+	status := make(map[string]interface{})
+	var err error
+	if as.RemapStatus != "" {
+		err = json.Unmarshal([]byte(as.RemapStatus), &status)
+	}
+	return status, err
+}
+
+// SetMappingStatusAndSave JSON serializes the dictionary, stores it in the AS and writes to DB
+func (as *SCIONLabAS) SetMappingStatusAndSave(status map[string]interface{}) error {
+	marshalled, err := json.Marshal(status)
+	if err != nil {
+		return err
+	}
+	as.RemapStatus = string(marshalled)
+	err = as.Update()
+	return err
+}
+
+// GetRemapChallenge returns the stored challenge or a new one otherwise.
+func (as *SCIONLabAS) GetRemapChallenge() (string, error) {
+	status, err := as.GetMappingStatus()
+	if err != nil {
+		return "", err
+	}
+	challengeAsAny, hasIt := status["challenge"]
+	if !hasIt {
+		randomBytes := make([]byte, 512)
+		_, err = rand.Read(randomBytes)
+		if err != nil {
+			return "", errors.New("Could not create challenge")
+		}
+		challengeAsAny = base64.StdEncoding.EncodeToString(randomBytes)
+		status["challenge"] = challengeAsAny
+		err = as.SetMappingStatusAndSave(status)
+		if err != nil {
+			return "", err
+		}
+	}
+	return challengeAsAny.(string), nil
 }
