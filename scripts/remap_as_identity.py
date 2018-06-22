@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 import datetime
 import shutil
+import time
 
 from lib.crypto.certificate import Certificate
 from lib.crypto.certificate_chain import CertificateChain
@@ -38,6 +39,9 @@ def solve_challenge(challenge):
     A = m.group(2)
     filepath = os.path.join(SC, "ISD"+I, "AS"+A, "bs"+I+"-"+A+"-1")
     privkey = os.path.join(filepath, "keys")
+    if not os.path.exists(privkey):
+        print("ERROR: no such path: ", privkey)
+        sys.exit(1)
     privkeys = [k for k in sorted(os.listdir(privkey), reverse=True) if k.endswith(".seed")]
     if len(privkeys) < 1:
         print("ERROR: could not find a private key under ", privkey)
@@ -67,6 +71,10 @@ def something_pending():
     except requests.exceptions.ConnectionError as e:
         print ("Error querying Coordinator: ", e)
         sys.exit(1)
+    if resp.status_code != 200:
+        print("Failed getting challenge")
+        print(resp.content)
+        sys.exit(1)
     content = resp.content.decode('utf-8')
     content = json.loads(content)
     print ("------------------------- Get Challenge, ANS: -----------------------")
@@ -92,6 +100,10 @@ def something_pending():
     except requests.exceptions.ConnectionError as e:
         print ("Error querying Coordinator solving challenge: ", e)
         sys.exit(1)
+    if resp.status_code != 200:
+        print("Failed posting solution to challenge")
+        print(resp.content)
+        sys.exit(1)
     content = resp.content.decode('utf-8')
     try:
         content = json.loads(content)
@@ -109,7 +121,6 @@ def something_pending():
 
 
 def download_gen_folder(answer):
-    mapped_ia = answer["ia"]
     url = SCION_COORD_URL + "/api/as/remapIdDownloadGen/" + IA
     print("-------------------- POST json to download GEN folder -------------------")
     print(answer)
@@ -158,8 +169,9 @@ def install_gen(gen_filename):
         shutil.move(newgen_dir, gen_dir)
 
 def notify_coordinator_all_okay(answer):
-    # TODO tell Coordinator we succeeded 
-    # mapped_ia = answer["ia"]
+    """
+    Returns True if it was successful in notifying
+    """
     challenge_solution= answer["challenge_solution"]
     print("notify Coordinator; challenge_solution:", challenge_solution)
     url = SCION_COORD_URL + "/api/as/remapIdConfirmStatus/" + IA
@@ -169,14 +181,14 @@ def notify_coordinator_all_okay(answer):
             url = resp.next.url if resp.is_redirect and resp.next else None
     except requests.exceptions.ConnectionError as ex:
         print ("Error notifying Coordinator: ", ex)
-        sys.exit(1)
-    print("response:", resp)
-    print(dir(resp))
+        return False
     if resp.status_code != 200:
         print("Failed notifying Coordinator")
         print(resp.content)
-        sys.exit(1)
+        return False
     print('Coordinator notified of success.')
+    return True
+
 
 def parse_command_line_args():
     global IA
@@ -188,8 +200,8 @@ def parse_command_line_args():
     args = parser.parse_args()
     IA = args.ia    
 
-
 def main():
+    retries = 0
     parse_command_line_args()
     pending, answer = something_pending()
     if not pending:
@@ -197,7 +209,9 @@ def main():
         return 0
     gen_file = download_gen_folder(answer)
     install_gen(gen_file)
-    notify_coordinator_all_okay(answer)
+    while not notify_coordinator_all_okay(answer) and retries < 6:
+        time.sleep(1)
+        retries += 1
 
 
 
