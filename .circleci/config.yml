@@ -18,6 +18,7 @@ jobs:
          command: dockerize -wait tcp://localhost:3306 -timeout 1m
       - run: "go get github.com/kardianos/govendor"
       - run: "govendor sync -v"
-      - run: "go test -v ./..."
+      # - run: "go test -v ./..."
+      - run: "go test $(go list ./... | grep -v scion-coord/sub/scion_nextversion)"
     working_directory: "/go/src/github.com/netsec-ethz/scion-coord"
 version: 2
