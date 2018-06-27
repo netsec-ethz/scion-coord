@@ -15,9 +15,11 @@
 package config
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -123,6 +125,19 @@ func init() {
 	for i, admin := range EmailAdmins {
 		EmailAdmins[i] = strings.Trim(admin, " ")
 	}
+
+	if flag.Lookup("test.v") != nil {
+		// this is running in testing, chdir to the right place
+		_, spath, _, _ := runtime.Caller(0)
+		spath = filepath.Dir(spath)
+		spath = filepath.Dir(spath)
+		err = os.Chdir(spath)
+		if err != nil {
+			fmt.Printf("Error in test chdir to %v: %v", spath, err)
+			os.Exit(1)
+		}
+	}
+
 	if NextVersionPythonPath != "" {
 		NextVersionPythonPath, err = filepath.Abs(NextVersionPythonPath)
 		if err != nil {
