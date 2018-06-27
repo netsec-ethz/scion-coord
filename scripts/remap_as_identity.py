@@ -78,8 +78,6 @@ def something_pending():
         sys.exit(1)
     content = resp.content.decode('utf-8')
     content = json.loads(content)
-    print ("------------------------- Get Challenge, ANS: -----------------------")
-    print (content)
     if "pending" not in content:
         print("ERROR: Wrong answer, does not contain the pending key")
         sys.exit(1)
@@ -92,8 +90,6 @@ def something_pending():
     solution = solve_challenge(challenge=challenge)
     challenge_solution_str = base64.standard_b64encode(solution).decode("utf-8")
     answer["challenge_solution"] = challenge_solution_str
-    print ("-------------- POST Solution to challenge: ---------------")
-    print (answer)
     try:
         while url:
             resp = requests.post(url, json=answer, allow_redirects=False)
@@ -110,8 +106,6 @@ def something_pending():
         content = json.loads(content)
     except:
         content = {}
-    print ("------------------------- Reply from Coordinator after solution: -----------------------")
-    print (content)
     if content['error']:
         print("Error in the reply from the Coordinator after our solution to the challenge: ")
         print(content['msg'])
@@ -123,8 +117,6 @@ def something_pending():
 
 def download_gen_folder(answer):
     url = SCION_COORD_URL + "/api/as/remapIdDownloadGen/" + IA
-    print("-------------------- POST json to download GEN folder -------------------")
-    print(answer)
     try:
         while url:
             resp = requests.post(url, json=answer, allow_redirects=False)
@@ -132,8 +124,6 @@ def download_gen_folder(answer):
     except requests.exceptions.ConnectionError as ex:
         print ("Error download Gen folder from Coordinator: ", ex)
         sys.exit(1)
-    print("response:", resp)
-    print(dir(resp))
     if resp.status_code != 200:
         print("Failed downloading gen folder")
         print(resp.content)
@@ -144,7 +134,6 @@ def download_gen_folder(answer):
         for chunk in resp.iter_content(chunk_size=1024*1024):
             if chunk:
                 f.write(chunk)
-    print("Downloaded gen folder")
     return filename
     
 
@@ -157,7 +146,7 @@ def install_gen(gen_filename):
         subprocess.check_output(['tar', 'xf', gen_filename], cwd=temp_dir)
         contents = os.listdir(temp_dir)
         if len(contents) != 1:
-            print("Uncompressing file %s didn't return the right number of subdirectories" % (gen_filename,))
+            print("Decompressing file %s didn't return the right number of subdirectories" % (gen_filename,))
             sys.exit(1)
         p = os.path.join(temp_dir, contents[0])
         contents = os.listdir(p)
@@ -174,7 +163,6 @@ def notify_coordinator_all_okay(answer):
     Returns True if it was successful in notifying
     """
     challenge_solution= answer["challenge_solution"]
-    print("notify Coordinator; challenge_solution:", challenge_solution)
     url = SCION_COORD_URL + "/api/as/remapIdConfirmStatus/" + IA
     try:
         while url:
@@ -187,7 +175,6 @@ def notify_coordinator_all_okay(answer):
         print("Failed notifying Coordinator")
         print(resp.content)
         return False
-    print('Coordinator notified of success.')
     return True
 
 
@@ -208,12 +195,15 @@ def main():
     if not pending:
         print ("Nothing is pending, out.")
         return 0
+    print('Mapping IA pending.')
     gen_file = download_gen_folder(answer)
+    print('Downloaded GEN.')
     install_gen(gen_file)
+    print('Installed GEN')
     while not notify_coordinator_all_okay(answer) and retries < 6:
         time.sleep(1)
         retries += 1
-
+    print('Remap: done.')
 
 
 if __name__ == '__main__':

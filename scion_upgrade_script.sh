@@ -112,7 +112,7 @@ else
     bash -c 'yes | GO_INSTALL=true ./env/deps' || echo "ERROR: Dependencies failed. Starting SCION might fail!"
 
     echo "Starting SCION again..."
-    ./scion.sh run
+    ./scion.sh start
 fi
 
 RESULT=$(curl -X POST "${SCION_COORD_URL}/api/as/confirmUpdate/${ACCOUNT_ID}/${ACCOUNT_SECRET}?IA=${IA}")
@@ -120,8 +120,10 @@ echo "Done, got response from server: ${RESULT}"
 
 if ! is_id_standardized "$IA" ; then
     echo "We need to map the addresses to the standard"
+    ./scion.sh stop
     wget https://raw.githubusercontent.com/netsec-ethz/scion-coord/master/scripts/remap_as_identity.py -O remap_as_identity.py || true
     python3 remap_as_identity.py --ia "$IA" || true
+    ./scion.sh start
 else
     echo "SCION IA follows standard."
 fi
