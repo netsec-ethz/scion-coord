@@ -894,8 +894,11 @@ func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 		scionPath = oldScionPath
 		pythonPath = filepath.Join(scionPath, "python")
 	}
-	defer setPyPath(scionPath)
-	setPyPath(config.NextVersionPythonPath)
+	if config.NextVersionPythonPath != "" {
+		// two step ready, use the next version of SCION
+		defer setPyPath(scionPath)
+		setPyPath(config.NextVersionPythonPath)
+	}
 	err = generateGenForAS(asInfo)
 	if err != nil {
 		return nil, err
