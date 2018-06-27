@@ -49,6 +49,17 @@ check_system_files() {
     fi
 }
 
+is_id_standardized() {
+    ia="$1"
+    iaarray=(${ia//-/ })
+    if [ "${iaarray[0]}" -lt "17" ]; then
+        return 1
+    else
+        return 0
+    fi
+}
+
+
 shopt -s nullglob
 
 export LC_ALL=C
@@ -106,3 +117,12 @@ fi
 
 RESULT=$(curl -X POST "${SCION_COORD_URL}/api/as/confirmUpdate/${ACCOUNT_ID}/${ACCOUNT_SECRET}?IA=${IA}")
 echo "Done, got response from server: ${RESULT}"
+
+if ! is_id_standardized "$IA" ; then
+    echo "We need to map the addresses to the standard"
+    wget https://raw.githubusercontent.com/netsec-ethz/scion-coord/master/scripts/remap_as_identity.py -O remap_as_identity.py || true
+    python3 remap_as_identity.py --ia "$IA" || true
+else
+    echo "SCION IA follows standard."
+fi
+echo "Done."
