@@ -991,6 +991,19 @@ func (s *SCIONLabASController) RemapASConfirmStatus(w http.ResponseWriter, r *ht
 	answer := make(map[string]interface{})
 	answer["pending"] = false
 	answer["date"] = time.Now()
+	// set its status to Create so the AP will create it:
+	conns, err := as.GetJoinConnections()
+	if err != nil {
+		logAndSendError(w, err.Error())
+		return
+	}
+	conns[0].RespondStatus = models.Create
+	err = conns[0].Update()
+	if err != nil {
+		logAndSendError(w, "Cannot update connection for AS %v: %v", asID, err)
+		return
+	}
+	as.Status = models.Create
 	err = as.SetMappingStatusAndSave(answer)
 	if err != nil {
 		answer["error"] = true
