@@ -806,7 +806,6 @@ func getASAndCheckChallenge(r *http.Request, asID string, verifyChallenge bool) 
 	}
 	challengeAsBytes, err := base64.StdEncoding.DecodeString(challenge.(string))
 	if err != nil {
-		// TODO critical error. Also check other possible critical errors
 		return nil, nil, fmt.Errorf("Internal error: cannot decode the stored challenge")
 	}
 	err = verifySignatureFromAS(as, challengeAsBytes, receivedSignature)
@@ -915,6 +914,7 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 	answer["error"] = false
 	vars := mux.Vars(r)
 	asID := vars["as_id"]
+	log.Printf("Remap request from %v. Solving challenge? %v", asID, answeringChallenge)
 	as, _, err := getASAndCheckChallenge(r, asID, answeringChallenge)
 	if err != nil {
 		logAndSendError(w, err.Error())
@@ -930,6 +930,7 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 		}
 		answer["challenge"] = challenge
 		utility.SendJSON(answer, w)
+		log.Printf("Remap: sent challenge for %v", asID)
 		return
 	}
 	answer["ia"], err = RemapASIDComputeNewGenFolder(as)
@@ -943,6 +944,7 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 		s.Error500(w, err, "Error during JSON marshaling")
 		return
 	}
+	log.Printf("Remap: finished computing new GEN.")
 }
 
 // RemapASDownloadGen will accept a JSON object containing the query from a user AS to obtain the
@@ -950,17 +952,13 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 func (s *SCIONLabASController) RemapASDownloadGen(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	asID := vars["as_id"]
-	as, request, err := getASAndCheckChallenge(r, asID, true)
+	log.Printf("Remap: request download GEN from %v", asID)
+	as, _, err := getASAndCheckChallenge(r, asID, true)
 	if err != nil {
 		logAndSendError(w, err.Error())
 		return
 	}
-	mappedIAStr := request["ia"].(string)
-	mappedIA, err := addr.IAFromString(mappedIAStr)
-	if err != nil {
-		logAndSendError(w, "Error parsing IA %v: %v", asID, err)
-		return
-	}
+	mappedIA := utility.MapOldIAToNewOne(as.ISD, as.ASID)
 	fileName := UserPackageName(as.UserEmail, mappedIA.I, mappedIA.A) + ".tar.gz"
 	filePath := filepath.Join(PackagePath, fileName)
 	data, err := ioutil.ReadFile(filePath)
@@ -968,6 +966,7 @@ func (s *SCIONLabASController) RemapASDownloadGen(w http.ResponseWriter, r *http
 		logAndSendError(w, "Error reading the tarball. FileName: %v, %v", fileName, err)
 		return
 	}
+	log.Printf("Remap: serving new GEN for %v -> %v", asID, mappedIA)
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
 	w.Header().Set("Content-Transfer-Encoding", "binary")
@@ -979,13 +978,13 @@ func (s *SCIONLabASController) RemapASDownloadGen(w http.ResponseWriter, r *http
 func (s *SCIONLabASController) RemapASConfirmStatus(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	asID := vars["as_id"]
+	log.Printf("Remap: confirming mapping for %v", asID)
 	as, _, err := getASAndCheckChallenge(r, asID, true)
 	if err != nil {
 		logAndSendError(w, err.Error())
 		return
 	}
 	mappedIA := utility.MapOldIAToNewOne(as.ISD, as.ASID)
-	log.Printf("Confirmed Mapping for AS %s -> %s\n", asID, mappedIA)
 	as.ISD = mappedIA.I
 	as.ASID = mappedIA.A
 	answer := make(map[string]interface{})
