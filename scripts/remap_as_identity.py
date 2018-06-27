@@ -35,6 +35,7 @@ def solve_challenge(challenge):
     m = re.match("^([0-9]+)-([0-9]+)$", IA)
     if not m:
         print ("ERROR: could not understand the IA from: ", IA)
+        sys.exit(1)
     I = m.group(1)
     A = m.group(2)
     filepath = os.path.join(SC, "ISD"+I, "AS"+A, "bs"+I+"-"+A+"-1")
