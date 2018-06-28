@@ -298,6 +298,7 @@ func (cn *Connection) getJoinAS() *SCIONLabAS {
 	// return as
 	// TODO, Question: if we have cn.JoinAS as the JoinAS, with the correct type, why
 	// do we need to query the DB again? Below is a simpler approach:
+	o.LoadRelated(cn, "JoinAS")
 	return cn.JoinAS
 }
 
