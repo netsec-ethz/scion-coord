@@ -17,12 +17,14 @@ package config
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 
+	"github.com/netsec-ethz/scion-coord/utility"
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/sec51/goconf"
 )
@@ -57,8 +59,8 @@ var (
 	DBPassword                   = goconf.AppConf.String("db.pass")
 	DBMaxConnections, _          = goconf.AppConf.Int("db.max_connections")
 	DBMaxIdle, _                 = goconf.AppConf.Int("db.max_idle")
-	BaseASID, _                  = goconf.AppConf.Int("base_as_id")
-	BaxBRID, _                   = goconf.AppConf.Int("max_br_id")
+	BaseASID                     addr.AS
+	MaxBRID, _                   = goconf.AppConf.Int("max_br_id")
 	ReservedBRsInfrastructure, _ = goconf.AppConf.Int("reserved_brs_infrastructure")
 	ASesPerUser, _               = goconf.AppConf.Int("ases_per_user")
 	ASesPerAdmin, _              = goconf.AppConf.Int("ases_per_admin")
@@ -121,6 +123,19 @@ func init() {
 		}
 		SigningASes[addr.ISD(ki)] = addr.AS(vi)
 	}
+	auxInt, err := goconf.AppConf.Int64("base_as_id")
+	if err != nil {
+		auxString := goconf.AppConf.String("base_as_id")
+		BaseASID, err = addr.ASFromString(auxString)
+		if err != nil {
+			BaseASID = addr.AS(utility.ScionlabUserASOffsetAddr)
+			log.Printf("Config: not a valid AS id: '%v'. Using %v as base instead.", auxString, BaseASID.String())
+		}
+	} else {
+		BaseASID = addr.AS(auxInt)
+	}
+	fmt.Println("Base AS ID: ", BaseASID.String())
+
 	// we don't validate the email addresses, we just trim them in case they had leading/trailing spaces
 	for i, admin := range EmailAdmins {
 		EmailAdmins[i] = strings.Trim(admin, " ")

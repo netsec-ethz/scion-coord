@@ -509,9 +509,7 @@ func (s *SCIONLabASController) getNewSCIONLabASID() (addr.AS, error) {
 		return 0, err
 	}
 	// Base AS ID for SCIONLab is set in config file
-	// leave it as this for now:
-	asID := addr.AS(config.BaseASID)
-	// asID := addr.AS(utility.ScionlabUserASOffsetAddr)
+	asID := config.BaseASID
 	for _, as := range ases {
 		if as.ASID > asID {
 			asID = as.ASID
@@ -709,7 +707,7 @@ func createUserLoginConfiguration(asInfo *SCIONLabASInfo) error {
 		return fmt.Errorf("failed to write account secret to file: %v", err)
 	}
 
-	ia := utility.IAString(asInfo.LocalAS.ISD, asInfo.LocalAS.ASID)
+	ia := utility.IAStringStandard(asInfo.LocalAS.ISD, asInfo.LocalAS.ASID)
 	iaString := []byte(ia)
 	err = ioutil.WriteFile(filepath.Join(userGenDir, "ia"), iaString, 0644)
 	if err != nil {

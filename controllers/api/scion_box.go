@@ -463,10 +463,8 @@ func (s *SCIONBoxController) getNewSCIONBoxASID(isd addr.ISD) (addr.AS, error) {
 	if err != nil {
 		return 0, err
 	}
-	// Base AS ID for SCION boxes starts from 2000
-	// TODO: replace with the other line below:
-	asID := addr.AS(2000)
-	// asID := addr.AS(BASE_ASID_FOR_SCIONBOX)
+	// Base AS ID for SCION boxes
+	asID := addr.AS(BASE_ASID_FOR_SCIONBOX)
 	for _, as := range ases {
 		if as.ASID > asID {
 			asID = as.ASID

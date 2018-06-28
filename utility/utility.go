@@ -35,10 +35,10 @@ import (
 const (
 	// ScionLabISDOffsetAddr : the first scionlab ISD (not taking backbone into account)
 	ScionLabISDOffsetAddr = 17
-	// ScionLabInfrastructureASOffsetAddr : infrastructure addresses start here
-	ScionLabInfrastructureASOffsetAddr = 0xFFAA00000001
-	// ScionlabUserASOffsetAddr : user ASes addresses start here:
-	ScionlabUserASOffsetAddr = 0xFFAA00010001
+	// ScionLabInfrastructureASOffsetAddr : infrastructure addresses start here, +1
+	ScionLabInfrastructureASOffsetAddr = 0xFFAA00000000
+	// ScionlabUserASOffsetAddr : user ASes addresses start here, +1:
+	ScionlabUserASOffsetAddr = 0xFFAA00010000
 )
 
 // Simple utility function to copy a file.
@@ -221,7 +221,7 @@ func MapOldIAToNewOne(ISDid addr.ISD, ASid addr.AS) addr.IA {
 	var I addr.ISD
 	var A addr.AS
 	if ISDid > 0 && ISDid < 9 && ASid > 1000 && ASid < 10000 {
-		I, A = ISDid+ScionLabISDOffsetAddr-1, ASid-1001+ScionlabUserASOffsetAddr
+		I, A = ISDid+ScionLabISDOffsetAddr-1, ASid-1000+ScionlabUserASOffsetAddr
 	}
 
 	return addr.IA{I: I, A: A}

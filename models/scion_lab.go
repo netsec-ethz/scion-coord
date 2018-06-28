@@ -128,13 +128,13 @@ func (as *SCIONLabAS) IAString() string {
 	if as.ISD < 1 {
 		return fmt.Sprintf("%v", as.ASID)
 	}
-	return utility.IAString(as.ISD, as.ASID)
+	return utility.IAStringStandard(as.ISD, as.ASID)
 }
 
 func (as *SCIONLabAS) String() string {
 	res := as.IAString()
 	if as.Label != "" {
-		res = fmt.Sprintf("%v (%v)", as.IAString(), as.Label)
+		res = fmt.Sprintf("%v (%v)", res, as.Label)
 	}
 	return res
 }
@@ -236,7 +236,7 @@ func (as *SCIONLabAS) GetFreeBRID() (uint16, error) {
 	if as.Type == Infrastructure {
 		minBRID += config.ReservedBRsInfrastructure
 	}
-	id, err := utility.GetAvailableID(brIDs, minBRID, config.BaxBRID)
+	id, err := utility.GetAvailableID(brIDs, minBRID, config.MaxBRID)
 	return uint16(id), err
 }
 
