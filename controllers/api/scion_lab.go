@@ -660,12 +660,12 @@ func packageConfiguration(asInfo *SCIONLabASInfo) error {
 				}
 			}
 		}
-
-		data := map[string]string{}
+		portForwarding := ""
 		if !asInfo.IsVPN {
-			data["PORT_FORWARDING"] = fmt.Sprintf("config.vm.network \"forwarded_port\", "+
+			portForwarding = fmt.Sprintf("config.vm.network \"forwarded_port\", "+
 				"guest: %[1]v, host: %[1]v, protocol: \"udp\"", asInfo.LocalPort)
 		}
+		data := map[string]string{"PORT_FORWARDING": portForwarding}
 		if err := utility.FillTemplateAndSave("templates/Vagrantfile.tmpl",
 			data, filepath.Join(userPackagePath, "Vagrantfile")); err != nil {
 			return err
