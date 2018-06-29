@@ -108,20 +108,23 @@ func init() {
 			fmt.Println("Error parsing section signing_ases:", err)
 			os.Exit(1)
 		}
-		vi, err := strconv.Atoi(v)
-		if err != nil {
-			fmt.Println("Error parsing section signing_ases:", err)
-			os.Exit(1)
-		}
 		if ki < 1 || ki > addr.MaxISD {
 			fmt.Println("Invalid value for ISD: ", k)
 			os.Exit(1)
 		}
-		if vi < 1 || vi > addr.MaxAS {
-			fmt.Println("Invalid value for Core AS ID: ", v)
-			os.Exit(1)
+
+		var asID addr.AS
+		vi, err := strconv.Atoi(v)
+		if err != nil {
+			asID, err = addr.ASFromString(v)
+			if err != nil {
+				fmt.Println("Error parsing section signing_ases:", err)
+				os.Exit(1)
+			}
+		} else {
+			asID = addr.AS(vi)
 		}
-		SigningASes[addr.ISD(ki)] = addr.AS(vi)
+		SigningASes[addr.ISD(ki)] = asID
 	}
 	auxInt, err := goconf.AppConf.Int64("base_as_id")
 	if err != nil {
