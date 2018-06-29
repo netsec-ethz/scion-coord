@@ -17,12 +17,12 @@ import time
 from lib.crypto.certificate import Certificate
 from lib.crypto.certificate_chain import CertificateChain
 from lib.crypto.asymcrypto import sign, verify
-# from local_config_util import (
-#     Certificate
-# )
 
 
-SCION_COORD_URL = "http://localhost:8080"
+# TODO: change this for goodness sake
+# SCION_COORD_URL = "https://www.scionlab.org"
+SCION_COORD_URL = "http://192.33.93.158:8080"
+
 
 def solve_challenge(challenge):
     """
