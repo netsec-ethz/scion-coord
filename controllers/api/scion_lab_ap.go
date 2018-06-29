@@ -378,7 +378,7 @@ func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejecte
 			failedNotifications = append(failedNotifications, originalIA)
 			continue
 		}
-		asCns, err := ap.GetRespondConnectionInfoToAS(as.IA())
+		asCns, err := ap.GetRespondConnectionInfoToAS(as.IAString())
 		if err != nil {
 			log.Printf("Error finding the connection to SCIONLabAS %v: %v", as.IA(), err)
 			failedNotifications = append(failedNotifications, originalIA)
