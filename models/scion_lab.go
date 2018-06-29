@@ -541,25 +541,22 @@ func FindSCIONLabASByIAString(ia string) (*SCIONLabAS, error) {
 	if err != nil {
 		return nil, err
 	}
-	as, err := FindSCIONLabASByIAInt(IA.I, IA.A)
-	if err != nil {
-		return nil, err
-	}
-	o.LoadRelated(as, "AP")
-	return as, nil
+	return FindSCIONLabASByASID(IA.A)
 }
 
 // Find SCIONLabAS by the ISD AS int
 func FindSCIONLabASByIAInt(isd int, asID int) (*SCIONLabAS, error) {
-	as := new(SCIONLabAS)
-	err := o.QueryTable(as).Filter("ISD", isd).Filter("ASID", asID).RelatedSel().One(as)
-	return as, err
+	return FindSCIONLabASByASID(asID)
 }
 
 func FindSCIONLabASByASID(asID int) (*SCIONLabAS, error) {
 	as := new(SCIONLabAS)
 	err := o.QueryTable(as).Filter("ASID", asID).RelatedSel().One(as)
-	return as, err
+	if err != nil {
+		return nil, err
+	}
+	o.LoadRelated(as, "AP")
+	return as, nil
 }
 
 // Find SCIONLabAS by the Public IP
