@@ -7,7 +7,7 @@ SERVICE_CURRENT_VERSION="0.4"
 
 # version less or equal. E.g. verleq 1.9 2.0.8  == true (1.9 <= 2.0.8)
 verleq() {
-    [  "$1" = "`echo -e "$1\n$2" | sort -V | head -n1`" ]
+    [  "$1" = `echo -e "$1\n$2" | sort -V | head -n1` ]
 }
 
 check_system_files() {
@@ -52,7 +52,7 @@ check_system_files() {
 is_id_standardized() {
     ia="$1"
     iaarray=(${ia//-/ })
-    if [ "${iaarray[0]}" -lt "17" ]; then
+    if [ "${iaarray[1]}" -lt "1000000" ]; then
         return 1
     else
         return 0
@@ -116,12 +116,13 @@ else
     ./scion.sh start
 fi
 
-RESULT=$(curl -X POST "${SCION_COORD_URL}/api/as/confirmUpdate/${ACCOUNT_ID}/${ACCOUNT_SECRET}?IA=${IA}")
+RESULT=$(curl -X POST "${SCION_COORD_URL}/api/as/confirmUpdate/${ACCOUNT_ID}/${ACCOUNT_SECRET}?IA=${IA}") || true
 echo "Done, got response from server: ${RESULT}"
 
 if ! is_id_standardized "$IA" ; then
     echo "We need to map the addresses to the standard"
-    wget https://raw.githubusercontent.com/netsec-ethz/scion-coord/master/scripts/remap_as_identity.sh -O remap_as_identity.sh || true
+    cd "/tmp"
+    wget https://raw.githubusercontent.com/netsec-ethz/scion-coord/master/scripts/remap_as_identity.sh -O remap_as_identity.sh || { echo "Not yet mapping IA IDs" && exit 0; }
     bash remap_as_identity.sh
 else
     echo "SCION IA follows standard."

@@ -128,6 +128,25 @@ type SCIONLabRequest struct {
 	Port      uint16  `json:"port"`
 }
 
+type remappingError struct {
+	err          error
+	notifyAdmins bool
+}
+
+func newMappingError(notifyAdmins bool, format string, params ...interface{}) *remappingError {
+	return &remappingError{err: fmt.Errorf(format, params...), notifyAdmins: notifyAdmins}
+}
+func (e *remappingError) Error() string {
+	return e.err.Error()
+}
+func (e *remappingError) LogAndNotifyAppropriately(w http.ResponseWriter, format string, params ...interface{}) {
+	if e.notifyAdmins {
+		logAndSendErrorAndNotifyAdmins(w, format, params...)
+	} else {
+		logAndSendError(w, format, params...)
+	}
+}
+
 // This generates a new AS for the user if they do not have too many already
 func (s *SCIONLabASController) GenerateNewSCIONLabAS(w http.ResponseWriter, r *http.Request) {
 	_, uSess, err := middleware.GetUserSession(r)
@@ -752,12 +771,7 @@ func (s *SCIONLabASController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 }
 
 func logAndSendError(w http.ResponseWriter, errorMsgFmt string, parms ...interface{}) string {
-	var errorMsg string
-	if len(parms) > 0 {
-		errorMsg = fmt.Sprintf(errorMsgFmt, parms)
-	} else {
-		errorMsg = errorMsgFmt
-	}
+	errorMsg := fmt.Sprintf(errorMsgFmt, parms...)
 	log.Print(errorMsg)
 	dict := make(map[string]interface{})
 	dict["error"] = true
@@ -772,16 +786,16 @@ func logAndSendErrorAndNotifyAdmins(w http.ResponseWriter, errorMsgFmt string, p
 }
 
 func getASAndCheckChallenge(r *http.Request, asID string, verifyChallenge bool) (
-	*models.SCIONLabAS, map[string]interface{}, error) {
+	*models.SCIONLabAS, map[string]interface{}, *remappingError) {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Could not read JSON in the request: %v", err)
+		return nil, nil, newMappingError(false, "Could not read JSON in the request for IA %v: %v", asID, err)
 	}
 	request := make(map[string]interface{})
 	json.Unmarshal(body, &request)
 	as, err := models.FindSCIONLabASByIAString(asID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Could not find AS with IA %v", asID)
+		return nil, nil, newMappingError(true, "Could not find AS with IA %v", asID)
 	}
 	if !verifyChallenge {
 		return as, request, nil
@@ -790,27 +804,27 @@ func getASAndCheckChallenge(r *http.Request, asID string, verifyChallenge bool) 
 	challenge, havechallenge := request["challenge"]
 	challengeSolution, haveanswer := request["challenge_solution"]
 	if !havechallenge || !haveanswer {
-		return nil, nil, fmt.Errorf(`JSON missing "challenge" or "challenge_solution"`)
+		return nil, nil, newMappingError(true, `JSON missing "challenge" or "challenge_solution", IA `, asID)
 	}
 	challengeInDB, err := as.GetRemapChallenge()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, newMappingError(true, "Error getting challenge for IA %v: %v", asID, err)
 	}
 	if challenge != challengeInDB {
-		return nil, nil, fmt.Errorf("Challenge stored and received don't match")
+		return nil, nil, newMappingError(true, "Challenge stored and received don't match. IA %v", asID)
 	}
 	// verify challenge solution
 	receivedSignature, err := base64.StdEncoding.DecodeString(challengeSolution.(string))
 	if err != nil {
-		return nil, nil, fmt.Errorf("Cannot decode the answer to the challenge")
+		return nil, nil, newMappingError(true, "Cannot decode the answer to the challenge, IA: %v", asID)
 	}
 	challengeAsBytes, err := base64.StdEncoding.DecodeString(challenge.(string))
 	if err != nil {
-		return nil, nil, fmt.Errorf("Internal error: cannot decode the stored challenge")
+		return nil, nil, newMappingError(true, "Internal error: cannot decode the stored challenge, IA: %v", asID)
 	}
 	err = verifySignatureFromAS(as, challengeAsBytes, receivedSignature)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, newMappingError(true, "Cannot verify signature for IA %v: %v", asID, err)
 	}
 	return as, request, nil
 }
@@ -919,9 +933,9 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 	vars := mux.Vars(r)
 	asID := vars["as_id"]
 	log.Printf("Remap request from %v. Solving challenge? %v", asID, answeringChallenge)
-	as, _, err := getASAndCheckChallenge(r, asID, answeringChallenge)
-	if err != nil {
-		logAndSendError(w, err.Error())
+	as, _, mapErr := getASAndCheckChallenge(r, asID, answeringChallenge)
+	if mapErr != nil {
+		mapErr.LogAndNotifyAppropriately(w, mapErr.Error())
 		return
 	}
 	if !answeringChallenge {
@@ -937,6 +951,7 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 		log.Printf("Remap: sent challenge for %v", asID)
 		return
 	}
+	var err error
 	answer["ia"], err = RemapASIDComputeNewGenFolder(as)
 	if err != nil {
 		logAndSendErrorAndNotifyAdmins(w, "ERROR in Coordinator: while mapping the ID, cannot generate a gen folder for the AS %s : %s", asID, err.Error())
@@ -957,9 +972,9 @@ func (s *SCIONLabASController) RemapASDownloadGen(w http.ResponseWriter, r *http
 	vars := mux.Vars(r)
 	asID := vars["as_id"]
 	log.Printf("Remap: request download GEN from %v", asID)
-	as, _, err := getASAndCheckChallenge(r, asID, true)
-	if err != nil {
-		logAndSendError(w, err.Error())
+	as, _, mapErr := getASAndCheckChallenge(r, asID, true)
+	if mapErr != nil {
+		mapErr.LogAndNotifyAppropriately(w, mapErr.Error())
 		return
 	}
 	mappedIA := utility.MapOldIAToNewOne(as.ISD, as.ASID)
@@ -983,9 +998,9 @@ func (s *SCIONLabASController) RemapASConfirmStatus(w http.ResponseWriter, r *ht
 	vars := mux.Vars(r)
 	asID := vars["as_id"]
 	log.Printf("Remap: confirming mapping for %v", asID)
-	as, _, err := getASAndCheckChallenge(r, asID, true)
-	if err != nil {
-		logAndSendError(w, err.Error())
+	as, _, mapErr := getASAndCheckChallenge(r, asID, true)
+	if mapErr != nil {
+		mapErr.LogAndNotifyAppropriately(w, mapErr.Error())
 		return
 	}
 	mappedIA := utility.MapOldIAToNewOne(as.ISD, as.ASID)
