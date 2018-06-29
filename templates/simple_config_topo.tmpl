@@ -25,7 +25,7 @@
         "1": {
           "InternalAddrIdx": 0,
           "Overlay": "UDP/IPv4",
-          "LinkType": "PARENT",
+          "LinkTo": "PARENT",
           "Bandwidth": 1000,
           "MTU": 1472,
           "Remote": {
@@ -78,7 +78,7 @@
     }
   },
   "MTU": 1472,
-  "ISD_AS": "{{.ISD_ID}}-{{.AS_ID}}",
+  "ISD_AS": "{{.LOCAL_ISDAS}}",
   "ZookeeperService": {
     "1": {
       "Addr": "127.0.0.1",
