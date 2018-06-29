@@ -292,7 +292,7 @@ func (as *SCIONLabAS) getAllConnections() ([]*Connection, error) {
 	return append(joinCns, resCns...), nil
 }
 
-func (cn *Connection) getJoinAS() *SCIONLabAS {
+func (cn *Connection) GetJoinAS() *SCIONLabAS {
 	// as := new(SCIONLabAS)
 	// o.QueryTable(as).Filter("ID", cn.JoinAS.ID).RelatedSel().One(as)
 	// return as
@@ -320,7 +320,7 @@ func (as *SCIONLabAS) GetJoinConnectionInfo() ([]ConnectionInfo, error) {
 	var cnInfos []ConnectionInfo
 	for _, cn := range cns {
 		respondAS := cn.GetRespondAS()
-		joinAS := cn.getJoinAS()
+		joinAS := cn.GetJoinAS()
 		// If the connection has been removed continue
 		if cn.JoinStatus == Removed {
 			continue
@@ -358,7 +358,7 @@ func (as *SCIONLabAS) GetRespondConnectionInfo() ([]ConnectionInfo, error) {
 	var cnInfos []ConnectionInfo
 	for _, cn := range cns {
 		respondAS := cn.GetRespondAS()
-		joinAS := cn.getJoinAS()
+		joinAS := cn.GetJoinAS()
 		if cn.RespondStatus == Removed {
 			continue
 		}
@@ -455,7 +455,7 @@ func (as *SCIONLabAS) UpdateDBConnection(cnInfo *ConnectionInfo) error {
 	cn.RespondIP = cnInfo.NeighborIP
 
 	respondAS := cn.GetRespondAS()
-	joinAS := cn.getJoinAS()
+	joinAS := cn.GetJoinAS()
 	if joinAS.ID == as.ID {
 		cn.JoinStatus = cnInfo.Status
 		cn.RespondStatus = cnInfo.NeighborStatus

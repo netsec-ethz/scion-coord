@@ -109,7 +109,7 @@ type SCIONLabASInfo struct {
 	IP              string             // the public IP address of the SCIONLab AS
 	LocalPort       uint16             // The port of the border router on the user side
 	OldAP           string             // the previous SCIONLab AP to which the AS was connected
-	RemoteIA        string             // the SCIONLab AP the AS connects to
+	RemoteIA        addr.IA            // the SCIONLab AP the AS connects to
 	RemoteIP        string             // the IP address of the SCIONLab AP it connects to
 	RemoteBRID      uint16             // ID of the border router in the SCIONLab AP
 	RemotePort      uint16             // Port of the BR in the SCIONLab AP
@@ -349,7 +349,7 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 		}
 	}
 
-	ia, err := addr.IAFromString(slReq.ServerIA)
+	remoteIA, err := addr.IAFromString(slReq.ServerIA)
 	if err != nil {
 		return nil, err
 	}
@@ -400,13 +400,13 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 		as.Status = models.Update
 	}
 	as.PublicIP = slReq.IP
-	as.ISD = ia.I
+	as.ISD = remoteIA.I
 	as.Label = slReq.Label
 
 	return &SCIONLabASInfo{
 		IsNewConnection: newConnection,
 		IsVPN:           slReq.IsVPN,
-		RemoteIA:        slReq.ServerIA,
+		RemoteIA:        remoteIA,
 		IP:              ip,
 		LocalPort:       as.StartPort,
 		OldAP:           oldAP,
@@ -424,7 +424,7 @@ func getSCIONLabASInfoFromDB(conn *models.Connection) (*SCIONLabASInfo, error) {
 	asInfo := SCIONLabASInfo{
 		IsNewConnection: false,
 		IsVPN:           conn.IsVPN,
-		RemoteIA:        conn.RespondAP.AS.IAString(),
+		RemoteIA:        conn.RespondAP.AS.IA(),
 		IP:              conn.JoinIP,
 		LocalPort:       conn.JoinAS.StartPort,
 		OldAP:           "",
@@ -473,7 +473,7 @@ func (s *SCIONLabASController) updateDB(asInfo *SCIONLabASInfo) error {
 	} else {
 		// we had found an existing connection to the same AP.
 		// Update the Connections Table
-		cns, err := asInfo.LocalAS.GetJoinConnectionInfoToAS(asInfo.RemoteIA)
+		cns, err := asInfo.LocalAS.GetJoinConnectionInfoToAS(asInfo.RemoteIA.String())
 		if err != nil {
 			return fmt.Errorf("error finding existing connection of user %v: %v",
 				userEmail, err)
@@ -543,6 +543,7 @@ func generateTopologyFile(asInfo *SCIONLabASInfo) error {
 	if asInfo.LocalAS.Type == models.VM {
 		localIP = config.VMLocalIP
 	}
+	localIA := asInfo.LocalAS.IAString()
 
 	// Topology file parameters
 	data := map[string]string{
@@ -550,9 +551,10 @@ func generateTopologyFile(asInfo *SCIONLabASInfo) error {
 		"BIND_IP":      asInfo.LocalAS.BindIP(asInfo.IsVPN, asInfo.IP),
 		"ISD_ID":       fmt.Sprintf("%d", asInfo.LocalAS.ISD),
 		"AS_ID":        asInfo.LocalAS.ASID.FileFmt(),
+		"LOCAL_ISDAS":  localIA,
 		"LOCAL_ADDR":   localIP,
 		"LOCAL_PORT":   strconv.Itoa(int(asInfo.LocalPort)),
-		"TARGET_ISDAS": asInfo.RemoteIA,
+		"TARGET_ISDAS": asInfo.RemoteIA.String(),
 		"REMOTE_ADDR":  asInfo.RemoteIP,
 		"REMOTE_PORT":  strconv.Itoa(int(asInfo.RemotePort)),
 	}
@@ -870,6 +872,7 @@ func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 		return nil, err
 	}
 	conn := conns[0]
+	conn.JoinAS = conn.GetJoinAS()
 	conn.RespondAP.AS = conn.GetRespondAS()
 	asInfo, err := getSCIONLabASInfoFromDB(conn)
 	asInfo.LocalAS = as
