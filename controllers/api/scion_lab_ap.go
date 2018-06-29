@@ -53,13 +53,23 @@ type APConnectionInfo struct {
 }
 
 // Check if the account is the owner of the specified Attachment Point
-func (s *SCIONLabASController) checkAuthorization(r *http.Request) (apIA string, err error) {
+func (s *SCIONLabASController) checkAuthorization(r *http.Request) (ia addr.IA, err error) {
 	log.Printf("API Call for getUpdatesForAP = %v", r.URL.Query())
-	apIA = r.URL.Query().Get("scionLabAP")
+	apIA := r.URL.Query().Get("scionLabAP")
 	if len(apIA) == 0 {
 		err = errors.New("scionLabAP parameter missing")
 		return
 	}
+	ia, err = addr.IAFromString(apIA)
+	if err != nil {
+		ia, err = addr.IAFromFileFmt(apIA, false)
+		if err != nil {
+			err = fmt.Errorf("%v is not a valid SCION IA", apIA)
+			return
+		}
+	}
+	// ensure apIA is always non file format:
+	apIA = ia.String()
 
 	ases, err := s.ownedASes(r)
 	if err == nil {
@@ -104,7 +114,7 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	as, err := models.FindSCIONLabASByIAString(apIA)
+	as, err := models.FindSCIONLabASByIAInt(apIA.I, apIA.A)
 	if err != nil {
 		log.Printf("Error looking up the AS %v: %v", apIA, err)
 		s.Error500(w, err, "Error looking up SCIONLab AS from DB")
@@ -121,7 +131,7 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 	var cnsRemoveResp []APConnectionInfo
 	for _, cn := range cnInfos {
 		cnInfo := APConnectionInfo{
-			ASID:      utility.IAString(as.ISD, cn.NeighborAS),
+			ASID:      utility.IAStringStandard(as.ISD, cn.NeighborAS),
 			IsVPN:     cn.IsVPN,
 			VPNUserID: vpnUserID(cn.NeighborUser, cn.NeighborAS),
 			IP:        cn.NeighborIP,
@@ -139,7 +149,7 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 		}
 	}
 	resp := map[string]map[string][]APConnectionInfo{
-		apIA: {
+		apIA.FileFmt(false): {
 			"Create": cnsCreateResp,
 			"Update": cnsUpdateResp,
 			"Remove": cnsRemoveResp,

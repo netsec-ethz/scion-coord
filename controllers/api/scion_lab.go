@@ -707,7 +707,7 @@ func createUserLoginConfiguration(asInfo *SCIONLabASInfo) error {
 		return fmt.Errorf("failed to write account secret to file: %v", err)
 	}
 
-	ia := utility.IAStringStandard(asInfo.LocalAS.ISD, asInfo.LocalAS.ASID)
+	ia := utility.IAFileName(asInfo.LocalAS.ISD, asInfo.LocalAS.ASID)
 	iaString := []byte(ia)
 	err = ioutil.WriteFile(filepath.Join(userGenDir, "ia"), iaString, 0644)
 	if err != nil {
@@ -765,7 +765,7 @@ func logAndSendError(w http.ResponseWriter, errorMsgFmt string, parms ...interfa
 }
 
 func logAndSendErrorAndNotifyAdmins(w http.ResponseWriter, errorMsgFmt string, parms ...interface{}) {
-	msg := logAndSendError(w, errorMsgFmt, parms)
+	msg := logAndSendError(w, errorMsgFmt, parms...)
 	email.SendEmailToAdmins("ERROR in remap", msg)
 }
 
@@ -936,7 +936,7 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 	}
 	answer["ia"], err = RemapASIDComputeNewGenFolder(as)
 	if err != nil {
-		logAndSendErrorAndNotifyAdmins(w, "ERROR in Coordinator: while mapping the ID, cannot generate a gen folder for the AS %s : %v", asID, err)
+		logAndSendErrorAndNotifyAdmins(w, "ERROR in Coordinator: while mapping the ID, cannot generate a gen folder for the AS %s : %s", asID, err.Error())
 		return
 	}
 	err = utility.SendJSON(answer, w)
