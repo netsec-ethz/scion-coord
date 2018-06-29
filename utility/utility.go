@@ -34,7 +34,7 @@ import (
 
 const (
 	// ScionLabISDOffsetAddr : the first scionlab ISD (not taking backbone into account)
-	ScionLabISDOffsetAddr = 17
+	ScionLabISDOffsetAddr = 16
 	// ScionLabInfrastructureASOffsetAddr : infrastructure addresses start here, +1
 	ScionLabInfrastructureASOffsetAddr = 0xFFAA00000000
 	// ScionlabUserASOffsetAddr : user ASes addresses start here, +1:
@@ -220,8 +220,11 @@ func SendJSONError(object interface{}, w http.ResponseWriter) error {
 func MapOldIAToNewOne(ISDid addr.ISD, ASid addr.AS) addr.IA {
 	var I addr.ISD
 	var A addr.AS
-	if ISDid > 0 && ISDid < 9 && ASid > 1000 && ASid < 10000 {
-		I, A = ISDid+ScionLabISDOffsetAddr-1, ASid-1000+ScionlabUserASOffsetAddr
+	if ISDid > 0 && ISDid < 22 && ASid > 1000 && ASid < 10000 {
+		if ISDid >= 20 && ISDid <= 21 {
+			ISDid += 40 - ScionLabISDOffsetAddr
+		}
+		I, A = ISDid+ScionLabISDOffsetAddr, ASid-1000+ScionlabUserASOffsetAddr
 	}
 
 	return addr.IA{I: I, A: A}
