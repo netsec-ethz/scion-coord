@@ -106,6 +106,7 @@ else
 
     ./scion.sh stop
     ~/.local/bin/supervisorctl -c supervisor/supervisord.conf shutdown
+    ./tools/zkcleanslate
 
     echo "Reinstalling dependencies..."
     ./scion.sh clean || true
@@ -120,10 +121,8 @@ echo "Done, got response from server: ${RESULT}"
 
 if ! is_id_standardized "$IA" ; then
     echo "We need to map the addresses to the standard"
-    ./scion.sh stop
-    wget https://raw.githubusercontent.com/netsec-ethz/scion-coord/master/scripts/remap_as_identity.py -O remap_as_identity.py || true
-    python3 remap_as_identity.py --ia "$IA" || true
-    ./scion.sh start
+    wget https://raw.githubusercontent.com/netsec-ethz/scion-coord/master/scripts/remap_as_identity.sh -O remap_as_identity.sh || true
+    bash remap_as_identity.sh
 else
     echo "SCION IA follows standard."
 fi
