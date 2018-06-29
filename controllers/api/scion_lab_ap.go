@@ -231,7 +231,7 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 			failedConfirmations = append(failedConfirmations, s.processConfirmedUpdatesFromAP(as, action, successIAs)...)
 		}
 	}
-	s.processRejectedUpdatesFromAP(rejectedIAs)
+	failedConfirmations = append(failedConfirmations, s.processRejectedUpdatesFromAP(rejectedIAs)...)
 	if len(failedConfirmations) > 0 {
 		log.Printf("ERROR processing confirmations for the following ASes: %v", failedConfirmations)
 		s.Error500(w, nil, "Error processing confirmations for the following ASes: %v",
@@ -360,7 +360,7 @@ func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejecte
 		IA, err = addr.IAFromString(rejectedAS.AP)
 		if err != nil {
 			log.Printf("Error converting IA (%v) to its components: %v", rejectedAS.AP, err)
-			failedNotifications = append(failedNotifications, rejectedAS.AP)
+			failedNotifications = append(failedNotifications, originalIA)
 			continue
 		}
 		ap, err := models.FindSCIONLabASByASID(IA.A)
