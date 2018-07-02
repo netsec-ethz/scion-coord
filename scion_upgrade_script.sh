@@ -124,6 +124,10 @@ else
 
     echo "Reinstalling dependencies..."
     ./scion.sh clean || true
+    mv go/vendor/vendor.json /tmp && rm -r go/vendor/* && mv /tmp/vendor.json go/vendor/
+    pushd go >/dev/null
+    govendor sync
+    popd >/dev/null
     bash -c 'yes | GO_INSTALL=true ./env/deps' || echo "ERROR: Dependencies failed. Starting SCION might fail!"
 
     echo "Starting SCION again..."
