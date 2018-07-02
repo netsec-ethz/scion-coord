@@ -82,7 +82,7 @@ if ! is_id_standardized "$IA" ; then
     cd "/tmp"
     wget https://raw.githubusercontent.com/netsec-ethz/scion-coord/master/scripts/remap_as_identity.sh -O remap_as_identity.sh  && doremap=1 || doremap=0
     if [ "$doremap" == 1 ]; then
-        echo bash remap_as_identity.sh
+        bash remap_as_identity.sh
     else
         echo "Not yet mapping IA IDs"
     fi
