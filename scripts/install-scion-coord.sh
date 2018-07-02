@@ -56,6 +56,14 @@ if [ ! -f "$HOME/.config/scion-coord/email.conf" ] || [ ! -f "$HOME/.config/scio
     exit 1
 fi
 
+# submodules
+pushd "$basedir" >/dev/null
+git submodule update --remote --recursive
+# in particular for the update V2, sub/scion_nextversion needs to be updated with one file, by running make:
+cd "sub/scion_nextversion/go"
+make ../proto/go.capnp
+popd >/dev/null
+
 sudo systemctl daemon-reload
 sudo systemctl start "scion-coord"
 sleep 1

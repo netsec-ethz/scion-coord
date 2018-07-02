@@ -53,13 +53,23 @@ type APConnectionInfo struct {
 }
 
 // Check if the account is the owner of the specified Attachment Point
-func (s *SCIONLabASController) checkAuthorization(r *http.Request) (apIA string, err error) {
+func (s *SCIONLabASController) checkAuthorization(r *http.Request) (ia addr.IA, err error) {
 	log.Printf("API Call for getUpdatesForAP = %v", r.URL.Query())
-	apIA = r.URL.Query().Get("scionLabAP")
+	apIA := r.URL.Query().Get("scionLabAP")
 	if len(apIA) == 0 {
 		err = errors.New("scionLabAP parameter missing")
 		return
 	}
+	ia, err = addr.IAFromString(apIA)
+	if err != nil {
+		ia, err = addr.IAFromFileFmt(apIA, false)
+		if err != nil {
+			err = fmt.Errorf("%v is not a valid SCION IA", apIA)
+			return
+		}
+	}
+	// ensure apIA is always non file format:
+	apIA = ia.String()
 
 	ases, err := s.ownedASes(r)
 	if err == nil {
@@ -104,7 +114,7 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	as, err := models.FindSCIONLabASByIAString(apIA)
+	as, err := models.FindSCIONLabASByIAInt(apIA.I, apIA.A)
 	if err != nil {
 		log.Printf("Error looking up the AS %v: %v", apIA, err)
 		s.Error500(w, err, "Error looking up SCIONLab AS from DB")
@@ -121,9 +131,9 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 	var cnsRemoveResp []APConnectionInfo
 	for _, cn := range cnInfos {
 		cnInfo := APConnectionInfo{
-			ASID:      utility.IAString(as.ISD, cn.NeighborAS),
+			ASID:      utility.IAStringStandard(as.ISD, cn.NeighborAS),
 			IsVPN:     cn.IsVPN,
-			VPNUserID: s.vpnUserID(cn.NeighborUser, cn.NeighborAS),
+			VPNUserID: vpnUserID(cn.NeighborUser, cn.NeighborAS),
 			IP:        cn.NeighborIP,
 			UserPort:  cn.NeighborPort,
 			APPort:    cn.LocalPort,
@@ -139,7 +149,7 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 		}
 	}
 	resp := map[string]map[string][]APConnectionInfo{
-		apIA: {
+		apIA.FileFmt(false): {
 			"Create": cnsCreateResp,
 			"Update": cnsUpdateResp,
 			"Remove": cnsRemoveResp,
@@ -266,7 +276,7 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 			failedConfirmations = append(failedConfirmations, ia)
 			continue
 		}
-		asCns, err := as.GetJoinConnectionInfoToAS(apAS.IA())
+		asCns, err := as.GetJoinConnectionInfoToAS(apAS.IAString())
 		if err != nil {
 			log.Printf("Error finding the connection to SCIONLabAS %v: %v", ia, err)
 			failedConfirmations = append(failedConfirmations, ia)
@@ -285,7 +295,7 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 		if len(workingSet) != 1 {
 			// we've failed our axiom that there's only one active connection. Complain
 			log.Printf("Error confirming updates for AS %v: we expected 1 connection to %v and found %v",
-				ia, apAS.IA(), len(workingSet))
+				ia, apAS.IAString(), len(workingSet))
 			failedConfirmations = append(failedConfirmations, ia)
 			continue
 		}
@@ -301,7 +311,7 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 				// this means to remove the connection entry but don't update the AS status
 				err = as.DeleteConnectionFromDB(&cnInfo)
 				if err != nil {
-					log.Printf("Error removing connection between AS %v and AP %v: %v", ia, apAS.IA(), err)
+					log.Printf("Error removing connection between AS %v and AP %v: %v", ia, apAS.IAString(), err)
 					continue
 				}
 			}
@@ -313,7 +323,7 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 		if cnInfo.IsCurrentConnection() {
 			as.Status = cnInfo.Status
 			if err = as.UpdateASAndConnection(&cnInfo); err != nil {
-				log.Printf("Error updating database tables for AS %v: %v", as.IA(), err)
+				log.Printf("Error updating database tables for AS %v: %v", as.IAString(), err)
 				failedConfirmations = append(failedConfirmations, ia)
 				continue
 			}
@@ -321,12 +331,11 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 			// just checking for consistency
 			if action != REMOVED {
 				// logic error! print failed assertion but don't quit this update
-				log.Printf("Logic error confirming updates for AS %v to AP %v. "+
-					"The connection is inactive but the action %v != REMOVED",
-					ia, apAS.IA(), action)
+				log.Printf("Logic error confirming updates for AS %v to AP %v. The connection is inactive but the action %v != REMOVED",
+					ia, apAS.IAString(), action)
 			}
 		}
-		successEmails = append(successEmails, emailConfirmation{as.UserEmail, as.IA(), action})
+		successEmails = append(successEmails, emailConfirmation{as.UserEmail, as.IAString(), action})
 	}
 	for _, e := range successEmails {
 		if err := sendConfirmationEmail(e.user, e.IA, e.action); err != nil {
@@ -369,7 +378,7 @@ func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejecte
 			failedNotifications = append(failedNotifications, originalIA)
 			continue
 		}
-		asCns, err := ap.GetRespondConnectionInfoToAS(as.IA())
+		asCns, err := ap.GetRespondConnectionInfoToAS(as.IAString())
 		if err != nil {
 			log.Printf("Error finding the connection to SCIONLabAS %v: %v", as.IA(), err)
 			failedNotifications = append(failedNotifications, originalIA)
@@ -458,7 +467,7 @@ func sendConfirmationEmail(userEmail, IA, action string) error {
 		Message:     message,
 	}
 	log.Printf("Sending confirmation email to user %v.", userEmail)
-	return email.ConstructAndSendEmail("as_status.html", subject, data, "as-update", userEmail, false)
+	return email.ConstructFromTemplateAndSend("as_status.html", subject, data, "as-update", userEmail, false)
 }
 
 // sends an email notifying of a failure to synchronize the attachment point with the user AS.\
@@ -485,5 +494,5 @@ func sendRejectedEmail(userEmail string, userIA, action, attachmentPointIA strin
 		Operation:   action,
 		AP:          attachmentPointIA,
 	}
-	return email.ConstructAndSendEmail("as_failure.html", subject, data, "as-rejection", userEmail, true)
+	return email.ConstructFromTemplateAndSend("as_failure.html", subject, data, "as-rejection", userEmail, true)
 }

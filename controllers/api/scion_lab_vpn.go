@@ -24,12 +24,13 @@ import (
 	"strings"
 
 	"github.com/netsec-ethz/scion-coord/utility"
+	"github.com/scionproto/scion/go/lib/addr"
 )
 
 // Generates client keys and configuration necessary for a VPN-based setup
-func (s *SCIONLabASController) generateVPNConfig(asInfo *SCIONLabASInfo) error {
+func generateVPNConfig(asInfo *SCIONLabASInfo) error {
 	log.Printf("Creating VPN config for SCIONLab AS")
-	if err := s.generateVPNKeys(asInfo); err != nil {
+	if err := generateVPNKeys(asInfo); err != nil {
 		return err
 	}
 	userEmail := asInfo.LocalAS.UserEmail
@@ -40,14 +41,14 @@ func (s *SCIONLabASController) generateVPNConfig(asInfo *SCIONLabASInfo) error {
 	if err != nil {
 		return fmt.Errorf("error reading CA certificate file: %v", err)
 	}
-	clientCert, err = ioutil.ReadFile(s.vpnCertPath(userEmail, userASID))
+	clientCert, err = ioutil.ReadFile(vpnCertPath(userEmail, userASID))
 	if err != nil {
 		return fmt.Errorf("error reading VPN certificate file for user %v: %v",
 			userEmail, err)
 	}
 	clientCertStr := string(clientCert)
 	startCert := strings.Index(clientCertStr, "-----BEGIN CERTIFICATE-----")
-	clientKey, err = ioutil.ReadFile(s.vpnKeyPath(userEmail, userASID))
+	clientKey, err = ioutil.ReadFile(vpnKeyPath(userEmail, userASID))
 	if err != nil {
 		return fmt.Errorf("error reading VPN key file for user %v: %v",
 			userEmail, err)
@@ -70,15 +71,15 @@ func (s *SCIONLabASController) generateVPNConfig(asInfo *SCIONLabASInfo) error {
 }
 
 // Creates the keys for VPN setup
-func (s *SCIONLabASController) generateVPNKeys(asInfo *SCIONLabASInfo) error {
+func generateVPNKeys(asInfo *SCIONLabASInfo) error {
 	userEmail := asInfo.LocalAS.UserEmail
 	userASID := asInfo.LocalAS.ASID
 	log.Printf("Generating RSA keys")
-	if _, err := os.Stat(s.vpnKeyPath(userEmail, userASID)); err == nil {
+	if _, err := os.Stat(vpnKeyPath(userEmail, userASID)); err == nil {
 		log.Printf("Previous VPN keys exist")
 	} else if os.IsNotExist(err) {
 		cmd := exec.Command("/bin/bash", "-c", "source vars; ./build-key --batch "+
-			s.vpnUserID(userEmail, userASID))
+			vpnUserID(userEmail, userASID))
 		cmd.Dir = EasyRSAPath
 		cmdOut, _ := cmd.StdoutPipe()
 		cmdErr, _ := cmd.StderrPipe()
@@ -103,21 +104,22 @@ func (s *SCIONLabASController) generateVPNKeys(asInfo *SCIONLabASInfo) error {
 }
 
 // Constructs the userID used as a common name for the VPN keys and certificates
-func (s *SCIONLabASController) vpnUserID(userEmail string, asID int) string {
-	return fmt.Sprintf("%v_%v", userEmail, asID)
+func vpnUserID(userEmail string, asID addr.AS) string {
+	ret := fmt.Sprintf("%s_%s", userEmail, asID.FileFmt())
+	return ret
 }
 
 // Path for client key and certificate; fileExt can be "key" or "cert"
-func (s *SCIONLabASController) vpnKeyCertPath(userEmail string, asID int, fileExt string) string {
-	return filepath.Join(RSAKeyPath, s.vpnUserID(userEmail, asID)+"."+fileExt)
+func vpnKeyCertPath(userEmail string, asID addr.AS, fileExt string) string {
+	return filepath.Join(RSAKeyPath, vpnUserID(userEmail, asID)+"."+fileExt)
 }
 
 // Path for client key
-func (s *SCIONLabASController) vpnKeyPath(userEmail string, asID int) string {
-	return s.vpnKeyCertPath(userEmail, asID, "key")
+func vpnKeyPath(userEmail string, asID addr.AS) string {
+	return vpnKeyCertPath(userEmail, asID, "key")
 }
 
 // Path for client certificate
-func (s *SCIONLabASController) vpnCertPath(userEmail string, asID int) string {
-	return s.vpnKeyCertPath(userEmail, asID, "crt")
+func vpnCertPath(userEmail string, asID addr.AS) string {
+	return vpnKeyCertPath(userEmail, asID, "crt")
 }

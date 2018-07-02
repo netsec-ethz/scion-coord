@@ -21,6 +21,12 @@
 			"revisionTime": "2017-07-11T18:34:51Z"
 		},
 		{
+			"checksumSHA1": "s8t6UaijV8WMK0RMdX00OPI5z0o=",
+			"path": "github.com/dchest/cmac",
+			"revision": "62ff55a1048c485e83f1882466f535da624e944a",
+			"revisionTime": "2015-05-27T14:46:52Z"
+		},
+		{
 			"checksumSHA1": "LWSc/x0uRpsG/Q5yi6X6tkx1QQA=",
 			"path": "github.com/didip/tollbooth",
 			"revision": "8a5832d289e4375d2fc658ed42ef08975b66dceb",
@@ -153,28 +159,70 @@
 			"revisionTime": "2017-06-12T15:36:48Z"
 		},
 		{
+			"checksumSHA1": "FGg99nQ56Fo3radSCuU1AeEUJug=",
+			"path": "github.com/pierrec/lz4",
+			"revision": "08c27939df1bd95e881e2c2367a749964ad1fceb",
+			"revisionTime": "2017-08-28T19:29:35Z"
+		},
+		{
+			"checksumSHA1": "lpMy6c/DV9QGLA90OluUIjdtTN0=",
+			"path": "github.com/pierrec/lz4/internal/xxh32",
+			"revision": "6b9367c9ff401dbc54fabce3fb8d972e799b702d",
+			"revisionTime": "2018-06-10T16:27:16Z"
+		},
+		{
+			"checksumSHA1": "zPWRjzsPeXCoqmidIcJtHbvrvRs=",
+			"path": "github.com/pierrec/xxHash/xxHash32",
+			"revision": "a0006b13c722f7f12368c00a3d3c2ae8a999a0c6",
+			"revisionTime": "2017-07-14T08:24:55Z"
+		},
+		{
 			"checksumSHA1": "LuFv4/jlrmFNnDb/5SCSEPAM9vU=",
 			"path": "github.com/pmezard/go-difflib/difflib",
 			"revision": "792786c7400a136282c1664665ae0a8db921c6c2",
 			"revisionTime": "2016-01-10T10:55:54Z"
 		},
 		{
-			"checksumSHA1": "IuMioGLKf8DMBhq/xS8DhnySZdM=",
+			"checksumSHA1": "qMOAMArXJWEc/XPtb8mVfeKzUY0=",
 			"path": "github.com/scionproto/scion/go/lib/addr",
-			"revision": "7e45df65c1450928190a2fb3fbe56432c9cb66a8",
-			"revisionTime": "2018-02-10T14:27:06Z"
+			"revision": "a1b413850eda7fa64cd6e34e246dfe1cde2e1a62",
+			"revisionTime": "2018-06-06T12:33:18Z"
 		},
 		{
 			"checksumSHA1": "sWlwbRcBj5NFJS1b4VGwUOIJsOw=",
 			"path": "github.com/scionproto/scion/go/lib/assert",
-			"revision": "7e45df65c1450928190a2fb3fbe56432c9cb66a8",
-			"revisionTime": "2018-02-10T14:27:06Z"
+			"revision": "a1b413850eda7fa64cd6e34e246dfe1cde2e1a62",
+			"revisionTime": "2018-06-06T12:33:18Z"
 		},
 		{
-			"checksumSHA1": "gcZn/QEtXQXdydouJCIOzlial4w=",
+			"checksumSHA1": "f7kL7lDIJJyxm4W6Hk1Dfz92DME=",
 			"path": "github.com/scionproto/scion/go/lib/common",
-			"revision": "7e45df65c1450928190a2fb3fbe56432c9cb66a8",
-			"revisionTime": "2018-02-10T14:27:06Z"
+			"revision": "a1b413850eda7fa64cd6e34e246dfe1cde2e1a62",
+			"revisionTime": "2018-06-06T12:33:18Z"
+		},
+		{
+			"checksumSHA1": "d6ZFiaGalh3jfJ4Bz0K7MzK6yg0=",
+			"path": "github.com/scionproto/scion/go/lib/crypto",
+			"revision": "a1b413850eda7fa64cd6e34e246dfe1cde2e1a62",
+			"revisionTime": "2018-06-06T12:33:18Z"
+		},
+		{
+			"checksumSHA1": "KbXSKoF1vAjIMlxFz8ZI2AgnYbc=",
+			"path": "github.com/scionproto/scion/go/lib/crypto/cert",
+			"revision": "a1b413850eda7fa64cd6e34e246dfe1cde2e1a62",
+			"revisionTime": "2018-06-06T12:33:18Z"
+		},
+		{
+			"checksumSHA1": "PwTONhsCNhUcBxt5ChTgJ+YSp/c=",
+			"path": "github.com/scionproto/scion/go/lib/crypto/trc",
+			"revision": "a1b413850eda7fa64cd6e34e246dfe1cde2e1a62",
+			"revisionTime": "2018-06-06T12:33:18Z"
+		},
+		{
+			"checksumSHA1": "yfAZTyJGbBFNHjNkvYCGNUjE90w=",
+			"path": "github.com/scionproto/scion/go/lib/util",
+			"revision": "a1b413850eda7fa64cd6e34e246dfe1cde2e1a62",
+			"revisionTime": "2018-06-06T12:33:18Z"
 		},
 		{
 			"checksumSHA1": "fM3cI8mK8m7fVQx83Ntk6izHmeA=",
@@ -199,6 +247,18 @@
 			"path": "golang.org/x/crypto/acme/autocert",
 			"revision": "2509b142fb2b797aa7587dad548f113b2c0f20ce",
 			"revisionTime": "2017-10-23T14:45:55Z"
+		},
+		{
+			"checksumSHA1": "2LpxYGSf068307b7bhAuVjvzLLc=",
+			"path": "golang.org/x/crypto/ed25519",
+			"revision": "a49355c7e3f8fe157a85be2f77e6e269a0f89602",
+			"revisionTime": "2018-06-20T09:14:27Z"
+		},
+		{
+			"checksumSHA1": "0JTAFXPkankmWcZGQJGScLDiaN8=",
+			"path": "golang.org/x/crypto/ed25519/internal/edwards25519",
+			"revision": "a49355c7e3f8fe157a85be2f77e6e269a0f89602",
+			"revisionTime": "2018-06-20T09:14:27Z"
 		},
 		{
 			"checksumSHA1": "4D8hxMIaSDEW5pCQk22Xj4DcDh4=",
@@ -235,6 +295,12 @@
 			"path": "golang.org/x/time/rate",
 			"revision": "8be79e1e0910c292df4e79c241bb7e8f7e725959",
 			"revisionTime": "2017-04-24T23:28:54Z"
+		},
+		{
+			"checksumSHA1": "ZSWoOPUNRr5+3dhkLK3C4cZAQPk=",
+			"path": "gopkg.in/yaml.v2",
+			"revision": "5420a8b6744d3b0345ab293f6fcba19c978f1183",
+			"revisionTime": "2018-03-28T19:50:20Z"
 		}
 	],
 	"rootPath": "github.com/netsec-ethz/scion-coord"

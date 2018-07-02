@@ -118,7 +118,7 @@ func (c *RegistrationController) ResetPassword(w http.ResponseWriter, r *http.Re
 		HostAddress:      config.HTTPHostAddress,
 		VerificationUUID: u.VerificationUUID,
 	}
-	if err = email.ConstructAndSendEmail(
+	if err = email.ConstructFromTemplateAndSend(
 		"password_reset.html",
 		"[SCIONLab] Password reset",
 		data,
@@ -314,7 +314,7 @@ func sendVerificationEmail(userID uint64) error {
 		VerificationUUID: user.VerificationUUID,
 	}
 
-	if err := email.ConstructAndSendEmail(
+	if err := email.ConstructFromTemplateAndSend(
 		"verification.html",
 		"[SCIONLab] Verify your email address for SCIONLab Coordination Service",
 		data,

@@ -15,12 +15,17 @@
 package config
 
 import (
+	"flag"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
+	"github.com/netsec-ethz/scion-coord/utility"
+	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/sec51/goconf"
 )
 
@@ -54,12 +59,12 @@ var (
 	DBPassword                   = goconf.AppConf.String("db.pass")
 	DBMaxConnections, _          = goconf.AppConf.Int("db.max_connections")
 	DBMaxIdle, _                 = goconf.AppConf.Int("db.max_idle")
-	BaseASID, _                  = goconf.AppConf.Int("base_as_id")
-	BaxBRID, _                   = goconf.AppConf.Int("max_br_id")
+	BaseASID                     addr.AS
+	MaxBRID, _                   = goconf.AppConf.Int("max_br_id")
 	ReservedBRsInfrastructure, _ = goconf.AppConf.Int("reserved_brs_infrastructure")
 	ASesPerUser, _               = goconf.AppConf.Int("ases_per_user")
 	ASesPerAdmin, _              = goconf.AppConf.Int("ases_per_admin")
-	SigningASes                  = make(map[int]int) // map[ISD]=signing_as
+	SigningASes                  = make(map[addr.ISD]addr.AS) // map[ISD]=signing_as
 	MTU, _                       = goconf.AppConf.Int("mtu")
 	BRStartPort                  uint16
 	BRInternalStartPort          uint16
@@ -83,6 +88,8 @@ var (
 	IMGBuilderAddressInternal = goconf.AppConf.String("img_builder.address.internal")
 	IMGBuilderSecretToken     = goconf.AppConf.String("img_builder.secret_token")
 	IMGBuilderBuildDelay, _   = goconf.AppConf.Int64("img_builder.build_delay")
+
+	NextVersionPythonPath = goconf.AppConf.String("nextversion.python_path")
 )
 
 func init() {
@@ -101,17 +108,72 @@ func init() {
 			fmt.Println("Error parsing section signing_ases:", err)
 			os.Exit(1)
 		}
-		vi, err := strconv.Atoi(v)
-		if err != nil {
-			fmt.Println("Error parsing section signing_ases:", err)
+		if ki < 1 || ki > addr.MaxISD {
+			fmt.Println("Invalid value for ISD: ", k)
 			os.Exit(1)
 		}
-		SigningASes[ki] = vi
+
+		var asID addr.AS
+		vi, err := strconv.Atoi(v)
+		if err != nil {
+			asID, err = addr.ASFromString(v)
+			if err != nil {
+				fmt.Println("Error parsing section signing_ases:", err)
+				os.Exit(1)
+			}
+		} else {
+			asID = addr.AS(vi)
+		}
+		SigningASes[addr.ISD(ki)] = asID
 	}
+	auxInt, err := goconf.AppConf.Int64("base_as_id")
+	if err != nil {
+		auxString := goconf.AppConf.String("base_as_id")
+		BaseASID, err = addr.ASFromString(auxString)
+		if err != nil {
+			BaseASID = addr.AS(utility.ScionlabUserASOffsetAddr)
+			log.Printf("Config: not a valid AS id: '%v'. Using %v as base instead.", auxString, BaseASID.String())
+		}
+	} else {
+		BaseASID = addr.AS(auxInt)
+	}
+	fmt.Println("Base AS ID: ", BaseASID.String())
+
 	// we don't validate the email addresses, we just trim them in case they had leading/trailing spaces
 	for i, admin := range EmailAdmins {
 		EmailAdmins[i] = strings.Trim(admin, " ")
 	}
+
+	if flag.Lookup("test.v") != nil {
+		// this is running in testing, chdir to the right place
+		_, spath, _, _ := runtime.Caller(0)
+		spath = filepath.Dir(spath)
+		spath = filepath.Dir(spath)
+		err = os.Chdir(spath)
+		if err != nil {
+			fmt.Printf("Error in test chdir to %v: %v", spath, err)
+			os.Exit(1)
+		}
+	}
+
+	if NextVersionPythonPath != "" {
+		NextVersionPythonPath, err = filepath.Abs(NextVersionPythonPath)
+		if err != nil {
+			fmt.Println("'nextversion.python_path': ", err)
+			os.Exit(1)
+		}
+		dirInfo, err := os.Stat(NextVersionPythonPath)
+		if err != nil {
+			fmt.Println("'nextversion.python_path': ", err)
+			os.Exit(1)
+		}
+		if !dirInfo.IsDir() {
+			fmt.Printf("Value for 'nextversion.python_path' is not a directory")
+			os.Exit(1)
+		}
+	}
+
+	fmt.Println(NextVersionPythonPath)
 }
 
 func MaxASes(isAdmin bool) int {

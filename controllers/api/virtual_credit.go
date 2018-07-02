@@ -24,6 +24,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/models"
+	"github.com/scionproto/scion/go/lib/addr"
 )
 
 // Dummy error to return if the virtual credit system is disabled
@@ -56,8 +57,8 @@ func (c *ASInfoController) ListASesConnectionsWithCredits(w http.ResponseWriter,
 	}
 
 	var response struct {
-		ISD         int                            // The ISD of this AS
-		ASID        int                            // This AS
+		ISD         addr.ISD                       // The ISD of this AS
+		ASID        addr.AS                        // This AS
 		Credits     int64                          // The current credits of this AS
 		Connections []models.ConnectionWithCredits // List of connections and their costs / yields
 	}

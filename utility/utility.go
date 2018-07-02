@@ -16,16 +16,29 @@ package utility
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"text/template"
+
+	"github.com/scionproto/scion/go/lib/addr"
+)
+
+const (
+	// ScionLabISDOffsetAddr : the first scionlab ISD (not taking backbone into account)
+	ScionLabISDOffsetAddr = 16
+	// ScionLabInfrastructureASOffsetAddr : infrastructure addresses start here, +1
+	ScionLabInfrastructureASOffsetAddr = 0xFFAA00000000
+	// ScionlabUserASOffsetAddr : user ASes addresses start here, +1:
+	ScionlabUserASOffsetAddr = 0xFFAA00010000
 )
 
 // Simple utility function to copy a file.
@@ -115,8 +128,22 @@ func IPCompare(ip1, ip2 string) int8 {
 }
 
 // Create IA string from ISD and AS IDs
-func IAString(isd, as interface{}) string {
-	return fmt.Sprintf("%v-%v", isd, as)
+func IAStringStandard(isd addr.ISD, as addr.AS) string {
+	// return fmt.Sprintf("%v-%v", isd, as)
+	ia := addr.IA{I: isd, A: as}
+	return ia.String()
+}
+
+// IAFileName returns the IA to be used as a filename
+func IAFileName(isd addr.ISD, as addr.AS) string {
+	ia := addr.IA{I: isd, A: as}
+	return ia.FileFmt(false)
+}
+
+// IAString returns the ISD-AS in decimal. This doesn't follow the standard, but is very
+// compatible with the Coordinator's scripts
+func IAString(isd addr.ISD, as addr.AS) string {
+	return fmt.Sprintf("%d-%d", isd, as)
 }
 
 // Parses a BR name and returns the BRID
@@ -166,4 +193,39 @@ func FillTemplateAndSave(templatePath string, data interface{}, savePath string)
 		return fmt.Errorf("error executing template file %v: %v", templatePath, err)
 	}
 	return nil
+}
+
+// SendJSON will marshall the passed object and write it to the ResponseWriter in the argument.
+func SendJSON(object interface{}, w http.ResponseWriter) error {
+	b, err := json.Marshal(object)
+	if err == nil {
+		_, err = fmt.Fprintln(w, string(b))
+	}
+	return err
+}
+
+// SendJSONError sends the object as JSON, with a 400 HTTP error code
+func SendJSONError(object interface{}, w http.ResponseWriter) error {
+	b, err := json.Marshal(object)
+	if err == nil {
+		http.Error(w, string(b), http.StatusBadRequest)
+	}
+	return err
+}
+
+// MapOldIAToNewOne returns a valid SCION IA address given
+// the old one. E.g. (1,1001) -> (17, ffaa:0001:0000)
+// The convention for scionlab user ASes is to start from exactly ffaa:0001:0000, meaning
+// we reserve ffaa:0000:0000 to ffaa:0000:ffff for infrastructure.
+func MapOldIAToNewOne(ISDid addr.ISD, ASid addr.AS) addr.IA {
+	var I addr.ISD
+	var A addr.AS
+	if ISDid > 0 && ISDid < 22 && ASid > 1000 && ASid < 10000 {
+		if ISDid >= 20 && ISDid <= 21 {
+			ISDid += 40 - ScionLabISDOffsetAddr
+		}
+		I, A = ISDid+ScionLabISDOffsetAddr, ASid-1000+ScionlabUserASOffsetAddr
+	}
+
+	return addr.IA{I: I, A: A}
 }

@@ -20,6 +20,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/scionproto/scion/go/lib/addr"
 )
 
 type ipComparisonTest struct {
@@ -210,4 +212,30 @@ func TestCopyPath(t *testing.T) {
 		t.Errorf("Test file \"b\" contents differ on %v and %v",
 			filepath.Join(src, "subdir"), filepath.Join(dst, "subdir"))
 	}
+}
+
+var mapOldIAToNewOneTests = []struct {
+	fromISD addr.ISD
+	fromAS  addr.AS
+	toISD   addr.ISD
+	toAS    addr.AS
+}{
+	{20, 1001, 60, 0xFFAA00010001},
+	{1, 1001, 17, 0xFFAA00010001},
+	{2, 1001, 18, 0xFFAA00010001},
+	{0, 1001, 0, 0},
+	{42, 1001, 0, 0},
+	{1, 1000, 0, 0},
+	{1, 2001, 17, 0xFFAA000103E9}, // scionbox valid
+	{8, 1017, 24, 0xFFAA00010011},
+}
+
+func TestMapOldIAToNewOne(t *testing.T) {
+	for index, c := range mapOldIAToNewOneTests {
+		IA := MapOldIAToNewOne(c.fromISD, c.fromAS)
+		if IA.I != c.toISD || IA.A != c.toAS {
+			t.Errorf("FAILED mapping #%d (%v,%v) -> (%v,%v). Should be (%v,%v)", index, c.fromISD, c.fromAS, IA.I, IA.A, c.toISD, c.toAS)
+		}
+	}
+	// t.Errorf("we are done")
 }

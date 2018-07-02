@@ -100,6 +100,9 @@ def create_scionlab_as_local_gen(args, tp):
     generate_sciond_config(TopoID(args.joining_ia), as_obj, tp, local_gen_path)
     # We don't initiate the prometheous service for user ASes.
     # generate_prom_config(ia, tp, gen_path)
+    with open(os.path.join(local_gen_path, 'overlay'), 'w') as f:
+        f.write('UDP/IPv4')
+
 
 
 def generate_certificate(joining_ia, core_ia, core_sign_priv_key_file, core_cert_file, trc_file):

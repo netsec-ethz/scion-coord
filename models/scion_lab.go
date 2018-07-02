@@ -15,6 +15,9 @@
 package models
 
 import (
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -45,8 +48,8 @@ type SCIONLabAS struct {
 	UserEmail   string           // Owner of the AS
 	PublicIP    string           `orm:"column(public_ip)"` // IP address of the AS; can be empty in case of VPN-based setups
 	StartPort   uint16           // First port used for border routers
-	ISD         int              `orm:"column(isd);default(0)"` // 0 means no ISD is joined
-	ASID        int              `orm:"column(as_id)"`
+	ISD         addr.ISD         `orm:"column(isd);default(0)"` // 0 means no ISD is joined
+	ASID        addr.AS          `orm:"column(as_id)"`
 	Core        bool             `orm:"default(false)"` // Is this SCIONLabAS a core AS
 	Label       string           // Optional label for this AS (can be chosen by the user)
 	Status      uint8            `orm:"default(0)"` // Status of the AS: Active, Create, ...
@@ -57,6 +60,7 @@ type SCIONLabAS struct {
 	Created     time.Time        // When the AS was first created
 	Updated     time.Time        // Last time the configuration was modified or the AS called `ConfirmUpdate`
 	Connections []*Connection    `orm:"reverse(many)"` // List of Connections
+	RemapStatus string           `orm:"size(1000);type(json);null"`
 }
 
 type Connection struct {
@@ -78,8 +82,8 @@ type Connection struct {
 // Contains all info needed to populate the topology file
 type ConnectionInfo struct {
 	ID                   uint64 // Used to find the BorderRouter
-	NeighborISD          int
-	NeighborAS           int
+	NeighborISD          addr.ISD
+	NeighborAS           addr.AS
 	NeighborIP           string
 	NeighborUser         string
 	NeighborStatus       uint8
@@ -116,17 +120,21 @@ func OnlyNotCurrentConnections(cns []ConnectionInfo) []ConnectionInfo {
 	return filterConnectionsByBeingCurrentStatus(cns, false)
 }
 
-func (as *SCIONLabAS) IA() string {
+func (as *SCIONLabAS) IA() addr.IA {
+	return addr.IA{I: as.ISD, A: as.ASID}
+}
+
+func (as *SCIONLabAS) IAString() string {
 	if as.ISD < 1 {
 		return fmt.Sprintf("%v", as.ASID)
 	}
-	return utility.IAString(as.ISD, as.ASID)
+	return utility.IAStringStandard(as.ISD, as.ASID)
 }
 
 func (as *SCIONLabAS) String() string {
-	res := as.IA()
+	res := as.IAString()
 	if as.Label != "" {
-		res = fmt.Sprintf("%v (%v)", as.IA(), as.Label)
+		res = fmt.Sprintf("%v (%v)", res, as.Label)
 	}
 	return res
 }
@@ -217,7 +225,7 @@ func (as *SCIONLabAS) GetPortNumberFromBRID(brID uint16) uint16 {
 func (as *SCIONLabAS) GetFreeBRID() (uint16, error) {
 	cns, err := as.GetConnectionInfo()
 	if err != nil {
-		return 0, fmt.Errorf("error finding connections of AS %v: %v", as.IA(), err)
+		return 0, fmt.Errorf("Error finding connections of AS %v: %v", as.IAString(), err)
 	}
 	length := len(cns)
 	brIDs := make([]int, length)
@@ -228,15 +236,15 @@ func (as *SCIONLabAS) GetFreeBRID() (uint16, error) {
 	if as.Type == Infrastructure {
 		minBRID += config.ReservedBRsInfrastructure
 	}
-	id, err := utility.GetAvailableID(brIDs, minBRID, config.BaxBRID)
+	id, err := utility.GetAvailableID(brIDs, minBRID, config.MaxBRID)
 	return uint16(id), err
 }
 
 // TODO(mlegner): Avoid signed/unsigned casting; could be problematic if huge IP ranges are used
 func (as *SCIONLabAS) GetFreeVPNIP() (string, error) {
-	cns, err := as.getRespondConnections()
+	cns, err := as.GetRespondConnections()
 	if err != nil {
-		return "", fmt.Errorf("error finding connections of AP %v: %v", as.IA(), err)
+		return "", fmt.Errorf("Error finding connections of AP %v: %v", as.IAString(), err)
 	}
 	var vpnIPs []int
 	for _, cn := range cns {
@@ -250,7 +258,7 @@ func (as *SCIONLabAS) GetFreeVPNIP() (string, error) {
 }
 
 // Only returns the connections of the AS in its function as the joining AS
-func (as *SCIONLabAS) getJoinConnections() ([]*Connection, error) {
+func (as *SCIONLabAS) GetJoinConnections() ([]*Connection, error) {
 	_, err := o.LoadRelated(as, "Connections")
 	if err == orm.ErrNoRows {
 		return []*Connection{}, nil
@@ -259,7 +267,7 @@ func (as *SCIONLabAS) getJoinConnections() ([]*Connection, error) {
 }
 
 // Only returns the connections of the AS in its function as an AP
-func (as *SCIONLabAS) getRespondConnections() ([]*Connection, error) {
+func (as *SCIONLabAS) GetRespondConnections() ([]*Connection, error) {
 	var cns []*Connection
 	if as.AP != nil {
 		APCns, err := as.AP.getConnections()
@@ -273,51 +281,54 @@ func (as *SCIONLabAS) getRespondConnections() ([]*Connection, error) {
 
 // Returns all connections of the AS
 func (as *SCIONLabAS) getAllConnections() ([]*Connection, error) {
-	joinCns, err := as.getJoinConnections()
+	joinCns, err := as.GetJoinConnections()
 	if err != nil {
 		return nil, err
 	}
-	resCns, err := as.getRespondConnections()
+	resCns, err := as.GetRespondConnections()
 	if err != nil {
 		return nil, err
 	}
 	return append(joinCns, resCns...), nil
 }
 
-func (cn *Connection) getJoinAS() *SCIONLabAS {
-	as := new(SCIONLabAS)
-	o.QueryTable(as).Filter("ID", cn.JoinAS.ID).RelatedSel().One(as)
-	return as
+func (cn *Connection) GetJoinAS() *SCIONLabAS {
+	// as := new(SCIONLabAS)
+	// o.QueryTable(as).Filter("ID", cn.JoinAS.ID).RelatedSel().One(as)
+	// return as
+	// TODO, Question: if we have cn.JoinAS as the JoinAS, with the correct type, why
+	// do we need to query the DB again? Below is a simpler approach:
+	o.LoadRelated(cn, "JoinAS")
+	return cn.JoinAS
 }
 
-func (cn *Connection) getRespondAS() *SCIONLabAS {
-	ap := new(AttachmentPoint)
-	if err := o.QueryTable(ap).Filter("ID", cn.RespondAP.ID).RelatedSel().One(ap); err != nil {
-		return nil
+func (cn *Connection) GetRespondAS() *SCIONLabAS {
+	// TODO: Question: same as the above method. Now we only ensure the AS is loaded:
+	if cn.RespondAP.AS == nil {
+		o.LoadRelated(cn.RespondAP, "AS")
 	}
-	o.LoadRelated(ap, "AS")
-	return ap.AS
+	return cn.RespondAP.AS
 }
 
 // Returns a list of ConnectionInfo where the AS is the joining AS
 func (as *SCIONLabAS) GetJoinConnectionInfo() ([]ConnectionInfo, error) {
-	cns, err := as.getJoinConnections()
+	cns, err := as.GetJoinConnections()
 	if err != nil {
 		return nil, err
 	}
 	var cnInfo ConnectionInfo
 	var cnInfos []ConnectionInfo
 	for _, cn := range cns {
-		respondAS := cn.getRespondAS()
-		joinAS := cn.getJoinAS()
+		respondAS := cn.GetRespondAS()
+		joinAS := cn.GetJoinAS()
 		// If the connection has been removed continue
 		if cn.JoinStatus == Removed {
 			continue
 		}
 		cnInfo = ConnectionInfo{
 			ID:                   cn.ID,
-			NeighborISD:          respondAS.ISD,
-			NeighborAS:           respondAS.ASID,
+			NeighborISD:          addr.ISD(respondAS.ISD),
+			NeighborAS:           addr.AS(respondAS.ASID),
 			NeighborIP:           cn.RespondIP,
 			NeighborUser:         respondAS.UserEmail,
 			NeighborStatus:       respondAS.Status,
@@ -339,15 +350,15 @@ func (as *SCIONLabAS) GetJoinConnectionInfo() ([]ConnectionInfo, error) {
 
 // Returns a list of ConnectionInfo where the AS is the responding AS
 func (as *SCIONLabAS) GetRespondConnectionInfo() ([]ConnectionInfo, error) {
-	cns, err := as.getRespondConnections()
+	cns, err := as.GetRespondConnections()
 	if err != nil {
 		return nil, err
 	}
 	var cnInfo ConnectionInfo
 	var cnInfos []ConnectionInfo
 	for _, cn := range cns {
-		respondAS := cn.getRespondAS()
-		joinAS := cn.getJoinAS()
+		respondAS := cn.GetRespondAS()
+		joinAS := cn.GetJoinAS()
 		if cn.RespondStatus == Removed {
 			continue
 		}
@@ -357,8 +368,8 @@ func (as *SCIONLabAS) GetRespondConnectionInfo() ([]ConnectionInfo, error) {
 		}
 		cnInfo = ConnectionInfo{
 			ID:                   cn.ID,
-			NeighborISD:          joinAS.ISD,
-			NeighborAS:           joinAS.ASID,
+			NeighborISD:          addr.ISD(joinAS.ISD),
+			NeighborAS:           addr.AS(joinAS.ASID),
 			NeighborIP:           cn.JoinIP,
 			NeighborUser:         joinAS.UserEmail,
 			NeighborStatus:       joinAS.Status,
@@ -443,8 +454,8 @@ func (as *SCIONLabAS) UpdateDBConnection(cnInfo *ConnectionInfo) error {
 	cn.JoinIP = cnInfo.LocalIP
 	cn.RespondIP = cnInfo.NeighborIP
 
-	respondAS := cn.getRespondAS()
-	joinAS := cn.getJoinAS()
+	respondAS := cn.GetRespondAS()
+	joinAS := cn.GetJoinAS()
 	if joinAS.ID == as.ID {
 		cn.JoinStatus = cnInfo.Status
 		cn.RespondStatus = cnInfo.NeighborStatus
@@ -481,7 +492,7 @@ func GetAllAPs() ([]*SCIONLabAS, error) {
 }
 
 // Returns all Attachment Point ASes in the given ISD
-func FindAllAPsByISD(isd int) ([]*SCIONLabAS, error) {
+func FindAllAPsByISD(isd addr.ISD) ([]*SCIONLabAS, error) {
 	var aps []*AttachmentPoint
 	var ases []*SCIONLabAS
 	_, err := o.QueryTable(new(AttachmentPoint)).RelatedSel().All(&aps)
@@ -529,7 +540,7 @@ func FindSCIONLabASesByAccountID(accountID string) (asStrings []string, err erro
 			return
 		}
 		for _, as := range ases {
-			asStrings = append(asStrings, as.IA())
+			asStrings = append(asStrings, as.IAString())
 		}
 	}
 	return
@@ -545,11 +556,11 @@ func FindSCIONLabASByIAString(ia string) (*SCIONLabAS, error) {
 }
 
 // Find SCIONLabAS by the ISD AS int
-func FindSCIONLabASByIAInt(isd int, asID int) (*SCIONLabAS, error) {
+func FindSCIONLabASByIAInt(isd addr.ISD, asID addr.AS) (*SCIONLabAS, error) {
 	return FindSCIONLabASByASID(asID)
 }
 
-func FindSCIONLabASByASID(asID int) (*SCIONLabAS, error) {
+func FindSCIONLabASByASID(asID addr.AS) (*SCIONLabAS, error) {
 	as := new(SCIONLabAS)
 	err := o.QueryTable(as).Filter("ASID", asID).RelatedSel().One(as)
 	if err != nil {
@@ -569,8 +580,8 @@ func FindSCIONLabASesByIP(ip string) ([]SCIONLabAS, error) {
 
 // The following struct and functions are used in the mediation API functions
 type ASInfo struct {
-	ISD     int
-	ASID    int
+	ISD     addr.ISD
+	ASID    addr.AS
 	Core    bool
 	Account *Account
 	Credits int64
@@ -602,8 +613,8 @@ func convertSCIONLabASToASInfo(as *SCIONLabAS) (*ASInfo, error) {
 		return nil, err
 	}
 	asInfo := ASInfo{
-		ISD:     as.ISD,
-		ASID:    as.ASID,
+		ISD:     addr.ISD(as.ISD),
+		ASID:    addr.AS(as.ASID),
 		Core:    as.Core,
 		Account: account,
 		Credits: as.Credits,
@@ -624,7 +635,7 @@ func convertSCIONLabASesToASInfos(ases []SCIONLabAS) (asInfos []ASInfo, err erro
 	return
 }
 
-func FindCoreASInfosByISD(isd int) ([]ASInfo, error) {
+func FindCoreASInfosByISD(isd addr.ISD) ([]ASInfo, error) {
 	var ases []SCIONLabAS
 	_, err := o.QueryTable(new(SCIONLabAS)).Filter("ISD", isd).Filter("Core", true).All(&ases)
 	if err != nil {
@@ -633,7 +644,7 @@ func FindCoreASInfosByISD(isd int) ([]ASInfo, error) {
 	return convertSCIONLabASesToASInfos(ases)
 }
 
-func FindASInfosByISD(isd int) ([]ASInfo, error) {
+func FindASInfosByISD(isd addr.ISD) ([]ASInfo, error) {
 	var ases []SCIONLabAS
 	_, err := o.QueryTable(new(SCIONLabAS)).Filter("ISD", isd).All(&ases)
 	if err != nil {
@@ -685,7 +696,7 @@ func (as *SCIONLabAS) DeleteConnectionFromDB(cnInfo *ConnectionInfo) error {
 func (as *SCIONLabAS) FlagAllConnectionsToApToBeDeleted(apIA string) error {
 	cns, err := as.GetJoinConnectionInfo()
 	if err != nil {
-		return fmt.Errorf("error looking up connections of SCIONLab AS for AS %v: %v", as.IA(), err)
+		return fmt.Errorf("Error looking up connections of SCIONLab AS for AS %v: %v", as.IAString(), err)
 	}
 	// all connections from an AS flagged as new connection and oldAP need to end up (localST, remoteST) = (REMOVE,REMOVE)
 	for _, cn := range cns {
@@ -720,4 +731,58 @@ func (cn *Connection) Delete() error {
 func DeleteConnection(connectionId uint64) error {
 	_, err := o.Delete(&Connection{ID: connectionId})
 	return err
+}
+
+// AreIDsFromScionLab checks the ISD and AS numbers against the standard
+// you can find in https://github.com/scionproto/scion/wiki/ISD-and-AS-numbering , and returns
+// true if they are okay for SCIONLab; false otherwise.
+func (as *SCIONLabAS) AreIDsFromScionLab() bool {
+	if as.ISD <= 15 || as.ASID <= 4294967295 {
+		return false
+	}
+	return true
+}
+
+// GetMappingStatus returns the mapping status map that was stored in the DB for this AS
+func (as *SCIONLabAS) GetMappingStatus() (map[string]interface{}, error) {
+	status := make(map[string]interface{})
+	var err error
+	if as.RemapStatus != "" {
+		err = json.Unmarshal([]byte(as.RemapStatus), &status)
+	}
+	return status, err
+}
+
+// SetMappingStatusAndSave JSON serializes the dictionary, stores it in the AS and writes to DB
+func (as *SCIONLabAS) SetMappingStatusAndSave(status map[string]interface{}) error {
+	marshalled, err := json.Marshal(status)
+	if err != nil {
+		return err
+	}
+	as.RemapStatus = string(marshalled)
+	err = as.Update()
+	return err
+}
+
+// GetRemapChallenge returns the stored challenge or a new one otherwise.
+func (as *SCIONLabAS) GetRemapChallenge() (string, error) {
+	status, err := as.GetMappingStatus()
+	if err != nil {
+		return "", err
+	}
+	challengeAsAny, hasIt := status["challenge"]
+	if !hasIt {
+		randomBytes := make([]byte, 512)
+		_, err = rand.Read(randomBytes)
+		if err != nil {
+			return "", errors.New("Could not create challenge")
+		}
+		challengeAsAny = base64.StdEncoding.EncodeToString(randomBytes)
+		status["challenge"] = challengeAsAny
+		err = as.SetMappingStatusAndSave(status)
+		if err != nil {
+			return "", err
+		}
+	}
+	return challengeAsAny.(string), nil
 }

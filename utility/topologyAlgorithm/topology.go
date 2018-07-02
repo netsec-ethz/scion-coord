@@ -17,6 +17,7 @@ package topologyAlgorithm
 import (
 	"github.com/astaxie/beego/orm"
 	"github.com/netsec-ethz/scion-coord/models"
+	"github.com/scionproto/scion/go/lib/addr"
 )
 
 // performance score thresholds
@@ -40,8 +41,8 @@ const (
 )
 
 type Neighbor struct {
-	ISD int
-	AS  int
+	ISD addr.ISD
+	AS  addr.AS
 	IP  string
 	BW  float64
 	RTT float64

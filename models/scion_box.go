@@ -16,15 +16,17 @@ package models
 
 import (
 	"time"
+
+	"github.com/scionproto/scion/go/lib/addr"
 )
 
 type SCIONBox struct {
 	ID             uint64 `orm:"column(id);auto;pk"`
 	MAC            string `orm:"column(mac)"`
 	UserEmail      string
-	ISD            int    `orm:"column(isd);default(0)"`
-	AS             int    `orm:"column(as);default(0)"`
-	InternalIP     string `orm:"column(internal_ip)"`
+	ISD            addr.ISD `orm:"column(isd);default(0)"`
+	AS             addr.AS  `orm:"column(as);default(0)"`
+	InternalIP     string   `orm:"column(internal_ip)"`
 	Shipping       string
 	OpenPorts      uint16 `orm:"default(0)"` // Number of free ports UDP ports starting from StartPort
 	StartPort      uint16 `orm:"default(50000)"`
@@ -45,7 +47,7 @@ func FindSCIONBoxByEMail(userEmail string) (*SCIONBox, error) {
 	return v, err
 }
 
-func FindSCIONBoxByIAint(isd int, As int) (*SCIONBox, error) {
+func FindSCIONBoxByIAint(isd addr.ISD, As addr.AS) (*SCIONBox, error) {
 	v := new(SCIONBox)
 	err := o.QueryTable(v).Filter("ISD", isd).Filter("AS", As).RelatedSel().One(v)
 	return v, err
@@ -70,8 +72,8 @@ func (sb *SCIONBox) Remove() error {
 }
 
 type ISDLocation struct {
-	ID        uint64 `orm:"column(id);auto;pk"`
-	ISD       int    `orm:"column(isd)"`
+	ID        uint64   `orm:"column(id);auto;pk"`
+	ISD       addr.ISD `orm:"column(isd)"`
 	Country   string
 	Continent string
 }
@@ -86,7 +88,7 @@ func (il *ISDLocation) Update() error {
 	return err
 }
 
-func FindISDbyID(id int) (*ISDLocation, error) {
+func FindISDbyID(id addr.ISD) (*ISDLocation, error) {
 	v := new(ISDLocation)
 	err := o.QueryTable(v).Filter("ISD", id).RelatedSel().One(v)
 	return v, err
@@ -105,14 +107,14 @@ func FindISDbyContinent(continent string) (*ISDLocation, error) {
 }
 
 // Find Potential Neighbors for the Box
-func FindPotentialNeighbors(isd int) ([]SCIONLabAS, error) {
+func FindPotentialNeighbors(isd addr.ISD) ([]SCIONLabAS, error) {
 	var v []SCIONLabAS
 	v, err := GetAllAPsByISD(isd)
 	return v, err
 }
 
 // Find All Active Attachment Points in an ISD
-func GetAllAPsByISD(isd int) ([]SCIONLabAS, error) {
+func GetAllAPsByISD(isd addr.ISD) ([]SCIONLabAS, error) {
 	var v []SCIONLabAS
 	w, err := GetAllAPs()
 	if err != nil {
@@ -128,7 +130,7 @@ func GetAllAPsByISD(isd int) ([]SCIONLabAS, error) {
 	return v, nil
 }
 
-func FindSCIONLabAsesByISD(isd int) ([]SCIONLabAS, error) {
+func FindSCIONLabAsesByISD(isd addr.ISD) ([]SCIONLabAS, error) {
 	var v []SCIONLabAS
 	_, err := o.QueryTable(new(SCIONLabAS)).Filter("ISD", isd).RelatedSel().All(&v)
 	return v, err

@@ -23,11 +23,12 @@ import (
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/models"
 	"github.com/netsec-ethz/scion-coord/utility"
+	"github.com/scionproto/scion/go/lib/addr"
 )
 
 type asInfo struct {
-	ASID      int       // AS ID of the user's SCIONLab AS
-	ISD       int       // Current ISD of the user's SCIONLab AS
+	ISD       addr.ISD  // Current ISD of the user's SCIONLab AS
+	ASID      addr.AS   // AS ID of the user's SCIONLab AS
 	Label     string    // Label of the AS
 	IALabel   string    // ISD-AS string + Label of the AS
 	Status    uint8     // Current status of the AS
@@ -89,7 +90,7 @@ func populateASStatusButtons(userEmail string) ([]asInfo, map[string]apInfo, err
 			Label:  ap.String(),
 			HasVPN: ap.AP.HasVPN,
 		}
-		apInfos[ap.IA()] = apI
+		apInfos[ap.IAString()] = apI
 	}
 	for _, as := range ases {
 		buttons := uiButtons{
@@ -133,7 +134,7 @@ func populateASStatusButtons(userEmail string) ([]asInfo, map[string]apInfo, err
 		// TODO: Currently only one active connection allowed
 		if len(cns) > 0 {
 			asI.IsVPN = cns[0].IsVPN
-			asI.AP = utility.IAString(cns[0].NeighborISD, cns[0].NeighborAS)
+			asI.AP = utility.IAStringStandard(cns[0].NeighborISD, cns[0].NeighborAS)
 		}
 
 		switch asI.Status {

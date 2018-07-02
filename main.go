@@ -33,6 +33,7 @@ import (
 	"github.com/netsec-ethz/scion-coord/controllers/api"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/models"
+	"github.com/scionproto/scion/go/lib/addr"
 	"golang.org/x/crypto/acme/autocert"
 )
 
@@ -43,7 +44,7 @@ func initializeISD() error {
 		fmt.Errorf("ERROR: Cannot access ISD location mapping json file: %v", err)
 	}
 	var isdLocs []struct {
-		ISD       int
+		ISD       addr.ISD
 		Country   string
 		Continent string
 	}
@@ -199,13 +200,19 @@ func main() {
 		scionLabASController.RemoveSCIONLabAS))
 	router.Handle("/api/as/downloadTarball/{as_id}", userChain.ThenFunc(
 		scionLabASController.ReturnTarball))
+	router.Handle("/api/as/remapId/{as_id}", loggingChain.ThenFunc(
+		scionLabASController.RemapASIdentityChallengeAndSolution)).Methods(http.MethodGet, http.MethodPost)
+	router.Handle("/api/as/remapIdDownloadGen/{as_id}", loggingChain.ThenFunc(
+		scionLabASController.RemapASDownloadGen)).Methods(http.MethodPost)
+	router.Handle("/api/as/remapIdConfirmStatus/{as_id}", loggingChain.ThenFunc(
+		scionLabASController.RemapASConfirmStatus)).Methods(http.MethodPost)
 	router.Handle("/api/as/getUpdatesForAP/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabASController.GetUpdatesForAP))
 	router.Handle("/api/as/confirmUpdatesFromAP/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabASController.ConfirmUpdatesFromAP))
 	router.Handle("/api/as/queryUpdateBranch/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabASController.QueryUpdateBranch))
-	router.Handle("/api/as/confirmUpdate/{account_id}/{secret}",
+	router.Handle("/api/as/confirmUpdate/{account_id}",
 		apiChain.ThenFunc(scionLabASController.ConfirmUpdate)).Methods(http.MethodPost)
 
 	//SCIONBox API

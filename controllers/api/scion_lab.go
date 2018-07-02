@@ -16,6 +16,7 @@ package api
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,7 +27,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
+	"strings"
 	"text/template"
 	"time"
 
@@ -35,9 +38,12 @@ import (
 	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
+	"github.com/netsec-ethz/scion-coord/email"
 	"github.com/netsec-ethz/scion-coord/models"
 	"github.com/netsec-ethz/scion-coord/utility"
 	"github.com/scionproto/scion/go/lib/addr"
+	"github.com/scionproto/scion/go/lib/crypto"
+	"github.com/scionproto/scion/go/lib/crypto/cert"
 )
 
 var (
@@ -63,24 +69,24 @@ var (
 )
 
 // TODO(mlegner): We need to find a better way to handle all the credential files.
-func CredentialFile(isd int, ending string) string {
+func CredentialFile(isd addr.ISD, ending string) string {
 	return filepath.Join(credentialsPath, fmt.Sprintf("ISD%d.%s", isd, ending))
 }
 
-func CoreCertFile(isd int) string {
+func CoreCertFile(isd addr.ISD) string {
 	return CredentialFile(isd, "crt")
 }
 
-func CoreSigKey(isd int) string {
+func CoreSigKey(isd addr.ISD) string {
 	return CredentialFile(isd, "key")
 }
 
-func TrcFile(isd int) string {
+func TrcFile(isd addr.ISD) string {
 	return CredentialFile(isd, "trc")
 }
 
-func UserPackageName(email string, isd, as int) string {
-	return fmt.Sprintf("%v_%v-%v", email, isd, as)
+func UserPackageName(email string, isd addr.ISD, as addr.AS) string {
+	return fmt.Sprintf("%s_%s", email, utility.IAFileName(isd, as))
 }
 
 func (asInfo *SCIONLabASInfo) UserPackageName() string {
@@ -103,7 +109,7 @@ type SCIONLabASInfo struct {
 	IP              string             // the public IP address of the SCIONLab AS
 	LocalPort       uint16             // The port of the border router on the user side
 	OldAP           string             // the previous SCIONLab AP to which the AS was connected
-	RemoteIA        string             // the SCIONLab AP the AS connects to
+	RemoteIA        addr.IA            // the SCIONLab AP the AS connects to
 	RemoteIP        string             // the IP address of the SCIONLab AP it connects to
 	RemoteBRID      uint16             // ID of the border router in the SCIONLab AP
 	RemotePort      uint16             // Port of the BR in the SCIONLab AP
@@ -112,14 +118,33 @@ type SCIONLabASInfo struct {
 }
 
 type SCIONLabRequest struct {
-	ASID      int    `json:"asID"`
-	UserEmail string `json:"userEmail"`
-	IsVPN     bool   `json:"isVPN"`
-	IP        string `json:"ip"`
-	ServerIA  string `json:"serverIA"`
-	Label     string `json:"label"`
-	Type      uint8  `json:"type"`
-	Port      uint16 `json:"port"`
+	ASID      addr.AS `json:"asID"`
+	UserEmail string  `json:"userEmail"`
+	IsVPN     bool    `json:"isVPN"`
+	IP        string  `json:"ip"`
+	ServerIA  string  `json:"serverIA"`
+	Label     string  `json:"label"`
+	Type      uint8   `json:"type"`
+	Port      uint16  `json:"port"`
+}
+
+type remappingError struct {
+	err          error
+	notifyAdmins bool
+}
+
+func newMappingError(notifyAdmins bool, format string, params ...interface{}) *remappingError {
+	return &remappingError{err: fmt.Errorf(format, params...), notifyAdmins: notifyAdmins}
+}
+func (e *remappingError) Error() string {
+	return e.err.Error()
+}
+func (e *remappingError) LogAndNotifyAppropriately(w http.ResponseWriter, format string, params ...interface{}) {
+	if e.notifyAdmins {
+		logAndSendErrorAndNotifyAdmins(w, format, params...)
+	} else {
+		logAndSendError(w, format, params...)
+	}
 }
 
 // This generates a new AS for the user if they do not have too many already
@@ -164,6 +189,38 @@ func (s *SCIONLabASController) GenerateNewSCIONLabAS(w http.ResponseWriter, r *h
 	return
 }
 
+func generateGenForAS(asInfo *SCIONLabASInfo) error {
+	var err error
+	// Generate topology file
+	if err = generateTopologyFile(asInfo); err != nil {
+		return fmt.Errorf("Error generating topology file: %v", err)
+	}
+	// Generate local gen
+	if err = generateLocalGen(asInfo); err != nil {
+		return fmt.Errorf("Error generating local config: %v", err)
+	}
+	// Generate VPN config if this is a VPN setup
+	if asInfo.IsVPN {
+		if err = generateVPNConfig(asInfo); err != nil {
+			return fmt.Errorf("Error generating VPN config: %v", err)
+		}
+	}
+	if err = addAuxiliaryFiles(asInfo); err != nil {
+		return fmt.Errorf("Error adding auxiliary files to the package: %v", err)
+	}
+	// Add account id and secret to gen directory
+	err = createUserLoginConfiguration(asInfo)
+	if err != nil {
+		return fmt.Errorf("Error generating user credential files: %v", err)
+	}
+	// Package the SCIONLab AS configuration
+	err = packageConfiguration(asInfo)
+	if err != nil {
+		return fmt.Errorf("Error packaging SCIONLabAS configuration: %v", err)
+	}
+	return nil
+}
+
 // The main handler function to generates a SCIONLab AS for the given user.
 // If successful, the front-end will initiate the downloading of the tarball.
 func (s *SCIONLabASController) ConfigureSCIONLabAS(w http.ResponseWriter, r *http.Request) {
@@ -188,46 +245,14 @@ func (s *SCIONLabASController) ConfigureSCIONLabAS(w http.ResponseWriter, r *htt
 		return
 	}
 	// Remove all existing files from UserPackagePath
-	// TODO(mlegner): May want to archive somewhere?
 	os.RemoveAll(asInfo.UserPackagePath() + "/")
-	// Generate topology file
-	if err = s.generateTopologyFile(asInfo); err != nil {
-		log.Printf("Error generating topology file: %v", err)
-		s.Error500(w, err, "Error generating topology file")
-		return
+	// generate the gen folder:
+	err = generateGenForAS(asInfo)
+	if err != nil {
+		log.Print(err)
+		s.Error500(w, err, "Error generating the configuration")
 	}
-	// Generate local gen
-	if err = s.generateLocalGen(asInfo); err != nil {
-		log.Printf("Error generating local config: %v", err)
-		s.Error500(w, err, "Error generating local config")
-		return
-	}
-	// Generate VPN config if this is a VPN setup
-	if asInfo.IsVPN {
-		if err = s.generateVPNConfig(asInfo); err != nil {
-			log.Printf("Error generating VPN config: %v", err)
-			s.Error500(w, err, "Error generating VPN config")
-			return
-		}
-	}
-	if err = s.addAuxiliaryFiles(asInfo); err != nil {
-		errTitle := "Error adding auxiliary files to the package"
-		log.Printf(errTitle+": %v", err)
-		s.Error500(w, err, errTitle)
-		return
-	}
-	// Add account id and secret to gen directory
-	if err = s.createUserLoginConfiguration(asInfo); err != nil {
-		log.Printf("Error generating user credential files: %v", err)
-		s.Error500(w, err, "Error generating user credential files")
-		return
-	}
-	// Package the SCIONLab AS configuration
-	if err = s.packageConfiguration(asInfo); err != nil {
-		log.Printf("Error packaging SCIONLabAS configuration: %v", err)
-		s.Error500(w, err, "Error packaging SCIONLabAS configuration")
-		return
-	}
+
 	// Persist the relevant data into the DB
 	if err = s.updateDB(asInfo); err != nil {
 		log.Printf("Error updating DB tables: %v", err)
@@ -281,7 +306,7 @@ func (s *SCIONLabASController) parseRequestParameters(r *http.Request) (
 }
 
 // Check if the user's AS is already in the process of being created or updated.
-func (s *SCIONLabASController) canConfigure(userEmail string, asID int) error {
+func (s *SCIONLabASController) canConfigure(userEmail string, asID addr.AS) error {
 	as, err := models.FindSCIONLabASByUserEmailAndASID(userEmail, asID)
 	if err != nil {
 		return err
@@ -343,7 +368,7 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 		}
 	}
 
-	ia, err := addr.IAFromString(slReq.ServerIA)
+	remoteIA, err := addr.IAFromString(slReq.ServerIA)
 	if err != nil {
 		return nil, err
 	}
@@ -394,13 +419,13 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 		as.Status = models.Update
 	}
 	as.PublicIP = slReq.IP
-	as.ISD = ia.I
+	as.ISD = remoteIA.I
 	as.Label = slReq.Label
 
 	return &SCIONLabASInfo{
 		IsNewConnection: newConnection,
 		IsVPN:           slReq.IsVPN,
-		RemoteIA:        slReq.ServerIA,
+		RemoteIA:        remoteIA,
 		IP:              ip,
 		LocalPort:       as.StartPort,
 		OldAP:           oldAP,
@@ -412,6 +437,25 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 		LocalAS:         as,
 		RemoteAS:        remoteAS,
 	}, nil
+}
+
+func getSCIONLabASInfoFromDB(conn *models.Connection) (*SCIONLabASInfo, error) {
+	asInfo := SCIONLabASInfo{
+		IsNewConnection: false,
+		IsVPN:           conn.IsVPN,
+		RemoteIA:        conn.RespondAP.AS.IA(),
+		IP:              conn.JoinIP,
+		LocalPort:       conn.JoinAS.StartPort,
+		OldAP:           "",
+		RemoteIP:        conn.RespondIP,
+		RemoteBRID:      conn.RespondBRID,
+		RemotePort:      conn.RespondAP.AS.GetPortNumberFromBRID(conn.RespondBRID),
+		VPNServerIP:     conn.RespondAP.VPNIP,
+		VPNServerPort:   conn.RespondAP.VPNPort,
+		LocalAS:         conn.JoinAS,
+		RemoteAS:        conn.RespondAP.AS,
+	}
+	return &asInfo, nil
 }
 
 // Updates the relevant database tables related to SCIONLab AS creation.
@@ -448,7 +492,7 @@ func (s *SCIONLabASController) updateDB(asInfo *SCIONLabASInfo) error {
 	} else {
 		// we had found an existing connection to the same AP.
 		// Update the Connections Table
-		cns, err := asInfo.LocalAS.GetJoinConnectionInfoToAS(asInfo.RemoteIA)
+		cns, err := asInfo.LocalAS.GetJoinConnectionInfoToAS(asInfo.RemoteIA.String())
 		if err != nil {
 			return fmt.Errorf("error finding existing connection of user %v: %v",
 				userEmail, err)
@@ -456,8 +500,8 @@ func (s *SCIONLabASController) updateDB(asInfo *SCIONLabASInfo) error {
 		cns = models.OnlyCurrentConnections(cns)
 		if len(cns) != 1 {
 			// we've failed our assertion that there's only one active connection. Complain.
-			return fmt.Errorf("error updating SCIONLabAS AS %v to AP %v: we expected 1 connection and found %v",
-				asInfo.LocalAS.IA(), asInfo.RemoteIA, len(cns))
+			return fmt.Errorf("Error updating SCIONLabAS AS %v to AP %v: we expected 1 connection and found %v",
+				asInfo.LocalAS.IAString(), asInfo.RemoteIA, len(cns))
 		}
 		cn := cns[0]
 		cn.BRID = 1
@@ -476,10 +520,12 @@ func (s *SCIONLabASController) updateDB(asInfo *SCIONLabASInfo) error {
 
 // Provides a new AS ID for the newly created SCIONLab AS AS.
 // TODO(mlegner): Should we maybe use the lowest unused ID instead?
-func (s *SCIONLabASController) getNewSCIONLabASID() (int, error) {
+// TODO: this function is too expensive: we retrieve all AS and convert them to ASInfo, only to
+// ensure the ID is bigger than the biggest of them! FIXME now!! (reviewer, tell me to fix it now)
+func (s *SCIONLabASController) getNewSCIONLabASID() (addr.AS, error) {
 	ases, err := models.FindAllASInfos()
 	if err != nil {
-		return -1, err
+		return 0, err
 	}
 	// Base AS ID for SCIONLab is set in config file
 	asID := config.BaseASID
@@ -493,13 +539,14 @@ func (s *SCIONLabASController) getNewSCIONLabASID() (int, error) {
 
 // Generates the path to the temporary topology file
 func (asInfo *SCIONLabASInfo) topologyFile() string {
-	return filepath.Join(TempPath, asInfo.LocalAS.IA()+"_topology.json")
+	iaForFile := utility.IAFileName(asInfo.LocalAS.ISD, asInfo.LocalAS.ASID)
+	return filepath.Join(TempPath, iaForFile+"_topology.json")
 }
 
 // Generates the topology file for the SCIONLab AS AS. It uses the template file
 // simple_config_topo.tmpl under templates folder in order to populate and generate the
 // JSON file.
-func (s *SCIONLabASController) generateTopologyFile(asInfo *SCIONLabASInfo) error {
+func generateTopologyFile(asInfo *SCIONLabASInfo) error {
 	log.Printf("Generating topology file for SCIONLab AS")
 	t, err := template.ParseFiles("templates/simple_config_topo.tmpl")
 	if err != nil {
@@ -515,16 +562,18 @@ func (s *SCIONLabASController) generateTopologyFile(asInfo *SCIONLabASInfo) erro
 	if asInfo.LocalAS.Type == models.VM {
 		localIP = config.VMLocalIP
 	}
+	localIA := asInfo.LocalAS.IAString()
 
 	// Topology file parameters
 	data := map[string]string{
 		"IP":           asInfo.IP,
 		"BIND_IP":      asInfo.LocalAS.BindIP(asInfo.IsVPN, asInfo.IP),
-		"ISD_ID":       strconv.Itoa(asInfo.LocalAS.ISD),
-		"AS_ID":        strconv.Itoa(asInfo.LocalAS.ASID),
+		"ISD_ID":       fmt.Sprintf("%d", asInfo.LocalAS.ISD),
+		"AS_ID":        asInfo.LocalAS.ASID.FileFmt(),
+		"LOCAL_ISDAS":  localIA,
 		"LOCAL_ADDR":   localIP,
 		"LOCAL_PORT":   strconv.Itoa(int(asInfo.LocalPort)),
-		"TARGET_ISDAS": asInfo.RemoteIA,
+		"TARGET_ISDAS": asInfo.RemoteIA.String(),
 		"REMOTE_ADDR":  asInfo.RemoteIP,
 		"REMOTE_PORT":  strconv.Itoa(int(asInfo.RemotePort)),
 	}
@@ -540,7 +589,7 @@ func (s *SCIONLabASController) generateTopologyFile(asInfo *SCIONLabASInfo) erro
 // Creates the local gen folder of the SCIONLab AS AS. It calls a Python wrapper script
 // located under the python directory. The script uses SCION's and SCION-WEB's library
 // functions in order to generate the certificate, AS keys etc.
-func (s *SCIONLabASController) generateLocalGen(asInfo *SCIONLabASInfo) error {
+func generateLocalGen(asInfo *SCIONLabASInfo) error {
 	log.Printf("Creating gen folder for SCIONLab AS")
 	isd := asInfo.LocalAS.ISD
 	asID := asInfo.LocalAS.ASID
@@ -554,13 +603,25 @@ func (s *SCIONLabASController) generateLocalGen(asInfo *SCIONLabASInfo) error {
 
 	cmd := exec.Command("python3", localGenPath,
 		"--topo_file="+asInfo.topologyFile(), "--user_id="+asInfo.UserPackageName(),
-		"--joining_ia="+utility.IAString(isd, asID),
-		"--core_ia="+utility.IAString(isd, signingAs),
+		"--joining_ia="+utility.IAStringStandard(isd, asID),
+		"--core_ia="+utility.IAStringStandard(isd, signingAs),
 		"--core_sign_priv_key_file="+CoreSigKey(isd),
 		"--core_cert_file="+CoreCertFile(isd),
 		"--trc_file="+TrcFile(isd),
 		"--package_path="+PackagePath)
-	os.Setenv("PYTHONPATH", pythonPath+":"+scionPath+":"+scionUtilPath)
+	pyPaths := []string{}
+	if pythonPath != "" {
+		pyPaths = []string{pythonPath}
+	}
+	if scionPath != "" {
+		pyPaths = append(pyPaths, scionPath)
+	}
+	if scionUtilPath != "" {
+		pyPaths = append(pyPaths, scionUtilPath)
+	}
+	pyPath := strings.Join(pyPaths, ":")
+	fmt.Println("PYTHONPATH:", pyPath)
+	os.Setenv("PYTHONPATH", pyPath)
 	cmd.Env = os.Environ()
 	cmdOut, _ := cmd.StdoutPipe()
 	cmdErr, _ := cmd.StderrPipe()
@@ -576,7 +637,7 @@ func (s *SCIONLabASController) generateLocalGen(asInfo *SCIONLabASInfo) error {
 	return nil
 }
 
-func (s *SCIONLabASController) addAuxiliaryFiles(asInfo *SCIONLabASInfo) error {
+func addAuxiliaryFiles(asInfo *SCIONLabASInfo) error {
 	userEmail := asInfo.LocalAS.UserEmail
 	userPackagePath := asInfo.UserPackagePath()
 	log.Printf("Adding auxiliary files to the package %v", asInfo.UserPackageName())
@@ -594,7 +655,7 @@ func (s *SCIONLabASController) addAuxiliaryFiles(asInfo *SCIONLabASInfo) error {
 // TODO(mlegner): Add README for Dedicated setup
 // Packages the SCIONLab AS configuration as a tarball and returns the name of the
 // generated file.
-func (s *SCIONLabASController) packageConfiguration(asInfo *SCIONLabASInfo) error {
+func packageConfiguration(asInfo *SCIONLabASInfo) error {
 	log.Printf("Packaging SCIONLab AS")
 	userEmail := asInfo.LocalAS.UserEmail
 	userPackageName := asInfo.UserPackageName()
@@ -620,12 +681,12 @@ func (s *SCIONLabASController) packageConfiguration(asInfo *SCIONLabASInfo) erro
 				}
 			}
 		}
-
-		data := map[string]string{}
+		portForwarding := ""
 		if !asInfo.IsVPN {
-			data["PORT_FORWARDING"] = fmt.Sprintf("config.vm.network \"forwarded_port\", "+
+			portForwarding = fmt.Sprintf("config.vm.network \"forwarded_port\", "+
 				"guest: %[1]v, host: %[1]v, protocol: \"udp\"", asInfo.LocalPort)
 		}
+		data := map[string]string{"PORT_FORWARDING": portForwarding}
 		if err := utility.FillTemplateAndSave("templates/Vagrantfile.tmpl",
 			data, filepath.Join(userPackagePath, "Vagrantfile")); err != nil {
 			return err
@@ -641,10 +702,11 @@ func (s *SCIONLabASController) packageConfiguration(asInfo *SCIONLabASInfo) erro
 	if err != nil {
 		return fmt.Errorf("failed to create SCIONLabAS tarball for user %v: %v", userEmail, err)
 	}
+
 	return nil
 }
 
-func (s *SCIONLabASController) createUserLoginConfiguration(asInfo *SCIONLabASInfo) error {
+func createUserLoginConfiguration(asInfo *SCIONLabASInfo) error {
 	log.Printf("Creating user authentication files")
 	userEmail := asInfo.LocalAS.UserEmail
 	acc, err := models.FindAccountByUserEmail(userEmail)
@@ -652,7 +714,6 @@ func (s *SCIONLabASController) createUserLoginConfiguration(asInfo *SCIONLabASIn
 		return fmt.Errorf("failed to find account for email %s: %v", userEmail, err)
 	}
 
-	//TODO: maybe a better place for adding these files would be in generateLocalGen function?
 	userGenDir := filepath.Join(asInfo.UserPackagePath(), "gen")
 
 	accountId := []byte(acc.AccountID)
@@ -667,7 +728,7 @@ func (s *SCIONLabASController) createUserLoginConfiguration(asInfo *SCIONLabASIn
 		return fmt.Errorf("failed to write account secret to file: %v", err)
 	}
 
-	ia := utility.IAString(asInfo.LocalAS.ISD, asInfo.LocalAS.ASID)
+	ia := utility.IAFileName(asInfo.LocalAS.ISD, asInfo.LocalAS.ASID)
 	iaString := []byte(ia)
 	err = ioutil.WriteFile(filepath.Join(userGenDir, "ia"), iaString, 0644)
 	if err != nil {
@@ -707,6 +768,270 @@ func (s *SCIONLabASController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
 	w.Header().Set("Content-Transfer-Encoding", "binary")
 	http.ServeContent(w, r, fileName, time.Now(), bytes.NewReader(data))
+}
+
+func logAndSendError(w http.ResponseWriter, errorMsgFmt string, parms ...interface{}) string {
+	errorMsg := fmt.Sprintf(errorMsgFmt, parms...)
+	log.Print(errorMsg)
+	dict := make(map[string]interface{})
+	dict["error"] = true
+	dict["msg"] = errorMsg
+	utility.SendJSONError(dict, w)
+	return errorMsg
+}
+
+func logAndSendErrorAndNotifyAdmins(w http.ResponseWriter, errorMsgFmt string, parms ...interface{}) {
+	msg := logAndSendError(w, errorMsgFmt, parms...)
+	email.SendEmailToAdmins("ERROR in remap", msg)
+}
+
+func getASAndCheckChallenge(r *http.Request, asID string, verifyChallenge bool) (
+	*models.SCIONLabAS, map[string]interface{}, *remappingError) {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return nil, nil, newMappingError(false, "Could not read JSON in the request for IA %v: %v", asID, err)
+	}
+	request := make(map[string]interface{})
+	json.Unmarshal(body, &request)
+	as, err := models.FindSCIONLabASByIAString(asID)
+	if err != nil {
+		return nil, nil, newMappingError(true, "Could not find AS with IA %v", asID)
+	}
+	if !verifyChallenge {
+		return as, request, nil
+	}
+
+	challenge, havechallenge := request["challenge"]
+	challengeSolution, haveanswer := request["challenge_solution"]
+	if !havechallenge || !haveanswer {
+		return nil, nil, newMappingError(true, `JSON missing "challenge" or "challenge_solution", IA `, asID)
+	}
+	challengeInDB, err := as.GetRemapChallenge()
+	if err != nil {
+		return nil, nil, newMappingError(true, "Error getting challenge for IA %v: %v", asID, err)
+	}
+	if challenge != challengeInDB {
+		return nil, nil, newMappingError(true, "Challenge stored and received don't match. IA %v", asID)
+	}
+	// verify challenge solution
+	receivedSignature, err := base64.StdEncoding.DecodeString(challengeSolution.(string))
+	if err != nil {
+		return nil, nil, newMappingError(true, "Cannot decode the answer to the challenge, IA: %v", asID)
+	}
+	challengeAsBytes, err := base64.StdEncoding.DecodeString(challenge.(string))
+	if err != nil {
+		return nil, nil, newMappingError(true, "Internal error: cannot decode the stored challenge, IA: %v", asID)
+	}
+	err = verifySignatureFromAS(as, challengeAsBytes, receivedSignature)
+	if err != nil {
+		return nil, nil, newMappingError(true, "Cannot verify signature for IA %v: %v", asID, err)
+	}
+	return as, request, nil
+}
+
+func verifySignatureFromAS(as *models.SCIONLabAS, thingToSign, receivedSignature []byte) error {
+	path := filepath.Join(PackagePath, UserPackageName(as.UserEmail, as.ISD, as.ASID), "gen", fmt.Sprintf("ISD%d", as.ISD), fmt.Sprintf("AS%d", as.ASID),
+		fmt.Sprintf("bs%d-%d-1", as.ISD, as.ASID), "certs")
+	var chain *cert.Chain
+	fileInfos, err := ioutil.ReadDir(path)
+	if err != nil {
+		return err
+	}
+
+	possibleCerts := []string{}
+	for _, f := range fileInfos {
+		if !f.IsDir() && strings.HasSuffix(strings.ToLower(f.Name()), ".crt") {
+			possibleCerts = append(possibleCerts, f.Name())
+		}
+	}
+	if len(possibleCerts) < 1 {
+		return fmt.Errorf("Cannot find any .crt file for IA %v", as.IAString())
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(possibleCerts)))
+	path = filepath.Join(path, possibleCerts[0])
+	chainBytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	chain, err = cert.ChainFromRaw(chainBytes, false)
+	if err != nil || chain == nil {
+		msg := fmt.Sprintf("ERROR in Coordinator: cannot load the public certificate for AS %s : %v", as.IAString(), err)
+		email.SendEmailToAdmins("ERROR in remap", msg)
+		return errors.New(msg)
+	}
+	publicKey := chain.Leaf.SubjectSignKey
+	err = crypto.Verify(thingToSign, receivedSignature, publicKey, crypto.Ed25519)
+	return err
+}
+
+// RemapASIDComputeNewGenFolder creates a new gen folder using a valid remapped ID
+// e.g. 17-ffaa:0:1 . This does not change IDs in the DB but recomputes topologies and certificates.
+// After finishing, there will be a new tgz file ready to download using the mapped ID.
+func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
+	oldIA := as.IA()
+	ia := utility.MapOldIAToNewOne(as.ISD, as.ASID)
+	if ia.I == 0 || ia.A == 0 {
+		return nil, fmt.Errorf("Invalid source address to map: (%d, %d)", as.ISD, as.ASID)
+	}
+	// replace IDs in the AS entry, but don't save in DB:
+	as.ISD = ia.I
+	as.ASID = ia.A
+	// retrieve connection:
+	conns, err := as.GetJoinConnections()
+	if err != nil {
+		return nil, err
+	}
+	if len(conns) != 1 {
+		err = fmt.Errorf("User AS should have only 1 connection. %s has %d", ia, len(conns))
+		return nil, err
+	}
+	conn := conns[0]
+	conn.JoinAS = conn.GetJoinAS()
+	conn.RespondAP.AS = conn.GetRespondAS()
+	asInfo, err := getSCIONLabASInfoFromDB(conn)
+	asInfo.LocalAS = as
+	if err != nil {
+		return nil, err
+	}
+	// now duplicate the VPN keys, if some:
+	err = utility.CopyFile(vpnKeyPath(as.UserEmail, oldIA.A), vpnKeyPath(as.UserEmail, as.ASID))
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	err = utility.CopyFile(vpnCertPath(as.UserEmail, oldIA.A), vpnCertPath(as.UserEmail, as.ASID))
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+
+	// finally, generate the gen folder:
+	// modify the paths to point to a new scionproto/scion/python place, and use that one
+	setPyPath := func(oldScionPath string) {
+		scionPath = oldScionPath
+		pythonPath = filepath.Join(scionPath, "python")
+	}
+	if config.NextVersionPythonPath != "" {
+		// two step ready, use the next version of SCION
+		defer setPyPath(scionPath)
+		setPyPath(config.NextVersionPythonPath)
+	}
+	err = generateGenForAS(asInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ia, nil
+}
+
+// RemapASIdentityChallengeAndSolution returns the challenge the AS should solve if said AS has to map the identity.
+func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.ResponseWriter, r *http.Request) {
+	answeringChallenge := false
+	if r.Method == http.MethodPost {
+		answeringChallenge = true
+	}
+	answer := make(map[string]interface{})
+	answer["error"] = false
+	vars := mux.Vars(r)
+	asID := vars["as_id"]
+	log.Printf("Remap request from %v. Solving challenge? %v", asID, answeringChallenge)
+	as, _, mapErr := getASAndCheckChallenge(r, asID, answeringChallenge)
+	if mapErr != nil {
+		mapErr.LogAndNotifyAppropriately(w, mapErr.Error())
+		return
+	}
+	if !answeringChallenge {
+		needsRemap := !as.AreIDsFromScionLab()
+		answer["pending"] = needsRemap
+		challenge, err := as.GetRemapChallenge()
+		if err != nil && needsRemap {
+			logAndSendErrorAndNotifyAdmins(w, err.Error())
+			return
+		}
+		answer["challenge"] = challenge
+		utility.SendJSON(answer, w)
+		log.Printf("Remap: sent challenge for %v", asID)
+		return
+	}
+	var err error
+	answer["ia"], err = RemapASIDComputeNewGenFolder(as)
+	if err != nil {
+		logAndSendErrorAndNotifyAdmins(w, "ERROR in Coordinator: while mapping the ID, cannot generate a gen folder for the AS %s : %s", asID, err.Error())
+		return
+	}
+	err = utility.SendJSON(answer, w)
+	if err != nil {
+		log.Printf("Error during JSON marshaling: %v", err)
+		s.Error500(w, err, "Error during JSON marshaling")
+		return
+	}
+	log.Printf("Remap: finished computing new GEN.")
+}
+
+// RemapASDownloadGen will accept a JSON object containing the query from a user AS to obtain the
+// new gen folder for a new ID after the remap on the IDs during the summer of 2018
+func (s *SCIONLabASController) RemapASDownloadGen(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	asID := vars["as_id"]
+	log.Printf("Remap: request download GEN from %v", asID)
+	as, _, mapErr := getASAndCheckChallenge(r, asID, true)
+	if mapErr != nil {
+		mapErr.LogAndNotifyAppropriately(w, mapErr.Error())
+		return
+	}
+	mappedIA := utility.MapOldIAToNewOne(as.ISD, as.ASID)
+	fileName := UserPackageName(as.UserEmail, mappedIA.I, mappedIA.A) + ".tar.gz"
+	filePath := filepath.Join(PackagePath, fileName)
+	data, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		logAndSendError(w, "Error reading the tarball. FileName: %v, %v", fileName, err)
+		return
+	}
+	log.Printf("Remap: serving new GEN for %v -> %v", asID, mappedIA)
+	w.Header().Set("Content-Type", "application/gzip")
+	w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
+	w.Header().Set("Content-Transfer-Encoding", "binary")
+	http.ServeContent(w, r, fileName, time.Now(), bytes.NewReader(data))
+}
+
+// RemapASConfirmStatus receives confirmation from a user AS that they applied the mapping.
+// The confirmation is writen in the DB with a timestamp.
+func (s *SCIONLabASController) RemapASConfirmStatus(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	asID := vars["as_id"]
+	log.Printf("Remap: confirming mapping for %v", asID)
+	as, _, mapErr := getASAndCheckChallenge(r, asID, true)
+	if mapErr != nil {
+		mapErr.LogAndNotifyAppropriately(w, mapErr.Error())
+		return
+	}
+	mappedIA := utility.MapOldIAToNewOne(as.ISD, as.ASID)
+	as.ISD = mappedIA.I
+	as.ASID = mappedIA.A
+	answer := make(map[string]interface{})
+	answer["pending"] = false
+	answer["date"] = time.Now()
+	// set its status to Create so the AP will create it:
+	conns, err := as.GetJoinConnections()
+	if err != nil {
+		logAndSendError(w, err.Error())
+		return
+	}
+	conns[0].RespondStatus = models.Create
+	err = conns[0].Update()
+	if err != nil {
+		logAndSendError(w, "Cannot update connection for AS %v: %v", asID, err)
+		return
+	}
+	as.Status = models.Create
+	err = as.SetMappingStatusAndSave(answer)
+	if err != nil {
+		answer["error"] = true
+		msg := fmt.Sprintf("Could not update mapping status for AS: %v", err)
+		answer["msg"] = msg
+		log.Print(msg)
+		utility.SendJSONError(answer, w)
+		return
+	}
+	log.Printf("Updated mapping for AS %v -> %v", asID, mappedIA)
 }
 
 // The handler function to remove a SCIONLab AS for the given user.
