@@ -76,6 +76,16 @@ echo "Invoking update script with $ACCOUNT_ID $ACCOUNT_SECRET $IA"
 # systemd files upgrade:
 check_system_files
 
+if ! is_id_standardized "$IA" ; then
+    echo "-----------------------------------------------------------------------------------"
+    echo "We need to map the addresses to the standard"
+    cd "/tmp"
+    wget https://raw.githubusercontent.com/netsec-ethz/scion-coord/master/scripts/remap_as_identity.sh -O remap_as_identity.sh || { echo "Not yet mapping IA IDs" && exit 0; }
+    bash remap_as_identity.sh
+else
+    echo "SCION IA follows standard."
+fi
+
 UPDATE_BRANCH=$(curl --fail "${SCION_COORD_URL}/api/as/queryUpdateBranch/${ACCOUNT_ID}/${ACCOUNT_SECRET}?IA=${IA}" || true)
 
 if [  -z "$UPDATE_BRANCH"  ]
@@ -118,13 +128,4 @@ fi
 
 RESULT=$(curl -X POST "${SCION_COORD_URL}/api/as/confirmUpdate/${ACCOUNT_ID}/${ACCOUNT_SECRET}?IA=${IA}") || true
 echo "Done, got response from server: ${RESULT}"
-
-if ! is_id_standardized "$IA" ; then
-    echo "We need to map the addresses to the standard"
-    cd "/tmp"
-    wget https://raw.githubusercontent.com/netsec-ethz/scion-coord/master/scripts/remap_as_identity.sh -O remap_as_identity.sh || { echo "Not yet mapping IA IDs" && exit 0; }
-    bash remap_as_identity.sh
-else
-    echo "SCION IA follows standard."
-fi
 echo "Done."
