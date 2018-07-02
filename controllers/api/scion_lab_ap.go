@@ -54,7 +54,6 @@ type APConnectionInfo struct {
 
 // Check if the account is the owner of the specified Attachment Point
 func (s *SCIONLabASController) checkAuthorization(r *http.Request) (ia addr.IA, err error) {
-	log.Printf("API Call for getUpdatesForAP = %v", r.URL.Query())
 	apIA := r.URL.Query().Get("scionLabAP")
 	if len(apIA) == 0 {
 		err = errors.New("scionLabAP parameter missing")
@@ -108,6 +107,7 @@ func (s *SCIONLabASController) ownedASes(r *http.Request) (ases map[string]struc
 //        }
 // }
 func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Request) {
+	log.Printf("API Call for getUpdatesForAP = %v", r.URL.Query())
 	apIA, err := s.checkAuthorization(r)
 	if err != nil {
 		s.Forbidden(w, err, "The account is not authorized for this AP")
@@ -201,21 +201,30 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 		s.BadRequest(w, err, "Error decoding JSON")
 		return
 	}
-
 	ownedASes, err := s.ownedASes(r)
 	if err != nil {
 		s.BadRequest(w, err, "Error looking up owned ASes")
 	}
 
 	var failedConfirmations []string
-
 	var rejectedIAs []rejectedAS
 	for ia, event := range updateLists {
+		IA, err := addr.IAFromString(ia)
+		if err != nil {
+			IA, err = addr.IAFromFileFmt(ia, false)
+			if err != nil {
+				err = fmt.Errorf("%v is not a valid SCION IA", ia)
+				return
+			}
+		}
+		// ensure apIA is always non file format:
+		ia = IA.String()
+
 		_, isAuthorized := ownedASes[ia]
 		if !isAuthorized {
 			log.Printf("Unauthorized updates from AS %v", ia)
 		}
-		as, err := models.FindSCIONLabASByIAString(ia)
+		as, err := models.FindSCIONLabASByIAInt(IA.I, IA.A)
 		if err != nil {
 			log.Printf("Error finding AS %v when processing confirmations: %v", ia, err)
 		}
