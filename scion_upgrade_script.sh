@@ -74,14 +74,18 @@ SCION_COORD_URL="https://www.scionlab.org"
 echo "Invoking update script with $ACCOUNT_ID $ACCOUNT_SECRET $IA"
 
 # systemd files upgrade:
-check_system_files
+echo check_system_files
 
 if ! is_id_standardized "$IA" ; then
     echo "-----------------------------------------------------------------------------------"
     echo "We need to map the addresses to the standard"
     cd "/tmp"
-    wget https://raw.githubusercontent.com/netsec-ethz/scion-coord/master/scripts/remap_as_identity.sh -O remap_as_identity.sh || { echo "Not yet mapping IA IDs" && exit 0; }
-    bash remap_as_identity.sh
+    wget https://raw.githubusercontent.com/netsec-ethz/scion-coord/master/scripts/remap_as_identity.sh -O remap_as_identity.sh  && doremap=1 || doremap=0
+    if [ "$doremap" == 1 ]; then
+        echo bash remap_as_identity.sh
+    else
+        echo "Not yet mapping IA IDs"
+    fi
 else
     echo "SCION IA follows standard."
 fi
