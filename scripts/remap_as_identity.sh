@@ -14,7 +14,7 @@ cd "$SC"
 ./tools/zkcleanslate  || true
 ./scion.sh clean || true
 
-python3 $basedir/remap_as_identity.py --ia "$IA"
+PYTHONPATH="$SC/python:$SC" python3 $basedir/remap_as_identity.py --ia "$IA"
 
 rm ./gen-cache/* || true
 mv go/vendor/vendor.json /tmp && rm -r go/vendor/* && mv /tmp/vendor.json go/vendor/
