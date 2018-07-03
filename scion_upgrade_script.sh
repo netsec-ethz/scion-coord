@@ -51,6 +51,7 @@ check_system_files() {
 
 is_id_standardized() {
     ia="$1"
+    echo $ia | grep _ >/dev/null && return 0
     iaarray=(${ia//-/ })
     if [ "${iaarray[1]}" -lt "1000000" ]; then
         return 1
@@ -74,7 +75,7 @@ SCION_COORD_URL="https://www.scionlab.org"
 echo "Invoking update script with $ACCOUNT_ID $ACCOUNT_SECRET $IA"
 
 # systemd files upgrade:
-echo check_system_files
+check_system_files
 
 if ! is_id_standardized "$IA" ; then
     echo "-----------------------------------------------------------------------------------"
