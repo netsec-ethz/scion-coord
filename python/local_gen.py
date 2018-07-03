@@ -57,6 +57,7 @@ from local_config_util import (
     write_supervisord_config,
     write_topology_file,
     write_zlog_file,
+    write_overlay_config,
     TYPES_TO_EXECUTABLES,
     TYPES_TO_KEYS,
 )
@@ -100,8 +101,7 @@ def create_scionlab_as_local_gen(args, tp):
     generate_sciond_config(TopoID(args.joining_ia), as_obj, tp, local_gen_path)
     # We don't initiate the prometheous service for user ASes.
     # generate_prom_config(ia, tp, gen_path)
-    with open(os.path.join(local_gen_path, 'overlay'), 'w') as f:
-        f.write('UDP/IPv4')
+    write_overlay_config(local_gen_path)
 
 
 
