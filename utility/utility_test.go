@@ -220,11 +220,12 @@ var mapOldIAToNewOneTests = []struct {
 	toISD   addr.ISD
 	toAS    addr.AS
 }{
-	{20, 1001, 60, 0xFFAA00010001},
+	// test only ISD-ASes that could show up in the Coordinator
 	{1, 1001, 17, 0xFFAA00010001},
 	{2, 1001, 18, 0xFFAA00010001},
 	{0, 1001, 0, 0},
-	{42, 1001, 0, 0},
+	{17, 1001, 17, 0xFFAA00010001},
+	{17, 0xFFAA00010001, 17, 0xFFAA00010001},
 	{1, 1000, 0, 0},
 	{1, 2001, 17, 0xFFAA000103E9}, // scionbox valid
 	{8, 1017, 24, 0xFFAA00010011},
