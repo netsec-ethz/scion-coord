@@ -411,7 +411,7 @@ func (as *SCIONLabAS) GetJoinConnectionInfoToAS(apIA string) ([]ConnectionInfo, 
 	}
 	var res []ConnectionInfo
 	for _, cn := range cns {
-		if utility.IAString(cn.NeighborISD, cn.NeighborAS) == apIA {
+		if utility.IAStringStandard(cn.NeighborISD, cn.NeighborAS) == apIA {
 			res = append(res, cn)
 		}
 	}
