@@ -220,14 +220,18 @@ var mapOldIAToNewOneTests = []struct {
 	toISD   addr.ISD
 	toAS    addr.AS
 }{
-	{20, 1001, 60, 0xFFAA00010001},
-	{1, 1001, 17, 0xFFAA00010001},
-	{2, 1001, 18, 0xFFAA00010001},
-	{0, 1001, 0, 0},
-	{42, 1001, 0, 0},
-	{1, 1000, 0, 0},
-	{1, 2001, 17, 0xFFAA000103E9}, // scionbox valid
-	{8, 1017, 24, 0xFFAA00010011},
+	// test only ISD-ASes that could show up in the Coordinator
+	{1, 1001, 17, 0xFFAA00010001},            // old -> new
+	{2, 1001, 18, 0xFFAA00010001},            // old -> new
+	{1, 2001, 17, 0xFFAA000103E9},            // old -> new (scion boxes?)
+	{8, 1017, 24, 0xFFAA00010011},            // old -> new
+	{17, 0xFFAA00010001, 17, 0xFFAA00010001}, // new -> new (user AS)
+	{16, 0xFFAA00001001, 16, 0xFFAA00001001}, // new -> new (infrastructure)
+	{30, 0xFFAA00001E01, 30, 0xFFAA00001E01}, // new -> new (infrastructure)
+	{17, 1001, 17, 0xFFAA00010001},           // mixed old/new -> new
+	{20, 1001, 20, 0xFFAA00010001},           // mixed old/new -> new (ISDs 20 and 21 are always considered new)
+	{0, 1001, 0, 0},                          // invalid ISD -> invalid
+	{1, 1000, 0, 0},                          // invalid (out of SCIONLab range) -> invalid
 }
 
 func TestMapOldIAToNewOne(t *testing.T) {
