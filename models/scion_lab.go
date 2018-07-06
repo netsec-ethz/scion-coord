@@ -419,15 +419,15 @@ func (as *SCIONLabAS) GetJoinConnectionInfoToAS(apIA string) ([]ConnectionInfo, 
 }
 
 // GetRespondConnectionInfoToAS returns a list where the AS is the responding AS (the AP), and the
-// other IA is the user AS attached to it.
-func (as *SCIONLabAS) GetRespondConnectionInfoToAS(anotherIA string) ([]ConnectionInfo, error) {
+// other AS is the user AS attached to it.
+func (as *SCIONLabAS) GetRespondConnectionInfoToAS(otherAS addr.AS) ([]ConnectionInfo, error) {
 	cns, err := as.GetRespondConnectionInfo()
 	if err != nil {
 		return nil, err
 	}
 	var res []ConnectionInfo
 	for _, cn := range cns {
-		if utility.IAString(cn.NeighborISD, cn.NeighborAS) == anotherIA {
+		if cn.NeighborAS == otherAS {
 			res = append(res, cn)
 		}
 	}

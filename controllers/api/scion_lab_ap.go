@@ -161,6 +161,7 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 		s.Error500(w, err, "Error during JSON marshaling")
 		return
 	}
+	log.Printf("getUpdatesForAP will return: %v", string(b))
 	fmt.Fprintln(w, string(b))
 }
 
@@ -387,12 +388,6 @@ func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejecte
 			failedNotifications = append(failedNotifications, originalIA)
 			continue
 		}
-		asCns, err := ap.GetRespondConnectionInfoToAS(as.IAString())
-		if err != nil {
-			log.Printf("Error finding the connection to SCIONLabAS %v: %v", as.IA(), err)
-			failedNotifications = append(failedNotifications, originalIA)
-			continue
-		}
 
 		err = sendRejectedEmail(as.UserEmail, originalIA, rejectedAS.action, rejectedAS.AP)
 		if err != nil {
@@ -401,6 +396,13 @@ func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejecte
 			continue
 		}
 
+		asCns, err := ap.GetRespondConnectionInfoToAS(as.IA().A)
+		if err != nil {
+			log.Printf("Error finding the connection to SCIONLabAS %v: %v", as.IA(), err)
+			failedNotifications = append(failedNotifications, originalIA)
+			continue
+		}
+		log.Printf("[DEBUG ConfirmUpdatesFromAP] connections between AP %v and user AS %v: %v", ap.IAString(), as.IA().A, asCns)
 		// now, clear the rejected AS, as the AP went out of sync with the Coordinator
 		for _, cn := range asCns {
 			if cn.Status != models.Create && cn.Status != models.Update && cn.Status != models.Remove {
