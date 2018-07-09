@@ -21,7 +21,7 @@ run_osx() {
         ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
     fi
     for pkg in $VB $VG $VM; do
-        if pkgutil --pkgs $pkg > /dev/null; then
+        if pkgutil --pkgs=$pkg > /dev/null; then
             echo "[SCIONLabVM] $pkg is already installed"
         elif brew cask ls $pkg > /dev/null; then
             echo "[SCIONLabVM] $pkg is already installed"
