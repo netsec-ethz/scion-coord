@@ -868,7 +868,6 @@ func verifySignatureFromAS(as *models.SCIONLabAS, thingToSign, receivedSignature
 // e.g. 17-ffaa:0:1 . This does not change IDs in the DB but recomputes topologies and certificates.
 // After finishing, there will be a new tgz file ready to download using the mapped ID.
 func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
-	oldIA := as.IA()
 	ia := utility.MapOldIAToNewOne(as.ISD, as.ASID)
 	if ia.I == 0 || ia.A == 0 {
 		return nil, fmt.Errorf("Invalid source address to map: (%d, %d)", as.ISD, as.ASID)
@@ -893,16 +892,6 @@ func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	if err != nil {
 		return nil, err
 	}
-	// now duplicate the VPN keys, if some:
-	err = utility.CopyFile(vpnKeyPath(as.UserEmail, oldIA.A), vpnKeyPath(as.UserEmail, as.ASID))
-	if err != nil && !os.IsNotExist(err) {
-		return nil, err
-	}
-	err = utility.CopyFile(vpnCertPath(as.UserEmail, oldIA.A), vpnCertPath(as.UserEmail, as.ASID))
-	if err != nil && !os.IsNotExist(err) {
-		return nil, err
-	}
-
 	// finally, generate the gen folder:
 	// modify the paths to point to a new scionproto/scion/python place, and use that one
 	setPyPath := func(oldScionPath string) {
