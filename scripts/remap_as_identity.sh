@@ -17,7 +17,8 @@ cd "$SC"
 PYTHONPATH="$SC/python:$SC" python3 $basedir/remap_as_identity.py --ia "$IA"
 
 rm ./gen-cache/* || true
-mv go/vendor/vendor.json /tmp && rm -r go/vendor/* && mv /tmp/vendor.json go/vendor/
+mv go/vendor/vendor.json /tmp && rm -r go/vendor && mkdir go/vendor || true
+mv /tmp/vendor.json go/vendor/ || true
 pushd go >/dev/null
 govendor sync
 popd >/dev/null
