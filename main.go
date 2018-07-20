@@ -212,7 +212,7 @@ func main() {
 		apiChain.ThenFunc(scionLabASController.ConfirmUpdatesFromAP))
 	router.Handle("/api/as/queryUpdateBranch/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabASController.QueryUpdateBranch))
-	router.Handle("/api/as/confirmUpdate/{account_id}",
+	router.Handle("/api/as/confirmUpdate/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabASController.ConfirmUpdate)).Methods(http.MethodPost)
 
 	//SCIONBox API
