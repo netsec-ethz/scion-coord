@@ -155,7 +155,16 @@ else
             echo "No need to patch."
     esac
     echo "SCION code has been upgraded, stopping..."
-
+    # update scion-viz
+    if [ -d "./sub/scion-viz" ]; then
+        sudo systemctl stop scion-viz
+        pushd "./sub/scion-viz" >/dev/null
+        git stash >/dev/null || true
+        git pull --ff-only >/dev/null || true
+        popd >/dev/null
+        sudo systemctl start scion-viz
+    fi
+    # rebuild scion
     ./scion.sh stop || true
     ~/.local/bin/supervisorctl -c supervisor/supervisord.conf shutdown || true
     ./tools/zkcleanslate || true
