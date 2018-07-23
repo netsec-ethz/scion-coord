@@ -3,7 +3,7 @@
 set -e
 
 # version of the systemd files:
-SERVICE_CURRENT_VERSION="0.4"
+SERVICE_CURRENT_VERSION="0.5"
 
 # version less or equal. E.g. verleq 1.9 2.0.8  == true (1.9 <= 2.0.8)
 verleq() {

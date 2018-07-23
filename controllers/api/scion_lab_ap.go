@@ -16,14 +16,12 @@ package api
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/mux"
 	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/email"
 	"github.com/netsec-ethz/scion-coord/models"
@@ -52,46 +50,6 @@ type APConnectionInfo struct {
 	APBRID    uint16 // ID of the border router at the AP
 }
 
-// Check if the account is the owner of the specified Attachment Point
-func (s *SCIONLabASController) checkAuthorization(r *http.Request) (ia addr.IA, err error) {
-	apIA := r.URL.Query().Get("scionLabAP")
-	if len(apIA) == 0 {
-		err = errors.New("scionLabAP parameter missing")
-		return
-	}
-	ia, err = addr.IAFromString(apIA)
-	if err != nil {
-		ia, err = addr.IAFromFileFmt(apIA, false)
-		if err != nil {
-			err = fmt.Errorf("%v is not a valid SCION IA", apIA)
-			return
-		}
-	}
-	// ensure apIA is always non file format:
-	apIA = ia.String()
-
-	ases, err := s.ownedASes(r)
-	if err == nil {
-		if _, ourAS := ases[apIA]; ourAS {
-			return
-		}
-	}
-	err = fmt.Errorf("the Attachment Point %v does not belong to the specified account", apIA)
-	return
-}
-
-// List of all ASes belonging to the account
-func (s *SCIONLabASController) ownedASes(r *http.Request) (ases map[string]struct{}, err error) {
-	vars := mux.Vars(r)
-	accountID := vars["account_id"]
-	asesList, err := models.FindSCIONLabASesByAccountID(accountID)
-	ases = make(map[string]struct{})
-	for _, as := range asesList {
-		ases[as] = struct{}{}
-	}
-	return
-}
-
 // API end-point for the SCIONLab APs to query actions to be done for users' SCIONLabASes.
 // An example response to this API may look like the following:
 // {"1-7":
@@ -108,7 +66,7 @@ func (s *SCIONLabASController) ownedASes(r *http.Request) (ases map[string]struc
 // }
 func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("API Call for getUpdatesForAP = %v", r.URL.Query())
-	apIA, err := s.checkAuthorization(r)
+	apIA, err := checkAuthorization(r, r.URL.Query().Get("scionLabAP"))
 	if err != nil {
 		s.Forbidden(w, err, "The account is not authorized for this AP")
 		return
@@ -161,6 +119,7 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 		s.Error500(w, err, "Error during JSON marshaling")
 		return
 	}
+	log.Printf("getUpdatesForAP will return: %v", string(b))
 	fmt.Fprintln(w, string(b))
 }
 
@@ -201,7 +160,7 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 		s.BadRequest(w, err, "Error decoding JSON")
 		return
 	}
-	ownedASes, err := s.ownedASes(r)
+	ownedASes, err := ownedASes(r)
 	if err != nil {
 		s.BadRequest(w, err, "Error looking up owned ASes")
 	}
@@ -387,12 +346,6 @@ func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejecte
 			failedNotifications = append(failedNotifications, originalIA)
 			continue
 		}
-		asCns, err := ap.GetRespondConnectionInfoToAS(as.IAString())
-		if err != nil {
-			log.Printf("Error finding the connection to SCIONLabAS %v: %v", as.IA(), err)
-			failedNotifications = append(failedNotifications, originalIA)
-			continue
-		}
 
 		err = sendRejectedEmail(as.UserEmail, originalIA, rejectedAS.action, rejectedAS.AP)
 		if err != nil {
@@ -401,6 +354,13 @@ func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejecte
 			continue
 		}
 
+		asCns, err := ap.GetRespondConnectionInfoToAS(as.IA().A)
+		if err != nil {
+			log.Printf("Error finding the connection to SCIONLabAS %v: %v", as.IA(), err)
+			failedNotifications = append(failedNotifications, originalIA)
+			continue
+		}
+		log.Printf("[DEBUG ConfirmUpdatesFromAP] connections between AP %v and user AS %v: %v", ap.IAString(), as.IA().A, asCns)
 		// now, clear the rejected AS, as the AP went out of sync with the Coordinator
 		for _, cn := range asCns {
 			if cn.Status != models.Create && cn.Status != models.Update && cn.Status != models.Remove {

@@ -147,6 +147,43 @@ func (e *remappingError) LogAndNotifyAppropriately(w http.ResponseWriter, format
 	}
 }
 
+// List of all ASes belonging to the account
+func ownedASes(r *http.Request) (map[string]struct{}, error) {
+	vars := mux.Vars(r)
+	accountID := vars["account_id"]
+	asesList, err := models.FindSCIONLabASesByAccountID(accountID)
+	if err != nil {
+		return nil, err
+	}
+	ases := make(map[string]struct{})
+	for _, as := range asesList {
+		ases[as] = struct{}{}
+	}
+	return ases, nil
+}
+
+// Check if the account is the owner of the specified IA
+func checkAuthorization(r *http.Request, ia string) (addr.IA, error) {
+	IA, err := addr.IAFromString(ia)
+	if err != nil {
+		IA, err = addr.IAFromFileFmt(ia, false)
+		if err != nil {
+			return IA, fmt.Errorf("%v is not a valid SCION IA", ia)
+		}
+	}
+	// ensure apIA is always non file format:
+	ia = IA.String()
+	ases, err := ownedASes(r)
+	if err != nil {
+		return IA, err
+	}
+	_, ourAS := ases[ia]
+	if !ourAS {
+		return IA, fmt.Errorf("The AS %v does not belong to the specified account", ia)
+	}
+	return IA, nil
+}
+
 // This generates a new AS for the user if they do not have too many already
 func (s *SCIONLabASController) GenerateNewSCIONLabAS(w http.ResponseWriter, r *http.Request) {
 	_, uSess, err := middleware.GetUserSession(r)
@@ -868,7 +905,6 @@ func verifySignatureFromAS(as *models.SCIONLabAS, thingToSign, receivedSignature
 // e.g. 17-ffaa:0:1 . This does not change IDs in the DB but recomputes topologies and certificates.
 // After finishing, there will be a new tgz file ready to download using the mapped ID.
 func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
-	oldIA := as.IA()
 	ia := utility.MapOldIAToNewOne(as.ISD, as.ASID)
 	if ia.I == 0 || ia.A == 0 {
 		return nil, fmt.Errorf("Invalid source address to map: (%d, %d)", as.ISD, as.ASID)
@@ -893,16 +929,6 @@ func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	if err != nil {
 		return nil, err
 	}
-	// now duplicate the VPN keys, if some:
-	err = utility.CopyFile(vpnKeyPath(as.UserEmail, oldIA.A), vpnKeyPath(as.UserEmail, as.ASID))
-	if err != nil && !os.IsNotExist(err) {
-		return nil, err
-	}
-	err = utility.CopyFile(vpnCertPath(as.UserEmail, oldIA.A), vpnCertPath(as.UserEmail, as.ASID))
-	if err != nil && !os.IsNotExist(err) {
-		return nil, err
-	}
-
 	// finally, generate the gen folder:
 	// modify the paths to point to a new scionproto/scion/python place, and use that one
 	setPyPath := func(oldScionPath string) {
@@ -1107,23 +1133,12 @@ func (s *SCIONLabASController) canRemove(userEmail, asID string) (bool, *models.
 
 // Reads the IA parameter from the URL and returns the associated SCIONLabAS if it belongs to the
 // correct account and an error otherwise
-func (s *SCIONLabASController) getIAParameter(r *http.Request) (as *models.SCIONLabAS, err error) {
-	ia := r.URL.Query().Get("IA")
-	if len(ia) == 0 {
-		err = errors.New("IA parameter missing")
-		return
+func (s *SCIONLabASController) getIAParameter(r *http.Request) (*models.SCIONLabAS, error) {
+	ia, err := checkAuthorization(r, r.URL.Query().Get("IA"))
+	if err != nil {
+		return nil, err
 	}
-	vars := mux.Vars(r)
-	accountID := vars["account_id"]
-	ases, err := models.FindSCIONLabASesByAccountID(accountID)
-	for _, ownedAS := range ases {
-		if ownedAS == ia {
-			as, err = models.FindSCIONLabASByIAString(ia)
-			return
-		}
-	}
-	err = fmt.Errorf("the AS %v does not belong to the specified account", ia)
-	return
+	return models.FindSCIONLabASByIAInt(ia.I, ia.A)
 }
 
 // API for SCIONLabASes to query which git branch they should use for updates
