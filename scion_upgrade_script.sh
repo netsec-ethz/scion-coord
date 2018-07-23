@@ -43,6 +43,10 @@ check_system_files() {
             sudo systemctl enable ntp || true
             sudo systemctl restart ntp || true
         fi
+        if ! egrep -- '^NTPD_OPTS=.*-g.*$' /etc/default/ntp >/dev/null; then
+            sudo sed -i "s/^NTPD_OPTS='\(.*\)'/NTPD_OPTS=\'\\1\ -g'/g" /etc/default/ntp
+            sudo systemctl restart ntp || true
+        fi
         # don't attempt to stop the service as this script is a child of the service and will also be killed !
         # if really needed, specify KillMode=none in the service file itself
         sudo systemctl daemon-reload

@@ -251,6 +251,15 @@ then
     
     sudo systemctl start scionupgrade.timer
     sudo systemctl start scionupgrade.service
+
+    # registering the upgrade service also means "manage SCION", including keep time sync'ed
+    sudo apt-get install -y --no-remove ntp || true
+    sudo systemctl enable ntp || true
+    sudo systemctl restart ntp || true
+    if ! egrep -- '^NTPD_OPTS=.*-g.*$' /etc/default/ntp >/dev/null; then
+        sudo sed -i "s/^NTPD_OPTS='\(.*\)'/NTPD_OPTS=\'\\1\ -g'/g" /etc/default/ntp
+        sudo systemctl restart ntp || true
+    fi
 else
     echo "SCION periodic upgrade service and timer files are not provided."
 fi
