@@ -67,7 +67,6 @@ type APConnectionInfo struct {
 func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("API Call for getUpdatesForAP = %v", r.URL.Query())
 	apIA, err := checkAuthorization(r, r.URL.Query().Get("scionLabAP"))
-	// apIA, err := s.checkAuthorization(r)
 	if err != nil {
 		s.Forbidden(w, err, "The account is not authorized for this AP")
 		return
