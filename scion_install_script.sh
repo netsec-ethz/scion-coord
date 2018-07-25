@@ -254,8 +254,13 @@ then
 
     # registering the upgrade service also means "manage SCION", including keep time sync'ed
     sudo apt-get install -y --no-remove ntp || true
+    sudo sed -i -- 's/^\(\s*start-stop-daemon\s*--start\s*--quiet\s*--oknodo\s*--exec\s*\/usr\/sbin\/VBoxService\)$/\1 -- --disable-timesync/g' /etc/init.d/virtualbox-guest-utils || true
+    # restart virtual box guest services and NTPd :
+    sudo systemctl daemon-reload || true
+    sudo systemctl restart virtualbox-guest-utils
     sudo systemctl enable ntp || true
     sudo systemctl restart ntp || true
+    # we want ntpd to use the -g flag (no panic threshold):
     if ! egrep -- '^NTPD_OPTS=.*-g.*$' /etc/default/ntp >/dev/null; then
         sudo sed -i "s/^NTPD_OPTS='\(.*\)'/NTPD_OPTS=\'\\1\ -g'/g" /etc/default/ntp
         sudo systemctl restart ntp || true
