@@ -29,6 +29,7 @@ check_system_files() {
     done
     if [ $need_to_reload -eq 1 ]; then
         if [ -d "/vagrant" ]; then # iff this is a VM
+            echo "VM detected, checking time synchronization mechanism ..."
             [[ $(ps aux | grep ntpd | grep -v grep | wc -l) == 1 ]] && ntp_running=1 || ntp_running=0
             [[ $(grep -e 'start-stop-daemon\s*--start\s*--quiet\s*--oknodo\s*--exec\s*\/usr\/sbin\/VBoxService\s*--\s*--disable-timesync$' /etc/init.d/virtualbox-guest-utils |wc -l) == 1 ]] && host_synced=0 || host_synced=1
             if [ $host_synced != 0 ]; then
@@ -36,18 +37,25 @@ check_system_files() {
                 sudo sed -i -- 's/^\(\s*start-stop-daemon\s*--start\s*--quiet\s*--oknodo\s*--exec\s*\/usr\/sbin\/VBoxService\)$/\1 -- --disable-timesync/g' /etc/init.d/virtualbox-guest-utils
                 sudo systemctl daemon-reload
                 sudo systemctl restart virtualbox-guest-utils
-                sudo systemctl restart ntp || true # might fail if not installed yet
             fi
             if [ $ntp_running != 1 ]; then
                 echo "Installing ntpd..."
                 sudo apt-get install -y --no-remove ntp || true
                 sudo systemctl enable ntp || true
-                sudo systemctl restart ntp || true
             fi
             if ! egrep -- '^NTPD_OPTS=.*-g.*$' /etc/default/ntp >/dev/null; then
                 sudo sed -i "s/^NTPD_OPTS='\(.*\)'/NTPD_OPTS=\'\\1\ -g'/g" /etc/default/ntp
-                sudo systemctl restart ntp || true
             fi
+            if ! egrep -- '^tinker panic 0' /etc/ntp.conf >/dev/null; then
+                echo "set panic limit to 0 (disable)"
+                echo -e "tinker panic 0\n" | sudo tee -a /etc/ntp.conf >/dev/null
+            fi
+            if ! egrep -- '^pool.*maxpoll.*$' /etc/ntp.conf >/dev/null; then
+                echo "set minpoll 1 maxpoll 6 (increase frequency of ntpd syncs)"
+                sudo sed -i 's/\(pool .*\)$/\1 minpoll 1 maxpoll 6/g' /etc/ntp.conf
+            fi
+            sudo systemctl restart ntp || true
+            echo "ntpd restarted."
         fi
         # don't attempt to stop the scionupgrade service as this script is a child of it and will also be killed !
         # if really needed, specify KillMode=none in the service file itself

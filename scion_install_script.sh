@@ -264,6 +264,13 @@ then
         if ! egrep -- '^NTPD_OPTS=.*-g.*$' /etc/default/ntp >/dev/null; then
             sudo sed -i "s/^NTPD_OPTS='\(.*\)'/NTPD_OPTS=\'\\1\ -g'/g" /etc/default/ntp
         fi
+        if ! grep 'tinker panic 0' /etc/ntp.conf; then
+            # set panic limit to 0 (disable)
+            echo -e "tinker panic 0\n" | sudo tee -a /etc/ntp.conf >/dev/null
+        fi
+        if ! egrep -- '^pool.*maxpoll.*$' /etc/ntp.conf; then
+            sudo sed -i 's/\(pool .*\)$/\1 minpoll 1 maxpoll 6/g' /etc/ntp.conf
+        fi
         sudo systemctl restart ntp || true
     fi
 else
