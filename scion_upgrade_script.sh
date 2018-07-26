@@ -58,7 +58,9 @@ check_system_files() {
             echo "ntpd restarted."
         fi
         # don't attempt to stop the scionupgrade service as this script is a child of it and will also be killed !
-        # if really needed, specify KillMode=none in the service file itself
+        # even with KillMode=none in the service file, restarting the service here would be really delicate, as it
+        # could basically hang forever if the service files don't update the version number correctly, and we would
+        # spawn a large number of processes one after the other, not doing anything but restarting the service.
         sudo systemctl daemon-reload
     fi
 }
@@ -139,6 +141,7 @@ else
     ./scion.sh stop || true
     ~/.local/bin/supervisorctl -c supervisor/supervisord.conf shutdown || true
     ./tools/zkcleanslate || true
+    sudo systemctl restart zookeeper || true
 
     echo "Reinstalling dependencies..."
     ./scion.sh clean || true
