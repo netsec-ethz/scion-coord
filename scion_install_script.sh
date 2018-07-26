@@ -272,6 +272,19 @@ then
             sudo sed -i 's/\(pool .*\)$/\1 minpoll 1 maxpoll 6/g' /etc/ntp.conf
         fi
         sudo systemctl restart ntp || true
+        # system updates, ensure unattended-upgrades is installed
+        if ! dpkg-query -W --showformat='${Status}\n' unattended-upgrades|grep "install ok installed" >/dev/null; then
+            sudo apt-get install -f --no-remove unattended-upgrades
+        fi
+        if [ ! -f /etc/apt/apt.conf.d/51unattended-upgrades ]; then
+            echo "Configuring unattended-upgrades"
+            echo 'Unattended-Upgrade::Allowed-Origins {
+"${distro_id}:${distro_codename}-security";
+"${distro_id}ESM:${distro_codename}";
+};
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "02:00";' | sudo tee /etc/apt/apt.conf.d/51unattended-upgrades >/dev/null
+        fi
     fi
 else
     echo "SCION periodic upgrade service and timer files are not provided."

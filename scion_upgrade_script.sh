@@ -56,6 +56,20 @@ check_system_files() {
             fi
             sudo systemctl restart ntp || true
             echo "ntpd restarted."
+            # system updates, ensure unattended-upgrades is installed
+            if ! dpkg-query -W --showformat='${Status}\n' unattended-upgrades|grep "install ok installed" >/dev/null; then
+                echo "Installing unattended-upgrades"
+                sudo apt-get install -f --no-remove unattended-upgrades
+            fi
+            if [ ! -f /etc/apt/apt.conf.d/51unattended-upgrades ]; then
+                echo "Configuring unattended-upgrades"
+                echo 'Unattended-Upgrade::Allowed-Origins {
+"${distro_id}:${distro_codename}-security";
+"${distro_id}ESM:${distro_codename}";
+};
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "02:00";' | sudo tee /etc/apt/apt.conf.d/51unattended-upgrades >/dev/null
+            fi
         fi
         # don't attempt to stop the scionupgrade service as this script is a child of it and will also be killed !
         # even with KillMode=none in the service file, restarting the service here would be really delicate, as it
