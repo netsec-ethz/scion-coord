@@ -6,4 +6,5 @@
 [submodule "sub/scion-box"]
 	path = sub/scion-box
 	url = https://github.com/netsec-ethz/scion-box
+	branch = master
 
