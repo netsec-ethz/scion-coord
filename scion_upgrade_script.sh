@@ -156,7 +156,19 @@ else
     ~/.local/bin/supervisorctl -c supervisor/supervisord.conf shutdown || true
     ./tools/zkcleanslate || true
     sudo systemctl restart zookeeper || true
-
+    MEMTOTAL=$(grep MemTotal /proc/meminfo  | awk '{print $2}')
+    echo "Available memory is: $MEMTOTAL"
+    # if less than 1920Mb
+    [[ $MEMTOTAL -lt 1966080 ]] && swapadded=1 || swapadded=0
+    if [ $swapadded -eq 1 ]; then
+        echo "Not enough memory, adding swap space..."
+        dd if=/dev/zero of=/tmp/swap bs=1M count=1920
+        mkswap /tmp/swap
+        sudo swapon /tmp/swap
+        echo "Swap space added."
+    else
+        echo "No swap space needed."
+    fi
     echo "Reinstalling dependencies..."
     ./scion.sh clean || true
     mv go/vendor/vendor.json /tmp && rm -r go/vendor && mkdir go/vendor || true
@@ -167,6 +179,12 @@ else
     bash -c 'yes | GO_INSTALL=true ./env/deps' || echo "ERROR: Dependencies failed. Starting SCION might fail!"
 
     echo "Starting SCION again..."
+    ./scion.sh build || true
+    if [ $swapadded==1 ]; then
+        echo "Removing swap space..."
+        sudo swapoff /tmp/swap
+        echo "Swap space removed."
+    fi
     ./scion.sh start || true
 fi
 RESULT=$(curl -X POST "${SCION_COORD_URL}/api/as/confirmUpdate/${ACCOUNT_ID}/${ACCOUNT_SECRET}?IA=${IA}") || true
