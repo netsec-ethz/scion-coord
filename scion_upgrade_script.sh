@@ -130,9 +130,13 @@ fi
 echo "Running git fetch $REMOTE_REPO $UPDATE_BRANCH &>/dev/null"
 git fetch "$REMOTE_REPO" "$UPDATE_BRANCH" &>/dev/null
 head_commit=$(git rev-parse "$REMOTE_REPO"/"$UPDATE_BRANCH")
-if [ $(git branch "$UPDATE_BRANCH" --contains "$head_commit" 2>/dev/null | wc -l) -gt 0 ]; then
-    echo "SCION version is already up to date!"
+[[ $(git branch "$UPDATE_BRANCH" --contains "$head_commit" 2>/dev/null | wc -l) -gt 0 ]] && needtoreset=0 || needtoreset=1
+[[ -f "scionupgrade.auto.begin" ]] && [[ -f "scionupgrade.auto.end" ]] && dirtybuild=0 || dirtybuild=1
+echo "Need to reset? $needtoreset . Dirty build? $dirtybuild"
+if [ $needtoreset -eq 0 ] && [ $dirtybuild -eq 0 ]; then
+    echo "SCION version is already up to date and ready!"
 else
+    touch "scionupgrade.auto.begin"
     git stash >/dev/null # just in case something was locally modified
     git reset --hard "$REMOTE_REPO"/"$UPDATE_BRANCH"
     # apply platform dependent patches, etc:
@@ -177,14 +181,14 @@ else
     govendor sync || true
     popd >/dev/null
     bash -c 'yes | GO_INSTALL=true ./env/deps' || echo "ERROR: Dependencies failed. Starting SCION might fail!"
-
-    echo "Starting SCION again..."
-    ./scion.sh build || true
-    if [ $swapadded==1 ]; then
+    echo "Rebuilding SCION..."
+    ./scion.sh build && touch "scionupgrade.auto.end" || true
+    if [ $swapadded -eq 1 ]; then
         echo "Removing swap space..."
-        sudo swapoff /tmp/swap
+        sudo swapoff /tmp/swap || true
         echo "Swap space removed."
     fi
+    echo "Starting SCION again..."
     ./scion.sh start || true
 fi
 RESULT=$(curl -X POST "${SCION_COORD_URL}/api/as/confirmUpdate/${ACCOUNT_ID}/${ACCOUNT_SECRET}?IA=${IA}") || true
