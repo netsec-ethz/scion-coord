@@ -251,6 +251,41 @@ then
     
     sudo systemctl start scionupgrade.timer
     sudo systemctl start scionupgrade.service
+
+    if [ -d "/vagrant" ]; then # iff this is a VM
+        # registering the upgrade service also means "manage SCION", including keep time sync'ed
+        sudo apt-get install -y --no-remove ntp || true
+        sudo sed -i -- 's/^\(\s*start-stop-daemon\s*--start\s*--quiet\s*--oknodo\s*--exec\s*\/usr\/sbin\/VBoxService\)$/\1 -- --disable-timesync/g' /etc/init.d/virtualbox-guest-utils || true
+        # restart virtual box guest services and NTPd :
+        sudo systemctl daemon-reload || true
+        sudo systemctl restart virtualbox-guest-utils
+        sudo systemctl enable ntp || true
+        # we want ntpd to use the -g flag (no panic threshold):
+        if ! egrep -- '^NTPD_OPTS=.*-g.*$' /etc/default/ntp >/dev/null; then
+            sudo sed -i "s/^NTPD_OPTS='\(.*\)'/NTPD_OPTS=\'\\1\ -g'/g" /etc/default/ntp
+        fi
+        if ! grep 'tinker panic 0' /etc/ntp.conf; then
+            # set panic limit to 0 (disable)
+            echo -e "tinker panic 0\n" | sudo tee -a /etc/ntp.conf >/dev/null
+        fi
+        if ! egrep -- '^pool.*maxpoll.*$' /etc/ntp.conf; then
+            sudo sed -i 's/\(pool .*\)$/\1 minpoll 1 maxpoll 6/g' /etc/ntp.conf
+        fi
+        sudo systemctl restart ntp || true
+        # system updates, ensure unattended-upgrades is installed
+        if ! dpkg-query -W --showformat='${Status}\n' unattended-upgrades|grep "install ok installed" >/dev/null; then
+            sudo apt-get install -f --no-remove unattended-upgrades
+        fi
+        if [ ! -f /etc/apt/apt.conf.d/51unattended-upgrades ]; then
+            echo "Configuring unattended-upgrades"
+            echo 'Unattended-Upgrade::Allowed-Origins {
+"${distro_id}:${distro_codename}-security";
+"${distro_id}ESM:${distro_codename}";
+};
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "02:00";' | sudo tee /etc/apt/apt.conf.d/51unattended-upgrades >/dev/null
+        fi
+    fi
 else
     echo "SCION periodic upgrade service and timer files are not provided."
 fi

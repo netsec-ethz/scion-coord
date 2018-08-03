@@ -3,11 +3,11 @@
 set -e
 
 # version of the systemd files:
-SERVICE_CURRENT_VERSION="0.5"
+SERVICE_CURRENT_VERSION="0.6"
 
 # version less or equal. E.g. verleq 1.9 2.0.8  == true (1.9 <= 2.0.8)
 verleq() {
-    [  "$1" = `echo -e "$1\n$2" | sort -V | head -n1` ]
+    [ ! -z "$1" ] && [ ! -z "$2" ] && [ "$1" = `echo -e "$1\n$2" | sort -V | head -n1` ]
 }
 
 check_system_files() {
@@ -28,23 +28,53 @@ check_system_files() {
         fi
     done
     if [ $need_to_reload -eq 1 ]; then
-        [[ $(ps aux | grep ntpd | grep -v grep | wc -l) == 1 ]] && ntp_running=1 || ntp_running=0
-        [[ $(grep -e 'start-stop-daemon\s*--start\s*--quiet\s*--oknodo\s*--exec\s*\/usr\/sbin\/VBoxService\s*--\s*--disable-timesync$' /etc/init.d/virtualbox-guest-utils |wc -l) == 1 ]] && host_synced=0 || host_synced=1
-        if [ $host_synced != 0 ]; then
-            echo "Disabling time synchronization via host..."
-            sudo sed -i -- 's/^\(\s*start-stop-daemon\s*--start\s*--quiet\s*--oknodo\s*--exec\s*\/usr\/sbin\/VBoxService\)$/\1 -- --disable-timesync/g' /etc/init.d/virtualbox-guest-utils
-            sudo systemctl daemon-reload
-            sudo systemctl restart virtualbox-guest-utils
-            sudo systemctl restart ntp || true # might fail if not installed yet
-        fi
-        if [ $ntp_running != 1 ]; then
-            echo "Installing ntpd..."
-            sudo apt-get install -y --no-remove ntp || true
-            sudo systemctl enable ntp || true
+        if [ -d "/vagrant" ]; then # iff this is a VM
+            echo "VM detected, checking time synchronization mechanism ..."
+            [[ $(ps aux | grep ntpd | grep -v grep | wc -l) == 1 ]] && ntp_running=1 || ntp_running=0
+            [[ $(grep -e 'start-stop-daemon\s*--start\s*--quiet\s*--oknodo\s*--exec\s*\/usr\/sbin\/VBoxService\s*--\s*--disable-timesync$' /etc/init.d/virtualbox-guest-utils |wc -l) == 1 ]] && host_synced=0 || host_synced=1
+            if [ $host_synced != 0 ]; then
+                echo "Disabling time synchronization via host..."
+                sudo sed -i -- 's/^\(\s*start-stop-daemon\s*--start\s*--quiet\s*--oknodo\s*--exec\s*\/usr\/sbin\/VBoxService\)$/\1 -- --disable-timesync/g' /etc/init.d/virtualbox-guest-utils
+                sudo systemctl daemon-reload
+                sudo systemctl restart virtualbox-guest-utils
+            fi
+            if [ $ntp_running != 1 ]; then
+                echo "Installing ntpd..."
+                sudo apt-get install -y --no-remove ntp || true
+                sudo systemctl enable ntp || true
+            fi
+            if ! egrep -- '^NTPD_OPTS=.*-g.*$' /etc/default/ntp >/dev/null; then
+                sudo sed -i "s/^NTPD_OPTS='\(.*\)'/NTPD_OPTS=\'\\1\ -g'/g" /etc/default/ntp
+            fi
+            if ! egrep -- '^tinker panic 0' /etc/ntp.conf >/dev/null; then
+                echo "set panic limit to 0 (disable)"
+                echo -e "tinker panic 0\n" | sudo tee -a /etc/ntp.conf >/dev/null
+            fi
+            if ! egrep -- '^pool.*maxpoll.*$' /etc/ntp.conf >/dev/null; then
+                echo "set minpoll 1 maxpoll 6 (increase frequency of ntpd syncs)"
+                sudo sed -i 's/\(pool .*\)$/\1 minpoll 1 maxpoll 6/g' /etc/ntp.conf
+            fi
             sudo systemctl restart ntp || true
+            echo "ntpd restarted."
+            # system updates, ensure unattended-upgrades is installed
+            if ! dpkg-query -W --showformat='${Status}\n' unattended-upgrades|grep "install ok installed" >/dev/null; then
+                echo "Installing unattended-upgrades"
+                sudo apt-get install -f --no-remove unattended-upgrades
+            fi
+            if [ ! -f /etc/apt/apt.conf.d/51unattended-upgrades ]; then
+                echo "Configuring unattended-upgrades"
+                echo 'Unattended-Upgrade::Allowed-Origins {
+"${distro_id}:${distro_codename}-security";
+"${distro_id}ESM:${distro_codename}";
+};
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "02:00";' | sudo tee /etc/apt/apt.conf.d/51unattended-upgrades >/dev/null
+            fi
         fi
-        # don't attempt to stop the service as this script is a child of the service and will also be killed !
-        # if really needed, specify KillMode=none in the service file itself
+        # don't attempt to stop the scionupgrade service as this script is a child of it and will also be killed !
+        # even with KillMode=none in the service file, restarting the service here would be really delicate, as it
+        # could basically hang forever if the service files don't update the version number correctly, and we would
+        # spawn a large number of processes one after the other, not doing anything but restarting the service.
         sudo systemctl daemon-reload
     fi
 }
@@ -96,19 +126,53 @@ then
     git config --global user.email "scion@scion-architecture.net"
     git config --global url.https://github.com/.insteadOf git@github.com:
 fi
-git fetch "$REMOTE_REPO" "$UPDATE_BRANCH"
-rebase_result=$(git rebase -Xours "${REMOTE_REPO}/${UPDATE_BRANCH}")
 
-if [[ $rebase_result == *"is up to date"* ]]
-then
-    echo "SCION version is already up to date!"
+echo "Running git fetch $REMOTE_REPO $UPDATE_BRANCH &>/dev/null"
+git fetch "$REMOTE_REPO" "$UPDATE_BRANCH" &>/dev/null
+head_commit=$(git rev-parse "$REMOTE_REPO"/"$UPDATE_BRANCH")
+[[ $(git branch "$UPDATE_BRANCH" --contains "$head_commit" 2>/dev/null | wc -l) -gt 0 ]] && needtoreset=0 || needtoreset=1
+[[ -f "scionupgrade.auto.begin" ]] && [[ -f "scionupgrade.auto.end" ]] && dirtybuild=0 || dirtybuild=1
+echo "Need to reset? $needtoreset . Dirty build? $dirtybuild"
+if [ $needtoreset -eq 0 ] && [ $dirtybuild -eq 0 ]; then
+    echo "SCION version is already up to date and ready!"
 else
+    touch "scionupgrade.auto.begin"
+    git stash >/dev/null # just in case something was locally modified
+    git reset --hard "$REMOTE_REPO"/"$UPDATE_BRANCH"
+    # apply platform dependent patches, etc:
+    ARCH=$(dpkg --print-architecture)
+    echo -n "This architecture: $ARCH. "
+    case "$ARCH" in
+        "armhf")
+            # current ARM patch:
+            echo "Patching for ARM 32"
+            curl https://gist.githubusercontent.com/juagargi/f007a3a80058895d81a72651af32cb44/raw/421d8bfecdd225a3b17a18ec1c1e1bf86c436b35/arm-scionlab-update2.patch | patch -p1
+            git branch -D scionlab_autoupdate_patched 2>/dev/null|| true
+            git add .
+            git commit -m "SCIONLab autoupdate patch for ARM"
+            ;;
+        *)
+            echo "No need to patch."
+    esac
     echo "SCION code has been upgraded, stopping..."
 
     ./scion.sh stop || true
     ~/.local/bin/supervisorctl -c supervisor/supervisord.conf shutdown || true
     ./tools/zkcleanslate || true
-
+    sudo systemctl restart zookeeper || true
+    MEMTOTAL=$(grep MemTotal /proc/meminfo  | awk '{print $2}')
+    echo "Available memory is: $MEMTOTAL"
+    # if less than 1920Mb
+    [[ $MEMTOTAL -lt 1966080 ]] && swapadded=1 || swapadded=0
+    if [ $swapadded -eq 1 ]; then
+        echo "Not enough memory, adding swap space..."
+        dd if=/dev/zero of=/tmp/swap bs=1M count=1920
+        mkswap /tmp/swap
+        sudo swapon /tmp/swap
+        echo "Swap space added."
+    else
+        echo "No swap space needed."
+    fi
     echo "Reinstalling dependencies..."
     ./scion.sh clean || true
     mv go/vendor/vendor.json /tmp && rm -r go/vendor && mkdir go/vendor || true
@@ -117,7 +181,13 @@ else
     govendor sync || true
     popd >/dev/null
     bash -c 'yes | GO_INSTALL=true ./env/deps' || echo "ERROR: Dependencies failed. Starting SCION might fail!"
-
+    echo "Rebuilding SCION..."
+    ./scion.sh build && touch "scionupgrade.auto.end" || true
+    if [ $swapadded -eq 1 ]; then
+        echo "Removing swap space..."
+        sudo swapoff /tmp/swap || true
+        echo "Swap space removed."
+    fi
     echo "Starting SCION again..."
     ./scion.sh start || true
 fi
