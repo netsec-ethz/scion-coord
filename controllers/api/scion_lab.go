@@ -789,7 +789,14 @@ func (s *SCIONLabASController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	vars := mux.Vars(r)
-	asID := vars["as_id"]
+	asIDstr := vars["as_id"]
+	asID, err := addr.ASFromFileFmt(asIDstr, false)
+	if err != nil {
+		msg := fmt.Sprintf("Cannot parse AS ID %v : %v", asIDstr, err)
+		log.Print(msg)
+		s.BadRequest(w, nil, msg)
+		return
+	}
 	as, err := models.FindSCIONLabASByUserEmailAndASID(uSess.Email, asID)
 	if err != nil || as.Status == models.Inactive || as.Status == models.Remove {
 		log.Printf("No active configuration found for user %v\n", uSess.Email)

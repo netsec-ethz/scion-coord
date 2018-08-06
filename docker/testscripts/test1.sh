@@ -81,9 +81,9 @@ VALUES
 out=$(runSQL "$sql") && stat=0 || stat=$?
 
 sql="INSERT INTO scion_coord_test.scion_lab_as
-(id, user_email,                   public_ip,   start_port, label,  isd, as_id, status, type,  created, updated)
+(id, user_email,                    public_ip,   start_port, label,        isd, as_id,             status, type,  created, updated)
 VALUES
-(2, 'netsec.test.email@gmail.com', '$INTF_ADDR', 50000,      'AS12', 1,     12,      1,      0, now(),   now());"
+(2, 'netsec.test.email@gmail.com', '$INTF_ADDR', 50000,      'old AS12',   1,   0xff0000000111,    1,      0,     now(),   now());"
 out=$(runSQL "$sql") && stat=0 || stat=$?
 
 sql="INSERT INTO scion_coord_test.attachment_point
@@ -91,7 +91,6 @@ sql="INSERT INTO scion_coord_test.attachment_point
 SELECT '10.0.8.1', '10.0.8.2',  '10.0.8.254', id
 FROM scion_coord_test.scion_lab_as WHERE user_email='netsec.test.email@gmail.com';"
 out=$(runSQL "$sql") && stat=0 || stat=$?
-
 
 # run SCION Coordinator in the background:
 ./scion-coord &
@@ -110,7 +109,8 @@ rm -f cookies.txt
 curl "$SCION_COORD_URL" -I -c cookies.txt -s >/dev/null
 curl "$SCION_COORD_URL/api/login" -H 'Content-Type: application/json;charset=UTF-8' -b cookies.txt --data-binary '{"email":"netsec.test.email@gmail.com","password":"scionscion"}' --compressed -s >/dev/null
 curl "$SCION_COORD_URL/api/as/generateAS" -X POST -H 'Content-Length: 0' -b cookies.txt -s >/dev/null
-curl "$SCION_COORD_URL/api/as/configureAS" -H 'Content-Type: application/json;charset=UTF-8' -b cookies.txt --data-binary '{"asID":1001,"userEmail":"netsec.test.email@gmail.com","isVPN":false,"ip":"127.0.0.210","serverIA":"1-12","label":"Label for AS1001","type":2,"port":50050}' -s >/dev/null
+curl "$SCION_COORD_URL/api/as/configureAS" -H 'Content-Type: application/json;charset=UTF-8' -b cookies.txt --data-binary '{"asID":281105609588737,"userEmail":"netsec.test.email@gmail.com","isVPN":false,"ip":"127.0.0.210","serverIA":"1-ff00:0:111","label":"Label for ASffaa:1:1 (old AS1001)","type":2,"port":50050}' -s >/dev/null
+
 GENFOLDERTMP=$(mktemp -d)
 rm -rf "$GENFOLDERTMP"
 mkdir -p "$GENFOLDERTMP"
