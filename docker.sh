@@ -6,16 +6,6 @@ BASE="$(dirname $(realpath $0))"
 
 build_scion_image() {
     pushd $SC >/dev/null
-    # need_base=0
-    # [[ $(docker images -q scion:scionlab) != "" ]] && need_scion=0 || { need_scion=1 && [[ $(docker images -q scion_base:scionlab) != "" ]] || need_base=1 ; } 
-    # echo $need_base
-    # echo $need_scion
-    # if [ $need_base == 1 ]; then
-    #     ./docker.sh base
-    # fi
-    # if [ $need_scion == 1 ]; then
-    #     ./docker.sh build
-    # fi
     ./docker.sh base
     ./docker.sh build
     popd >/dev/null
@@ -25,8 +15,8 @@ build() {
     build_scion_image
 
     # # docker build -t juagargi/scionlab-scion:0.1 -f docker/Dockerfile-scion .
-    docker build -t scionlab-coord:0.1 -f docker/Dockerfile-coord .
-    docker build -t scionlab-coord-test -f docker/Dockerfile-coord-test .
+    docker build -t scionlab-coord:0.1 -f docker/Dockerfile-coord . || exit 1
+    docker build -t scionlab-coord-test -f docker/Dockerfile-coord-test . || exit 1
     # docker push juagargi/scionlab-coord:0.1
 }
 
