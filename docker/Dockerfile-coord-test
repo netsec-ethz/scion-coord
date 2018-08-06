@@ -12,7 +12,8 @@ ENV SCIONCOORD $SCIONCOORD
 USER scion
 
 WORKDIR $SC
-RUN rm -rf $./gen && ./scion.sh topology -c topology/Tiny.topo
+ADD ./docker/coord-test/Tiny.topo /tmp/
+RUN rm -rf $./gen && ./scion.sh topology -c /tmp/Tiny.topo
 
 WORKDIR $HOME
 # just copy the whole thing:
@@ -29,9 +30,9 @@ RUN ./scripts/install_attachment_point.sh -t
 
 RUN mkdir -p "$SCIONCOORD/credentials"
 WORKDIR ${SCIONCOORD}/credentials
-RUN cp "$SC/gen/ISD1/AS11/br1-11-1/keys/as-sig.seed" ISD1.key
-RUN cp "$SC/gen/ISD1/AS11/br1-11-1/certs/ISD1-AS11-V1.crt" ISD1.crt
-RUN cp "$SC/gen/ISD1/AS11/br1-11-1/certs/ISD1-V1.trc" ISD1.trc
+RUN cp "$SC/gen/ISD1/ASff00_0_110/cs1-ff00_0_110-1/keys/as-sig.seed" ISD1.key
+RUN cp "$SC/gen/ISD1/ASff00_0_110/cs1-ff00_0_110-1/certs/ISD1-ASff00_0_110-V1.crt" ISD1.crt
+RUN cp "$SC/gen/ISD1/ASff00_0_110/cs1-ff00_0_110-1/certs/ISD1-V1.trc" ISD1.trc
 
 # VPN keys:
 RUN mkdir -p "$CONFDIR"
@@ -49,3 +50,4 @@ WORKDIR ${SCIONCOORD}
 COPY --chown=scion ./docker/testscripts/test1.sh ${SCIONCOORD}/docker/testscripts/test1.sh
 
 ENTRYPOINT ${SCIONCOORD}/docker/testscripts/test1.sh
+# ENTRYPOINT ["/bin/bash", "-l"]
