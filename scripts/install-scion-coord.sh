@@ -27,20 +27,16 @@ SCION="${GOPATH:?}/src/github.com/scionproto/scion"
 CONFDIR="$HOME/scionLabConfigs"
 basedir="$(realpath $(dirname $(realpath $0))/../)"
 files="$basedir/files/install-coordinator"
-inside_docker=0
 
 usage="$(basename $0) [-n]
 Installs the Coordinator in this machine
 where:
     -d      Install inside docker container. This means no service files and not starting services in this script."
-while getopts ":dh" opt; do
+while getopts ":h" opt; do
 case $opt in
     h)
         echo "$usage"
         exit 0
-        ;;
-    d)
-        inside_docker=1
         ;;
     \?)
         echo "Invalid option: -$OPTARG" >&2
@@ -98,12 +94,7 @@ if ! dpkg-query -s openssl &> /dev/null ; then
     DEBIAN_FRONTEND="noninteractive" sudo apt-get install openssl -y
 fi
 
-echo "[CoIn]: running apt-get update"
-DEBIAN_FRONTEND="noninteractive" sudo apt-get update
-if [ "$inside_docker" == 1 ]; then
-    echo "[CoIn]: Installing MySQL client"
-    DEBIAN_FRONTEND="noninteractive" sudo apt-get install -y "mysql-client-5.7"
-elif ! dpkg-query -s mysql-server &> /dev/null ; then
+if ! dpkg-query -s mysql-server &> /dev/null ; then
     # MySQL DB step. If already installed, we assume it's already configured the way we want
     echo "[CoIn]: Installing MySQL server"
     echo "mysql-server-5.7 mysql-server/root_password password development_pass" | sudo debconf-set-selections
@@ -122,18 +113,6 @@ if [ ! -x "scion-coord" ]; then
 fi
 popd >/dev/null
 echo "[CoIn]: done (SCION Coordinator binary built)."
-
-if [ "$inside_docker" == 1 ]; then
-    echo "[CoIn]: Running in docker. Configuring MySQL to run on host 'mysql'."
-    # copy the default configuration and edit it for postmark
-    cp "$SCIONCOORD/conf/development.conf.default" "$SCIONCOORD/conf/development.conf"
-    sed -i -- 's/email.pm_server_token = ""/email.pm_server_token = "server_token"/g' "$SCIONCOORD/conf/development.conf"
-    sed -i -- 's/email.pm_account_token = ""/email.pm_account_token = "account_token"/g' "$SCIONCOORD/conf/development.conf"
-    echo "[CoIn]: Success."
-    exit 0
-fi
-
-############## NON DOCKER system:
 
 # VPN stuff
 mkdir -p "$SCIONCOORD/credentials"
