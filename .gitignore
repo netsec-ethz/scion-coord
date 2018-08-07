@@ -4,3 +4,4 @@ temp/
 credentials/
 conf/development.conf
 public/img/topology_no_labels.gv.png
+docker/_build/

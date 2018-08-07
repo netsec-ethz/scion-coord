@@ -1,4 +1,4 @@
-FROM scion:scionlab
+FROM scionlab-coord-base:0.2
 ENV HOME /home/scion
 ENV GOPATH $HOME/go
 ENV PATH /usr/lib/go-1.9/bin:$GOPATH/bin:$HOME/.local/bin:$PATH
@@ -6,16 +6,21 @@ ENV PATH /usr/lib/go-1.9/bin:$GOPATH/bin:$HOME/.local/bin:$PATH
 ARG SCIONCOORD=$GOPATH/src/github.com/netsec-ethz/scion-coord
 ENV SCIONCOORD $SCIONCOORD
 
-WORKDIR $HOME
+WORKDIR $SCIONCOORD
 USER scion
 
-# TODO: instead of installing the Coordinator by running the script, run it for dependencies, but copy files here
-ADD ./scripts/install-scion-coord.sh /tmp/
-RUN /tmp/install-scion-coord.sh -d
-# TODO: fix Dockerfile so everything is really configured and ready to work
-# now configure mysql
+# copy the git files
+RUN sudo mkdir -p $SCIONCOORD
+RUN sudo chown -R scion:scion $SCIONCOORD
+COPY --chown=scion:scion . $SCIONCOORD/
+
+# build and configure
+RUN go build
+RUN cp $SCIONCOORD/conf/development.conf.default $SCIONCOORD/conf/development.conf
+RUN sed -i -- 's/email.pm_server_token = ""/email.pm_server_token = "server_token"/g' "$SCIONCOORD/conf/development.conf"
+RUN sed -i -- 's/email.pm_account_token = ""/email.pm_account_token = "account_token"/g' "$SCIONCOORD/conf/development.conf"
 RUN sed -i -- 's/^db.host = "127.0.0.1"$/db.host = "mysql"/g'   "$SCIONCOORD/conf/development.conf"
-# run coordinator and wait
+
+
 CMD []
 ENTRYPOINT ["/bin/bash", "-l"]
-# ENTRYPOINT ${SCIONCOORD}/scion-coord

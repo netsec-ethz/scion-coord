@@ -1,39 +1,69 @@
 #!/bin/bash
 
-VERSION=0.1
+VERSION=0.2
 
 BASE="$(dirname $(realpath $0))"
+build_dir="./docker/_build"
+dst_path="${build_dir}/scion-coord.git/"
 
-build_scion_image() {
-    pushd $SC >/dev/null
-    ./docker.sh base
-    ./docker.sh build
-    popd >/dev/null
-}
 
 build() {
     build_scion_image
 
-    # # docker build -t juagargi/scionlab-scion:0.1 -f docker/Dockerfile-scion .
-    docker build -t scionlab-coord:0.1 -f docker/Dockerfile-coord . || exit 1
-    docker build -t scionlab-coord-test -f docker/Dockerfile-coord-test . || exit 1
-    # docker push juagargi/scionlab-coord:0.1
+    echo "Building Coordinator Docker images"
+    copy_tree
+    build_specific '-base'
+    build_specific
+    build_specific '-test'
+}
+
+build_specific() {
+    local specific=$1
+    local suffix=${specific:-$specific}
+    local tag=scionlab-coord$suffix:$VERSION
+    echo
+    echo "Building scionlab-coord$suffix:$VERSION Docker image"
+    echo "=========================="
+    docker build -t $tag -f docker/Dockerfile-coord$suffix . || exit 1
+    docker tag "$tag" "scionlab-coord$suffix:latest"
 }
 
 rebuild() {
     # for now, just remove the image and build
-    docker rmi scionlab-coord:0.1 scionlab-coord-test || true
+    docker rmi scionlab-coord:$VERSION scionlab-coord-test || true
     build
 }
 
 test() {
-    # asfdasd
     cd $BASE
     docker-compose -f docker/test-coordinator.yml up --abort-on-container-exit --exit-code-from test
     TEST1=$?
     echo "Test1 exit status: $TEST1"
 }
 
+
+build_scion_image() {
+    pushd $SC >/dev/null
+    ./docker.sh base
+    ./docker.sh build
+    echo
+    popd >/dev/null
+}
+
+copy_tree() {
+    set -e
+    set -o pipefail
+    echo "Copying current working tree for Docker image"
+    echo "============================================="
+    mkdir -p "${build_dir:?}"
+    # Just in case it's sitting there from a previous run
+    rm -rf "$dst_path"
+    {
+        git ls-files;
+        git submodule --quiet foreach 'git ls-files | sed "s|^|$path/|"';
+    } | rsync -a --files-from=- . "$dst_path"
+    echo
+}
 
 
 
