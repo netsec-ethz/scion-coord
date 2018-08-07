@@ -37,6 +37,9 @@ basedir="$(realpath $(dirname $(realpath $0))/../)"
 mkdir -p "$NETSEC"
 cd "$NETSEC"
 
+# Zookeeper won't run in this container, redirect its port:
+redir --lport=2181 --caddr=zookeeper1 --cport=2181 &
+
 
 # wait until mysql is ready:
 echo "Waiting for MySql server ..."
