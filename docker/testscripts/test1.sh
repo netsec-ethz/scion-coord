@@ -31,7 +31,6 @@ runSQL() {
     return $FAIL
 }
 
-
 CURRENTWD="$PWD"
 basedir="$(realpath $(dirname $(realpath $0))/../)"
 
@@ -40,12 +39,13 @@ cd "$NETSEC"
 
 
 # wait until mysql is ready:
+echo "Waiting for MySql server ..."
 while ! mysqladmin ping -h mysql --silent; do
     sleep 1
 done
+echo "MySql server found."
 runSQL "DROP DATABASE scion_coord_test;" &>/dev/null || true
 runSQL "CREATE DATABASE scion_coord_test;" || (echo "Failed to create the SCION Coordinator DB" && exit 1)
-
 
 # create the initial tables:
 cd "$SCIONCOORD"
@@ -53,7 +53,7 @@ rm -f scion-coord
 go build
 ./scion-coord --help >/dev/null
 
-# populate the test DB accordingly. For now with one attachment point, in ISD1 AS12
+# populate the test DB accordingly. For now with one attachment point, in ISD1 ASffaa:0:111
 sql="SELECT COUNT(*) FROM scion_coord_test.account WHERE name='netsec.test.email@gmail.com';"
 out=$(runSQL "$sql") && stat=0 || stat=$?
 out=$(echo "$out" | tail -n 1)
@@ -110,45 +110,46 @@ curl "$SCION_COORD_URL" -I -c cookies.txt -s >/dev/null
 curl "$SCION_COORD_URL/api/login" -H 'Content-Type: application/json;charset=UTF-8' -b cookies.txt --data-binary '{"email":"netsec.test.email@gmail.com","password":"scionscion"}' --compressed -s >/dev/null
 curl "$SCION_COORD_URL/api/as/generateAS" -X POST -H 'Content-Length: 0' -b cookies.txt -s >/dev/null
 curl "$SCION_COORD_URL/api/as/configureAS" -H 'Content-Type: application/json;charset=UTF-8' -b cookies.txt --data-binary '{"asID":281105609588737,"userEmail":"netsec.test.email@gmail.com","isVPN":false,"ip":"127.0.0.210","serverIA":"1-ff00:0:111","label":"Label for ASffaa:1:1 (old AS1001)","type":2,"port":50050}' -s >/dev/null
-
 GENFOLDERTMP=$(mktemp -d)
 rm -rf "$GENFOLDERTMP"
 mkdir -p "$GENFOLDERTMP"
-curl "$SCION_COORD_URL/api/as/downloadTarball/1001" -b cookies.txt --output "$GENFOLDERTMP/1001.tgz" -s >/dev/null
+curl "$SCION_COORD_URL/api/as/downloadTarball/ffaa_1_1" -b cookies.txt --output "$GENFOLDERTMP/ffaa_1_1.tgz" -s >/dev/null
 rm -f cookies.txt
 
-if [ ! -f "$GENFOLDERTMP/1001.tgz" ]; then
-    echo "Cannot find the (presumably) downloaded file $GENFOLDERTMP/1001.tgz\nFAIL"
+if [ ! -f "$GENFOLDERTMP/ffaa_1_1.tgz" ]; then
+    echo -e "Cannot find the (presumably) downloaded file $GENFOLDERTMP/ffaa_1_1.tgz\nFAIL"
     exit 101
 fi
 cd "$GENFOLDERTMP"
-tar xf "1001.tgz"
-if [ ! -d "netsec.test.email@gmail.com_1-1001/gen/ISD1/AS1001" ]; then
-    echo "Unknown TGZ structure. Cannot continue\nABORT"
+tar xf "ffaa_1_1.tgz"
+if [ ! -d "netsec.test.email@gmail.com_1-ffaa_1_1/gen/ISD1/ASffaa_1_1" ]; then
+    echo -e "Unknown TGZ structure. Cannot continue\nABORT"
     exit 1
 fi
-rm -rf "$SC/gen/ISD1/AS1001"
-cp -r "netsec.test.email@gmail.com_1-1001/gen/ISD1/AS1001" "$SC/gen/ISD1/"
+rm -rf "$SC/gen/ISD1/ASffaa_1_1"
+cp -r "netsec.test.email@gmail.com_1-ffaa_1_1/gen/ISD1/ASffaa_1_1" "$SC/gen/ISD1/"
 rm -rf "$GENFOLDERTMP"
-pwd 
-cd "$SC"
-pwd
 
-# update existing AS12 using the scion box update-gen script
-pushd "$CURRENTWD" >/dev/null
-pwd 
-# run update gen:
-cd "${SCIONBOXLOCATION:?}"
-pwd
-if [ $(ls sub/util | wc -l) == 0 ]; then
-    git submodule init
-    git submodule update
-fi
-torun="./updateGen.sh"
-params="--url $SCION_COORD_URL --address $INTF_ADDR --accountId $ACC_ID --secret $ACC_PW --updateAS 1-12"
+# update existing ASffaa:0:111 using the scion box update-gen script
+cd "$SC"
+pushd "${SCIONBOXLOCATION:?}" >/dev/null
+torun="${SCIONBOXLOCATION:?}/updateGen.sh"
+params="--url $SCION_COORD_URL --address $INTF_ADDR --accountId $ACC_ID --secret $ACC_PW --updateAS 1-ff00_0_111"
 echo "Calling: $torun $params"
 "$torun" "$params" &>/dev/null
 popd >/dev/null
+
+
+
+# TODO: remove after https://github.com/netsec-ethz/scion-utilities/issues/17 is fixed :
+# patch: replace the wrongfully assigned default.sock socket name with the right one sd1-ff00_0_111.sock :
+find "$SC/gen/ISD1/ASff00_0_111/" -type f -name 'supervisord.conf' -exec sed -i 's/default.sock/sd1-ff00_0_111.sock/' "{}" +
+echo "Replaced default.sock with the correct one sd1-ff00_0_111.sock . Please remove this patch after issue #17 in scion-utilities has been fixed"
+./scion.sh stop || true
+./supervisor/supervisor.sh reload
+# end of patch
+
+
 
 # we are done using SCION Coord; shut it down
 kill $scionCoordPid
@@ -156,16 +157,15 @@ echo "SCION Coordinator service was stopped."
 
 echo "Running SCION now:"
 cd "$SC"
-"./scion.sh" stop || true
-"./scion.sh" run
+./scion.sh stop || true
+./scion.sh start
 
 echo "Checking logs for successful arrival of beacons to the new AS (or $TESTTIMEOUT seconds)..."
 FOUND=false
-
 exec 4>&2
 exec 2>/dev/null
 # run timeout tail in a subshell because we need the while read loop in this one, to set FOUND to true iff found
-exec 3< <(timeout $TESTTIMEOUT tail -n0 -f "$SC/logs/bs1-1001-1.DEBUG")
+exec 3< <(timeout $TESTTIMEOUT tail -n0 -f "$SC/logs/bs1-ffaa_1_1-1.DEBUG")
 exec 2>&4 4>&-
 SSPID=$!
 while read -u 3 LINE; do

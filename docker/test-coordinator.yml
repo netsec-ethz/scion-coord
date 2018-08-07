@@ -5,15 +5,20 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: development_pass
       MYSQL_ROOT_HOST: '%'
-      # MYSQL_ROOT_HOST: 172.*.*.*
+
+  zookeeper1:
+    image: "zookeeper"
+    logging:
+      driver: none
+
   test:
     # call e.g.
     # docker-compose -f docker/test-coordinator.yml up --abort-on-container-exit --exit-code-from test
     depends_on:
       - mysql
+      - zookeeper1
 
-    # image: "juagargi/scionlab-coord:0.1"
-    image: "scionlab-coord-test"
+    image: "scionlab-coord-test:latest"
     # build:
     #   dockerfile: "./docker/Dockerfile-coord"
     #   dockerfile: "./docker/Dockerfile-coord-test"
@@ -22,13 +27,3 @@ services:
     #   - /bin/bash 
     #   - -l
     # entrypoint: sleep 30000
-    
-  # console:
-  #   image: "ubuntu:16.04"
-  #   # command: /bin/bash -l
-  #   # command: ["/bin/bash", "-l"]
-  #   entrypoint:
-  #     - /bin/bash 
-  #     - -l
-  #   stdin_open: true
-  #   tty: true
