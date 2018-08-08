@@ -1168,3 +1168,73 @@ func (s *SCIONLabASController) ConfirmUpdate(w http.ResponseWriter, r *http.Requ
 	}
 	as.Update()
 }
+
+// GetConnectionsForAP will return a JSON with the connections for an AP as seen by the Coordinator
+// Example of returned message:
+// {
+//     "17-ffaa:0:1107": {
+//       "connections": [
+//         {
+//           "ASID": "17-ffaa:1:14",
+//           "IsVPN": true,
+//           "VPNUserID": "user@example.com_ffaa_1_14",
+//           "IP": "10.0.8.42",
+//           "UserPort": 50000,
+//           "APPort": 50053,
+//           "APBRID": 5
+//         }
+//       ]
+//     }
+//   }
+func (s *SCIONLabASController) GetConnectionsForAP(w http.ResponseWriter, r *http.Request) {
+	log.Printf("API Call for GetConnectionsForAP = %v", r.URL.Query())
+	apIA, err := checkAuthorization(r, r.URL.Query().Get("scionLabAP"))
+	if err != nil {
+		s.Forbidden(w, err, "The account is not authorized for this AP")
+		return
+	}
+
+	as, err := models.FindSCIONLabASByIAInt(apIA.I, apIA.A)
+	if err != nil {
+		log.Printf("Error looking up the AS %v: %v", apIA, err)
+		s.Error500(w, err, "Error looking up SCIONLab AS from DB")
+		return
+	}
+	cnInfos, err := as.GetRespondConnectionInfo()
+	if err != nil {
+		log.Printf("Error looking up connections for AS %v: %v", apIA, err)
+		s.Error500(w, err, "Error looking up SCIONLab ASes from DB")
+		return
+	}
+	var conns []APConnectionInfo
+	for _, cn := range cnInfos {
+		cnInfo := APConnectionInfo{
+			ASID:      utility.IAStringStandard(as.ISD, cn.NeighborAS),
+			IsVPN:     cn.IsVPN,
+			VPNUserID: vpnUserID(cn.NeighborUser, cn.NeighborAS),
+			IP:        cn.NeighborIP,
+			UserPort:  cn.NeighborPort,
+			APPort:    cn.LocalPort,
+			APBRID:    cn.BRID,
+		}
+		if cn.Status != models.Active &&
+			cn.Status != models.Create &&
+			cn.Status != models.Update {
+			continue
+		}
+		conns = append(conns, cnInfo)
+	}
+	resp := map[string]map[string]interface{}{
+		apIA.FileFmt(false): {
+			"connections": conns,
+		},
+	}
+	b, err := json.Marshal(resp)
+	if err != nil {
+		log.Printf("Error during JSON marshaling: %v", err)
+		s.Error500(w, err, "Error during JSON marshaling")
+		return
+	}
+	log.Printf("getUpdatesForAP will return: %v", string(b))
+	fmt.Fprintln(w, string(b))
+}

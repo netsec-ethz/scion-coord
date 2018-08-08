@@ -214,6 +214,9 @@ func main() {
 		apiChain.ThenFunc(scionLabASController.QueryUpdateBranch))
 	router.Handle("/api/as/confirmUpdate/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabASController.ConfirmUpdate)).Methods(http.MethodPost)
+	// full synchronization (not only pending changes) for the APs:
+	router.Handle("/api/as/getConnectionsForAP/{account_id}/{secret}",
+		apiChain.ThenFunc(scionLabASController.GetConnectionsForAP))
 
 	//SCIONBox API
 	router.Handle("/api/as/initBox", loggingChain.ThenFunc(scionBoxController.InitializeBox))
