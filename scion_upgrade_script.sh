@@ -155,7 +155,7 @@ else
             echo "No need to patch."
     esac
     echo "SCION code has been upgraded, stopping..."
-
+    # rebuild scion
     ./scion.sh stop || true
     ~/.local/bin/supervisorctl -c supervisor/supervisord.conf shutdown || true
     ./tools/zkcleanslate || true
@@ -191,6 +191,17 @@ else
     echo "Starting SCION again..."
     ./scion.sh start || true
 fi
+# update scion-viz
+if [ -d "./sub/scion-viz" ]; then
+    pushd "./sub/scion-viz" >/dev/null
+    git stash >/dev/null || true
+    pull_result=$(git pull --ff-only)
+    if [[ $pull_result != *"up-to-date"* ]]; then
+        sudo systemctl restart scion-viz
+    fi
+    popd >/dev/null
+fi
+
 RESULT=$(curl -X POST "${SCION_COORD_URL}/api/as/confirmUpdate/${ACCOUNT_ID}/${ACCOUNT_SECRET}?IA=${IA}") || true
 echo "Done, got response from server: ${RESULT}"
 
