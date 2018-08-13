@@ -728,7 +728,7 @@ func (cn *Connection) Delete() error {
 	return err
 }
 
-func DeleteConnection(connectionId uint64) error {
+func DeleteConnectionFromDB(connectionId uint64) error {
 	_, err := o.Delete(&Connection{ID: connectionId})
 	return err
 }

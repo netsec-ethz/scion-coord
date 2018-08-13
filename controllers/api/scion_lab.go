@@ -1178,7 +1178,7 @@ func (s *SCIONLabASController) ConfirmUpdate(w http.ResponseWriter, r *http.Requ
 //           "ASID": "17-ffaa:1:14",
 //           "IsVPN": true,
 //           "VPNUserID": "user@example.com_ffaa_1_14",
-//           "IP": "10.0.8.42",
+//           "UserIP": "10.0.8.42",
 //           "UserPort": 50000,
 //           "APPort": 50053,
 //           "APBRID": 5
@@ -1212,7 +1212,7 @@ func (s *SCIONLabASController) GetConnectionsForAP(w http.ResponseWriter, r *htt
 			ASID:      utility.IAStringStandard(as.ISD, cn.NeighborAS),
 			IsVPN:     cn.IsVPN,
 			VPNUserID: vpnUserID(cn.NeighborUser, cn.NeighborAS),
-			IP:        cn.NeighborIP,
+			UserIP:    cn.NeighborIP,
 			UserPort:  cn.NeighborPort,
 			APPort:    cn.LocalPort,
 			APBRID:    cn.BRID,
