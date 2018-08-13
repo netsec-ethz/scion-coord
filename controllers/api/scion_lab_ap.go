@@ -163,6 +163,7 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 	ownedASes, err := ownedASes(r)
 	if err != nil {
 		s.BadRequest(w, err, "Error looking up owned ASes")
+		return
 	}
 
 	var failedConfirmations []string
@@ -301,6 +302,7 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 				// logic error! print failed assertion but don't quit this update
 				log.Printf("Logic error confirming updates for AS %v to AP %v. The connection is inactive but the action %v != REMOVED",
 					ia, apAS.IAString(), action)
+				continue
 			}
 		}
 		successEmails = append(successEmails, emailConfirmation{as.UserEmail, as.IAString(), action})
