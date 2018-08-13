@@ -44,7 +44,7 @@ type APConnectionInfo struct {
 	ASID      string // ISD-AS of the AS
 	IsVPN     bool   // is this a VPN connection
 	VPNUserID string // user identifier used for VPN, currently the user's email + ASID
-	IP        string // IP address of the SCIONLab AS
+	UserIP    string // IP address of the SCIONLab AS
 	UserPort  uint16 // port number of the AS connecting to the AP
 	APPort    uint16 // port number at the AP
 	APBRID    uint16 // ID of the border router at the AP
@@ -92,7 +92,7 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 			ASID:      utility.IAStringStandard(as.ISD, cn.NeighborAS),
 			IsVPN:     cn.IsVPN,
 			VPNUserID: vpnUserID(cn.NeighborUser, cn.NeighborAS),
-			IP:        cn.NeighborIP,
+			UserIP:    cn.NeighborIP,
 			UserPort:  cn.NeighborPort,
 			APPort:    cn.LocalPort,
 			APBRID:    cn.BRID,
@@ -369,7 +369,7 @@ func (s *SCIONLabASController) processRejectedUpdatesFromAP(rejections []rejecte
 				// if we don't have pending actions, skip completely
 				continue
 			}
-			err = models.DeleteConnection(cn.ID)
+			err = models.DeleteConnectionFromDB(cn.ID)
 			if err != nil {
 				log.Printf("ERROR removing rejected connection. UserAS: %s, AP: %s, action: %s", rejectedAS.IA, rejectedAS.AP, rejectedAS.action)
 				failedNotifications = append(failedNotifications, rejectedAS.IA)
