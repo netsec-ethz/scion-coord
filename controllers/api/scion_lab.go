@@ -1395,8 +1395,8 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 			if cnInfoInDB.IsCurrentConnection() {
 				// If the connection is the current one from the user AS to the AP, update the user AS status:
 				userAS.Status = cnInfoInDB.Status
-				// TODO: there is a bug here (the connection had to be joining connection for it to work):
-				if err = userAS.UpdateASAndConnectionFromJoinConnInfo(&cnInfoInDB); err != nil {
+				cnInfoInDB.NeighborStatus = userAS.Status
+				if err = userAS.UpdateASAndConnectionFromRespondConnInfo(&cnInfoInDB); err != nil {
 					log.Printf("[ERROR] Cannot update AS and connection for AS %v: %v", userAS.IAString(), err)
 					// TODO: send email to users, etc
 					continue

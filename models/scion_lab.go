@@ -468,15 +468,42 @@ func (as *SCIONLabAS) UpdateDBConnectionFromJoinConnInfo(cnInfo *ConnectionInfo)
 		cn.JoinStatus = cnInfo.NeighborStatus
 		cn.RespondBRID = cnInfo.BRID
 	}
-	if err := cn.Update(); err != nil {
-		return err
+	return cn.Update()
+}
+
+func (as *SCIONLabAS) UpdateDBConnectionFromRespondConnInfo(cnInfo *ConnectionInfo) error {
+	cn := new(Connection)
+	if err := o.QueryTable(cn).Filter("ID", cnInfo.ID).RelatedSel().One(cn); err != nil {
+		return nil
 	}
-	return nil
+	cn.IsVPN = cnInfo.IsVPN
+	cn.JoinIP = cnInfo.NeighborIP
+	cn.RespondIP = cnInfo.LocalIP
+
+	respondAS := cn.GetRespondAS()
+	joinAS := cn.GetJoinAS()
+	if joinAS.ID == as.ID {
+		cn.RespondStatus = cnInfo.Status
+		cn.JoinStatus = cnInfo.NeighborStatus
+		cn.RespondBRID = cnInfo.BRID
+	}
+	if respondAS.ID == as.ID {
+		cn.JoinStatus = cnInfo.Status
+		cn.RespondStatus = cnInfo.NeighborStatus
+		cn.JoinBRID = cnInfo.BRID
+	}
+	return cn.Update()
 }
 
 // Update both the SCIONLabAS and Connection tables
 func (as *SCIONLabAS) UpdateASAndConnectionFromJoinConnInfo(cnInfo *ConnectionInfo) error {
 	if err := as.UpdateDBConnectionFromJoinConnInfo(cnInfo); err != nil {
+		return err
+	}
+	return as.Update()
+}
+func (as *SCIONLabAS) UpdateASAndConnectionFromRespondConnInfo(cnInfo *ConnectionInfo) error {
+	if err := as.UpdateDBConnectionFromRespondConnInfo(cnInfo); err != nil {
 		return err
 	}
 	return as.Update()
