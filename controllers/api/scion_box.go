@@ -275,7 +275,7 @@ func (s *SCIONBoxController) getPotentialNeighbors(ip string,
 func (s *SCIONBoxController) getCredentialsByEmail(userEmail string) (string, string, error) {
 	user, err := models.FindUserByEmail(userEmail)
 	if err != nil {
-		fmt.Errorf("error looking for user %v", err)
+		err = fmt.Errorf("error looking for user %v", err)
 		return "", "", err
 	}
 	account := user.Account
@@ -619,7 +619,7 @@ func (s *SCIONBoxController) generateCredentialsFile(slas *models.SCIONLabAS) er
 	// find Account
 	id, secret, err := s.getCredentialsByEmail(slas.UserEmail)
 	if err != nil {
-		fmt.Errorf("error looking for credentials %v", err)
+		return fmt.Errorf("error looking for credentials %v", err)
 	}
 	cr := credentials{
 		ID:       id,
