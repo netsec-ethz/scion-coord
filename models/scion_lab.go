@@ -97,6 +97,7 @@ type ConnectionInfo struct {
 	IsVPN                bool
 	Status               uint8
 	KeepASStatusOnUpdate bool // true if this WAS a connection to an AP, but it needs to be deleted in the AP
+	CreatedOn            time.Time
 }
 
 func (cn *ConnectionInfo) IsCurrentConnection() bool {
@@ -342,6 +343,7 @@ func (as *SCIONLabAS) GetJoinConnectionInfo() ([]ConnectionInfo, error) {
 			IsVPN:                cn.IsVPN,
 			Status:               cn.JoinStatus,
 			KeepASStatusOnUpdate: cn.RespondStatus == Remove && cn.JoinStatus == Remove,
+			CreatedOn:            cn.Created,
 		}
 		cnInfos = append(cnInfos, cnInfo)
 	}
