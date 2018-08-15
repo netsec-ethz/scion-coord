@@ -547,7 +547,7 @@ func (s *SCIONLabASController) updateDB(asInfo *SCIONLabASInfo) error {
 		cn.NeighborIP = asInfo.RemoteIP
 		cn.NeighborStatus = asInfo.LocalAS.Status
 		cn.Status = models.Active
-		if err := asInfo.LocalAS.UpdateASAndConnection(&cn); err != nil {
+		if err := asInfo.LocalAS.UpdateASAndConnectionFromJoinConnInfo(&cn); err != nil {
 			return fmt.Errorf("error updating database tables for user %v: %v",
 				userEmail, err)
 		}
@@ -1092,7 +1092,7 @@ func (s *SCIONLabASController) RemoveSCIONLabAS(w http.ResponseWriter, r *http.R
 	as.Status = models.Remove
 	cn.NeighborStatus = models.Remove
 	cn.Status = models.Inactive
-	if err := as.UpdateASAndConnection(cn); err != nil {
+	if err := as.UpdateASAndConnectionFromJoinConnInfo(cn); err != nil {
 		log.Printf("Error marking AS and Connection as removed for user %v: %v",
 			userEmail, err)
 		s.Error500(w, err, "Error marking AS and Connection as removed")

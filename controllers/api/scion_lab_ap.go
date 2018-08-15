@@ -291,7 +291,7 @@ func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONL
 		}
 		if cnInfo.IsCurrentConnection() {
 			as.Status = cnInfo.Status
-			if err = as.UpdateASAndConnection(&cnInfo); err != nil {
+			if err = as.UpdateASAndConnectionFromJoinConnInfo(&cnInfo); err != nil {
 				log.Printf("Error updating database tables for AS %v: %v", as.IAString(), err)
 				failedConfirmations = append(failedConfirmations, ia)
 				continue
