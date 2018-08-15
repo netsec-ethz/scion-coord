@@ -1194,13 +1194,13 @@ func (s *SCIONLabASController) GetConnectionsForAP(w http.ResponseWriter, r *htt
 		return
 	}
 
-	as, err := models.FindSCIONLabASByIAInt(apIA.I, apIA.A)
+	ap, err := models.FindSCIONLabASByIAInt(apIA.I, apIA.A)
 	if err != nil {
 		log.Printf("Error looking up the AS %v: %v", apIA, err)
 		s.Error500(w, err, "Error looking up SCIONLab AS from DB")
 		return
 	}
-	cnInfos, err := as.GetRespondConnectionInfo()
+	cnInfos, err := ap.GetRespondConnectionInfo()
 	if err != nil {
 		log.Printf("Error looking up connections for AS %v: %v", apIA, err)
 		s.Error500(w, err, "Error looking up SCIONLab ASes from DB")
@@ -1209,7 +1209,7 @@ func (s *SCIONLabASController) GetConnectionsForAP(w http.ResponseWriter, r *htt
 	var conns []APConnectionInfo
 	for _, cn := range cnInfos {
 		cnInfo := APConnectionInfo{
-			ASID:      utility.IAStringStandard(as.ISD, cn.NeighborAS),
+			ASID:      utility.IAStringStandard(ap.ISD, cn.NeighborAS),
 			IsVPN:     cn.IsVPN,
 			VPNUserID: vpnUserID(cn.NeighborUser, cn.NeighborAS),
 			UserIP:    cn.NeighborIP,
@@ -1237,4 +1237,205 @@ func (s *SCIONLabASController) GetConnectionsForAP(w http.ResponseWriter, r *htt
 	}
 	log.Printf("getUpdatesForAP will return: %v", string(b))
 	fmt.Fprintln(w, string(b))
+}
+
+// SetConnectionsForAP receives the connections an AP has and flags them as such in the Coordinator
+// In case the belief of the AP differs to that of the Coordinator, the AP will be notified. Then
+// the AP could get the belief of the Coordinator via a different backend call
+// Example of request:
+// {
+//     "17-ffaa:0:1107": {
+//       "connections": [
+//         {
+//           "UserASID": "17-ffaa:1:14",
+//           "UserIP": "10.0.8.42",
+//           "UserPort": 50000,
+//           "APIP": 10.0.8.1,
+//           "APPort": 50004,
+//           "APBRID": 5
+//           "VPNUserID": "user@example.com_ffaa_1_14",
+//         }
+//       ]
+//     }
+//   }
+func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *http.Request) {
+	log.Printf("API Call for SetConnectionsForAP")
+	// TODO: use a timestamp in GetConnections and also here to avoid touching new connections
+	bodyBytes, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("Error reading body of HTTP request. Error: %v \nBody: %v", r.Body, err)
+		s.BadRequest(w, err, "Error reading request body")
+		return
+	}
+	body := string(bodyBytes)
+	var allStatusMap map[string]map[string][]APConnectionInfo
+	decoder := json.NewDecoder(strings.NewReader(body))
+	if err := decoder.Decode(&allStatusMap); err != nil {
+		log.Printf("Error decoding JSON: %v, %v", err, body)
+		s.BadRequest(w, err, "Error decoding JSON")
+		return
+	}
+	ownedASes, err := ownedASes(r)
+	if err != nil {
+		s.BadRequest(w, err, "Error looking up owned ASes")
+		return
+	}
+
+	var sendToAdminMessages []string
+	for apIAstr, reportedStatus := range allStatusMap {
+		apIA, err := addr.IAFromString(apIAstr)
+		if err != nil {
+			apIA, err = addr.IAFromFileFmt(apIAstr, false)
+			if err != nil {
+				err = fmt.Errorf("%v is not a valid SCION IA", apIAstr)
+				return
+			}
+		}
+		// ensure apIA is always non file format:
+		apIAstr = apIA.String()
+		log.Printf("[DEBUG] IA: %v, status: %v", apIAstr, reportedStatus)
+		reportedConnections := reportedStatus["connections"]
+		_, isAuthorized := ownedASes[apIAstr]
+		if !isAuthorized {
+			log.Printf("Unauthorized updates from AS %v", apIAstr)
+		}
+		ap, err := models.FindSCIONLabASByIAInt(apIA.I, apIA.A)
+		if err != nil {
+			log.Printf("[ERROR] Error finding AS %v when processing confirmations: %v", apIAstr, err)
+		}
+		if !isAuthorized || err != nil {
+			var reason string
+			if !isAuthorized {
+				reason = "Not authorized"
+			} else {
+				reason = fmt.Sprintf("Cannot obtain AS: %v", err)
+			}
+			var ias []string
+			for _, c := range reportedConnections {
+				ias = append(ias, c.ASID)
+			}
+			msg := fmt.Sprintf("Could not process set connections from AP %v. Reason: %v. Affected user ASes: %v", apIAstr, reason, ias)
+			sendToAdminMessages = append(sendToAdminMessages, msg)
+			continue
+		}
+		// find the pending connections in the DB and the AP's received status, and change the status accordingly
+		cnInfosInDB, err := ap.GetRespondConnectionInfo()
+		if err != nil {
+			log.Printf("[ERROR] Error looking up connections for AS %v: %v", apIAstr, err)
+			s.Error500(w, err, "Error looking up SCIONLab ASes from DB")
+			return
+		}
+		// all received connections for this AP, as a map:
+		reportedFromAPmap := make(map[addr.AS][]APConnectionInfo)
+		for _, c := range reportedConnections {
+			ia, err := addr.IAFromString(c.ASID)
+			if err != nil {
+				log.Printf("[ERROR] String (%v) does not parse to IA: %v", c.ASID, err)
+				return
+			}
+			reportedFromAPmap[ia.A] = append(reportedFromAPmap[ia.A], c)
+		}
+		// find the pending connections in the received ones:
+		allCnInfosInDBmap := make(map[string][]APConnectionInfo)
+		for _, cnInfoInDB := range cnInfosInDB {
+			userASinDBia := utility.IAStringStandard(ap.ISD, cnInfoInDB.NeighborAS)
+			apCnInfo := APConnectionInfo{
+				ASID:      userASinDBia,
+				IsVPN:     cnInfoInDB.IsVPN,
+				VPNUserID: vpnUserID(cnInfoInDB.NeighborUser, cnInfoInDB.NeighborAS),
+				UserIP:    cnInfoInDB.NeighborIP,
+				UserPort:  cnInfoInDB.NeighborPort,
+				APPort:    cnInfoInDB.LocalPort,
+				APBRID:    cnInfoInDB.BRID,
+			}
+			allCnInfosInDBmap[userASinDBia] = append(allCnInfosInDBmap[userASinDBia], apCnInfo)
+			// if the connection status in AP's side is not pending, skip
+			if cnInfoInDB.Status != models.Create && cnInfoInDB.Status != models.Update && cnInfoInDB.Status != models.Remove {
+				continue
+			}
+			cnArr := reportedFromAPmap[cnInfoInDB.NeighborAS]
+			foundPendingInReported := false
+			for _, existingConn := range cnArr {
+				if existingConn == apCnInfo {
+					foundPendingInReported = true
+					break
+				}
+			}
+			userAS, err := models.FindSCIONLabASByASID(cnInfoInDB.NeighborAS)
+			if err != nil {
+				log.Printf("[ERROR] Cannot find user AS with IA %v: %v", apIA.A.String(), err)
+				// TODO: send email to users, etc
+				continue
+			}
+			if foundPendingInReported {
+				cnInfoInDB.Status = models.Active
+			} else {
+				if cnInfoInDB.Status == models.Remove {
+					if cnInfoInDB.IsCurrentConnection() {
+						cnInfoInDB.Status = models.Inactive
+						cnInfoInDB.BRID = 0 // Set BRID to 0 for inactive connections
+					} else {
+						err := models.DeleteConnectionFromDB(cnInfoInDB.ID)
+						if err != nil {
+							log.Printf("[ERROR] Error removing connection between AP %v and AS %v: %v", apIA, apCnInfo.ASID, err)
+							continue
+						}
+					}
+				} else {
+					// we have a connection to create or update that it's not in the list from the AP
+					// if this connection was created more than 2 minutes ago, complain!
+					if time.Since(cnInfoInDB.CreatedOn).Minutes() > 2 {
+						log.Printf("[ERROR] Could not find pending connection ASID %v, user %v", apCnInfo.ASID, cnInfoInDB.NeighborUser)
+						// TODO: send email to users, etc
+						continue
+					}
+				}
+			}
+			// cnInfo was found in the AP, or not found but pending to remove (both cases okay).
+			if cnInfoInDB.IsCurrentConnection() {
+				// If the connection is the current one from the user AS to the AP, update the user AS status:
+				userAS.Status = cnInfoInDB.Status
+				// TODO: there is a bug here (the connection had to be joining connection for it to work):
+				if err = userAS.UpdateASAndConnectionFromJoinConnInfo(&cnInfoInDB); err != nil {
+					log.Printf("[ERROR] Cannot update AS and connection for AS %v: %v", userAS.IAString(), err)
+					// TODO: send email to users, etc
+					continue
+				}
+			} else {
+				if cnInfoInDB.Status != models.Remove {
+					// logic error! print failed assertion but don't quit this update
+					log.Printf("[ERROR] Logic error setting connections for AP %v to user AS %v. The connection is inactive but the action %v != REMOVED", apIAstr, userAS.IAString(), cnInfoInDB.Status)
+				}
+			}
+		}
+		// check that all the received connections exist as such in the DB
+		for _, reportedConn := range reportedConnections {
+			foundInDB := false
+			for _, c := range allCnInfosInDBmap[reportedConn.ASID] {
+				if c == reportedConn {
+					foundInDB = true
+					break
+				}
+			}
+			if !foundInDB {
+				msg := fmt.Sprintf("A reported connection was not found in the DB. AP: %v user AS: %v, full APConnectionInfo: %v", apIAstr, reportedConn.ASID, reportedConn)
+				sendToAdminMessages = append(sendToAdminMessages, msg)
+			}
+		}
+	} // for each AP,status
+	if len(sendToAdminMessages) > 0 {
+		log.Printf("[DEBUG] Messages to the admins: %v", sendToAdminMessages)
+		data := struct {
+			errorMessages string
+		}{
+			errorMessages: strings.Join(sendToAdminMessages, "\n"),
+		}
+		err = email.ConstructFromTemplateAndSendToAdmins("setconnections_failed.html", "FAILED SetConnections", data, "")
+		if err != nil {
+			log.Printf("Error sending email: %v", err)
+			return
+		}
+	}
+	// TODO: notify of errors
+	fmt.Fprintln(w, "{}")
 }

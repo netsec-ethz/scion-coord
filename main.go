@@ -216,6 +216,8 @@ func main() {
 	// full synchronization (not only pending changes) for the APs:
 	router.Handle("/api/as/getConnectionsForAP/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabASController.GetConnectionsForAP))
+	router.Handle("/api/as/setConnectionsForAP/{account_id}/{secret}",
+		apiChain.ThenFunc(scionLabASController.SetConnectionsForAP))
 
 	//SCIONBox API
 	router.Handle("/api/as/initBox", loggingChain.ThenFunc(scionBoxController.InitializeBox))
