@@ -444,7 +444,7 @@ func FindRespondConnectionInfoByIA(ia string) ([]ConnectionInfo, error) {
 }
 
 // Update the Status of a Connection using a ConnectionInfo Object
-func (as *SCIONLabAS) UpdateDBConnection(cnInfo *ConnectionInfo) error {
+func (as *SCIONLabAS) UpdateDBConnectionFromJoinConnInfo(cnInfo *ConnectionInfo) error {
 	cn := new(Connection)
 	err := o.QueryTable(cn).Filter("ID", cnInfo.ID).RelatedSel().One(cn)
 	if err != nil {
@@ -473,8 +473,8 @@ func (as *SCIONLabAS) UpdateDBConnection(cnInfo *ConnectionInfo) error {
 }
 
 // Update both the SCIONLabAS and Connection tables
-func (as *SCIONLabAS) UpdateASAndConnection(cnInfo *ConnectionInfo) error {
-	if err := as.UpdateDBConnection(cnInfo); err != nil {
+func (as *SCIONLabAS) UpdateASAndConnectionFromJoinConnInfo(cnInfo *ConnectionInfo) error {
+	if err := as.UpdateDBConnectionFromJoinConnInfo(cnInfo); err != nil {
 		return err
 	}
 	return as.Update()
@@ -705,7 +705,7 @@ func (as *SCIONLabAS) FlagAllConnectionsToApToBeDeleted(apIA string) error {
 		}
 		cn.Status = Remove
 		cn.NeighborStatus = Remove
-		err = as.UpdateDBConnection(&cn)
+		err = as.UpdateDBConnectionFromJoinConnInfo(&cn)
 		if err != nil {
 			return fmt.Errorf("error updating previous connection ID %v: %v", cn.ID, err)
 		}
