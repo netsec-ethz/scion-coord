@@ -1269,7 +1269,7 @@ func (s *SCIONLabASController) GetConnectionsForAP(w http.ResponseWriter, r *htt
 //     }
 //   }
 func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *http.Request) {
-	log.Printf("API Call for SetConnectionsForAP")
+	log.Printf("API Call for SetConnectionsForAP ----------------- BEGIN ---------------------------------")
 	type SetConnectionsResult struct {
 		ShouldTryAgain    bool
 		CriticalError     string
@@ -1278,7 +1278,7 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 	CreateSetConnectionsResult := func() *SetConnectionsResult {
 		return &SetConnectionsResult{FailedASesReasons: make(map[string]string)}
 	}
-	// Response to the AP when this call is finished:
+	// Response to the AP when this call is finished. Not being in the map means all okay:
 	type ResponseToAP map[string]*SetConnectionsResult
 
 	apUtcTimeDeltaCutoffParam := r.URL.Query().Get("utcTimeDelta")
@@ -1512,9 +1512,9 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 		}
 		err = email.ConstructFromTemplateAndSendToAdmins("setconnections_failed.html", "FAILED SetConnections", data, "")
 		if err != nil {
-			log.Printf("Error sending email: %v", err)
-			return
+			log.Printf("[ERROR] Error sending email: %v", err)
 		}
 	}
+	log.Printf("API Call for SetConnectionsForAP ----------------- END -----------------------------------")
 	fmt.Fprintln(w, string(responseJSON))
 }
