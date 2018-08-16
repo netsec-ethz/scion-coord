@@ -1188,12 +1188,19 @@ func (s *SCIONLabASController) ConfirmUpdate(w http.ResponseWriter, r *http.Requ
 //   }
 func (s *SCIONLabASController) GetConnectionsForAP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("API Call for GetConnectionsForAP = %v", r.URL.Query())
-	apIA, err := checkAuthorization(r, r.URL.Query().Get("scionLabAP"))
+	apIAparam := r.URL.Query().Get("scionLabAP")
+	apUtcTimeDeltaCutoffParam := r.URL.Query().Get("utcTimeDelta")
+	nowUtcSeconds := time.Now().Unix()
+	utcTimeDeltaCutoff, err := strconv.ParseInt(apUtcTimeDeltaCutoffParam, 10, 64)
+	if err != nil {
+		utcTimeDeltaCutoff = nowUtcSeconds
+	}
+	log.Printf("[DEBUG] Using UTC time delta: %d (now is %d)", utcTimeDeltaCutoff, nowUtcSeconds)
+	apIA, err := checkAuthorization(r, apIAparam)
 	if err != nil {
 		s.Forbidden(w, err, "The account is not authorized for this AP")
 		return
 	}
-
 	ap, err := models.FindSCIONLabASByIAInt(apIA.I, apIA.A)
 	if err != nil {
 		log.Printf("Error looking up the AS %v: %v", apIA, err)
@@ -1208,6 +1215,9 @@ func (s *SCIONLabASController) GetConnectionsForAP(w http.ResponseWriter, r *htt
 	}
 	var conns []APConnectionInfo
 	for _, cn := range cnInfos {
+		if cn.UpdatedOn.Unix() > utcTimeDeltaCutoff {
+			continue
+		}
 		cnInfo := APConnectionInfo{
 			ASID:      utility.IAStringStandard(ap.ISD, cn.NeighborAS),
 			IsVPN:     cn.IsVPN,
@@ -1260,7 +1270,13 @@ func (s *SCIONLabASController) GetConnectionsForAP(w http.ResponseWriter, r *htt
 //   }
 func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("API Call for SetConnectionsForAP")
-	// TODO: use a timestamp in GetConnections and also here to avoid touching new connections
+	apUtcTimeDeltaCutoffParam := r.URL.Query().Get("utcTimeDelta")
+	nowUtcSeconds := time.Now().Unix()
+	utcTimeDeltaCutoff, err := strconv.ParseInt(apUtcTimeDeltaCutoffParam, 10, 64)
+	if err != nil {
+		utcTimeDeltaCutoff = nowUtcSeconds
+	}
+	log.Printf("[DEBUG] Using UTC time delta: %d (now is %d)", utcTimeDeltaCutoff, nowUtcSeconds)
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		log.Printf("Error reading body of HTTP request. Error: %v \nBody: %v", r.Body, err)
@@ -1353,6 +1369,15 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 			if cnInfoInDB.Status != models.Create && cnInfoInDB.Status != models.Update && cnInfoInDB.Status != models.Remove {
 				continue
 			}
+			var actionString string
+			switch cnInfoInDB.Status {
+			case models.Create:
+				actionString = CREATED
+			case models.Update:
+				actionString = UPDATED
+			case models.Remove:
+				actionString = REMOVED
+			}
 			cnArr := reportedFromAPmap[cnInfoInDB.NeighborAS]
 			foundPendingInReported := false
 			for _, existingConn := range cnArr {
@@ -1363,8 +1388,9 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 			}
 			userAS, err := models.FindSCIONLabASByASID(cnInfoInDB.NeighborAS)
 			if err != nil {
-				log.Printf("[ERROR] Cannot find user AS with IA %v: %v", apIA.A.String(), err)
-				// TODO: send email to users, etc
+				msg := fmt.Sprintf("[ERROR] Cannot find user AS with IA %v: %v", cnInfoInDB.NeighborAS.String(), err)
+				log.Print(msg)
+				sendToAdminMessages = append(sendToAdminMessages, msg)
 				continue
 			}
 			if foundPendingInReported {
@@ -1377,16 +1403,18 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 					} else {
 						err := models.DeleteConnectionFromDB(cnInfoInDB.ID)
 						if err != nil {
-							log.Printf("[ERROR] Error removing connection between AP %v and AS %v: %v", apIA, apCnInfo.ASID, err)
+							log.Printf("[ERROR] Error removing connection between AP %v and AS %v: %v", apIA, userASinDBia, err)
 							continue
 						}
 					}
 				} else {
 					// we have a connection to create or update that it's not in the list from the AP
-					// if this connection was created more than 2 minutes ago, complain!
-					if time.Since(cnInfoInDB.CreatedOn).Minutes() > 2 {
-						log.Printf("[ERROR] Could not find pending connection ASID %v, user %v", apCnInfo.ASID, cnInfoInDB.NeighborUser)
-						// TODO: send email to users, etc
+					// if this connection was updated before our cut off time, complain!
+					if cnInfoInDB.UpdatedOn.Unix() < utcTimeDeltaCutoff {
+						log.Printf("[ERROR] Could not find pending connection to ASID %v, user %v, DB id %d, updated on %v", userASinDBia, cnInfoInDB.NeighborUser, cnInfoInDB.ID, cnInfoInDB.UpdatedOn)
+						if err = sendRejectedEmail(cnInfoInDB.NeighborUser, userASinDBia, actionString, apIAstr); err != nil {
+							log.Printf("[ERROR] Could not send email to user %v about failed sync between AP %v and user AS %v", cnInfoInDB.NeighborUser, apIAstr, userASinDBia)
+						}
 						continue
 					}
 				}
@@ -1398,7 +1426,9 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 				cnInfoInDB.NeighborStatus = userAS.Status
 				if err = userAS.UpdateASAndConnectionFromRespondConnInfo(&cnInfoInDB); err != nil {
 					log.Printf("[ERROR] Cannot update AS and connection for AS %v: %v", userAS.IAString(), err)
-					// TODO: send email to users, etc
+					if err = sendRejectedEmail(cnInfoInDB.NeighborUser, userASinDBia, actionString, apIAstr); err != nil {
+						log.Printf("[ERROR] Could not send email to user %v about failed sync between AP %v and user AS %v", cnInfoInDB.NeighborUser, apIAstr, userASinDBia)
+					}
 					continue
 				}
 			} else {
@@ -1436,6 +1466,6 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 			return
 		}
 	}
-	// TODO: notify of errors
+	// TODO: notify the AP of synchronization errors
 	fmt.Fprintln(w, "{}")
 }
