@@ -1270,6 +1270,17 @@ func (s *SCIONLabASController) GetConnectionsForAP(w http.ResponseWriter, r *htt
 //   }
 func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("API Call for SetConnectionsForAP")
+	type SetConnectionsResult struct {
+		ShouldTryAgain    bool
+		CriticalError     string
+		FailedASesReasons map[string]string
+	}
+	CreateSetConnectionsResult := func() *SetConnectionsResult {
+		return &SetConnectionsResult{FailedASesReasons: make(map[string]string)}
+	}
+	// Response to the AP when this call is finished:
+	type ResponseToAP map[string]*SetConnectionsResult
+
 	apUtcTimeDeltaCutoffParam := r.URL.Query().Get("utcTimeDelta")
 	nowUtcSeconds := time.Now().Unix()
 	utcTimeDeltaCutoff, err := strconv.ParseInt(apUtcTimeDeltaCutoffParam, 10, 64)
@@ -1298,24 +1309,27 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 	}
 
 	var sendToAdminMessages []string
-	responseDictionary := make(map[string]interface{})
+	response := make(ResponseToAP)
 	for apIAstr, reportedStatus := range allStatusMap {
-		addThing := func(subkey string, errorMsg interface{}) {
-			if responseDictionary[apIAstr] == nil {
-				responseDictionary[apIAstr] = make(map[string]interface{})
+		setCriticalError := func(errorMsg string) {
+			if response[apIAstr] == nil {
+				response[apIAstr] = CreateSetConnectionsResult()
 			}
-			if responseDictionary[apIAstr].(map[string]interface{})[subkey] == nil {
-				responseDictionary[apIAstr].(map[string]interface{})[subkey] = make([]interface{}, 0)
-			}
-			responseDictionary[apIAstr].(map[string]interface{})[subkey] = append(responseDictionary[apIAstr].(map[string]interface{})[subkey].([]interface{}), errorMsg)
+			response[apIAstr].CriticalError = errorMsg
 		}
-		addCriticalError := func(errorMsg string) { addThing("critical", errorMsg) }
+		setUserASerror := func(userASiaStr, errorMsg string) {
+			if response[apIAstr] == nil {
+				response[apIAstr] = CreateSetConnectionsResult()
+			}
+			response[apIAstr].ShouldTryAgain = true
+			response[apIAstr].FailedASesReasons[userASiaStr] = errorMsg
+		}
 		apIA, err := addr.IAFromString(apIAstr)
 		if err != nil {
 			apIA, err = addr.IAFromFileFmt(apIAstr, false)
 			if err != nil {
 				err = fmt.Errorf("%v is not a valid SCION IA", apIAstr)
-				addCriticalError(err.Error())
+				setCriticalError(err.Error())
 				continue
 			}
 		}
@@ -1344,7 +1358,7 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 			}
 			msg := fmt.Sprintf("Could not process set connections from AP %v. Reason: %v. Affected user ASes: %v", apIAstr, reason, ias)
 			sendToAdminMessages = append(sendToAdminMessages, msg)
-			addCriticalError(msg)
+			setCriticalError(msg)
 			continue
 		}
 		// find the pending connections in the DB and the AP's received status, and change the status accordingly
@@ -1352,7 +1366,7 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 		if err != nil {
 			msg := fmt.Sprintf("[ERROR] Error looking up connections for AS %v: %v", apIAstr, err)
 			log.Print(msg)
-			addCriticalError(msg)
+			setCriticalError(msg)
 			continue
 		}
 		// all received connections for this AP, as a map:
@@ -1360,8 +1374,10 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 		for _, c := range reportedConnections {
 			ia, err := addr.IAFromString(c.ASID)
 			if err != nil {
-				log.Printf("[ERROR] String (%v) does not parse to IA: %v", c.ASID, err)
-				return
+				msg := fmt.Sprintf("[ERROR] String (%v) does not parse to IA: %v", c.ASID, err)
+				log.Print(msg)
+				setUserASerror(c.ASID, msg)
+				continue
 			}
 			reportedFromAPmap[ia.A] = append(reportedFromAPmap[ia.A], c)
 		}
@@ -1405,6 +1421,7 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 				msg := fmt.Sprintf("[ERROR] Cannot find user AS with IA %v: %v", cnInfoInDB.NeighborAS.String(), err)
 				log.Print(msg)
 				sendToAdminMessages = append(sendToAdminMessages, msg)
+				setUserASerror(userASinDBia, msg)
 				continue
 			}
 			if foundPendingInReported {
@@ -1417,7 +1434,9 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 					} else {
 						err := models.DeleteConnectionFromDB(cnInfoInDB.ID)
 						if err != nil {
-							log.Printf("[ERROR] Error removing connection between AP %v and AS %v: %v", apIA, userASinDBia, err)
+							msg := fmt.Sprintf("[ERROR] Error removing connection between AP %v and AS %v: %v", apIA, userASinDBia, err)
+							log.Print(msg)
+							setUserASerror(userASinDBia, msg)
 							continue
 						}
 					}
@@ -1425,7 +1444,9 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 					// we have a connection to create or update that it's not in the list from the AP
 					// if this connection was updated before our cut off time, complain!
 					if cnInfoInDB.UpdatedOn.Unix() < utcTimeDeltaCutoff {
-						log.Printf("[ERROR] Could not find pending connection to ASID %v, user %v, DB id %d, updated on %v", userASinDBia, cnInfoInDB.NeighborUser, cnInfoInDB.ID, cnInfoInDB.UpdatedOn)
+						msg := fmt.Sprintf("[ERROR] Could not find pending connection to ASID %v, user %v, DB id %d, updated on %v", userASinDBia, cnInfoInDB.NeighborUser, cnInfoInDB.ID, cnInfoInDB.UpdatedOn)
+						log.Print(msg)
+						setUserASerror(userASinDBia, msg)
 						if err = sendRejectedEmail(cnInfoInDB.NeighborUser, userASinDBia, actionString, apIAstr); err != nil {
 							log.Printf("[ERROR] Could not send email to user %v about failed sync between AP %v and user AS %v", cnInfoInDB.NeighborUser, apIAstr, userASinDBia)
 						}
@@ -1439,7 +1460,9 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 				userAS.Status = cnInfoInDB.Status
 				cnInfoInDB.NeighborStatus = userAS.Status
 				if err = userAS.UpdateASAndConnectionFromRespondConnInfo(&cnInfoInDB); err != nil {
-					log.Printf("[ERROR] Cannot update AS and connection for AS %v: %v", userAS.IAString(), err)
+					msg := fmt.Sprintf("[ERROR] Cannot update AS and connection for AS %v: %v", userAS.IAString(), err)
+					log.Print(msg)
+					setUserASerror(userASinDBia, msg)
 					if err = sendRejectedEmail(cnInfoInDB.NeighborUser, userASinDBia, actionString, apIAstr); err != nil {
 						log.Printf("[ERROR] Could not send email to user %v about failed sync between AP %v and user AS %v", cnInfoInDB.NeighborUser, apIAstr, userASinDBia)
 					}
@@ -1448,7 +1471,9 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 			} else {
 				if cnInfoInDB.Status != models.Remove {
 					// logic error! print failed assertion but don't quit this update
-					log.Printf("[ERROR] Logic error setting connections for AP %v to user AS %v. The connection is inactive but the action %v != REMOVED", apIAstr, userAS.IAString(), cnInfoInDB.Status)
+					msg := fmt.Sprintf("[ERROR] Logic error setting connections for AP %v to user AS %v. The connection is inactive but the action %v != REMOVED", apIAstr, userAS.IAString(), cnInfoInDB.Status)
+					log.Print(msg)
+					sendToAdminMessages = append(sendToAdminMessages, msg)
 				}
 			}
 		}
@@ -1463,10 +1488,21 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 			}
 			if !foundInDB {
 				msg := fmt.Sprintf("A reported connection was not found in the DB. AP: %v user AS: %v, full APConnectionInfo: %v", apIAstr, reportedConn.ASID, reportedConn)
+				log.Print(msg)
 				sendToAdminMessages = append(sendToAdminMessages, msg)
+				setUserASerror(reportedConn.ASID, msg)
 			}
 		}
 	} // for each AP,status
+
+	responseJSON, err := json.Marshal(response)
+	if err != nil {
+		msg := fmt.Sprintf("[ERROR] Cannot serialize response to SetConnections to JSON: %v", err)
+		log.Print(msg)
+		sendToAdminMessages = append(sendToAdminMessages, msg)
+		responseJSON = []byte("{}")
+	}
+	log.Printf("[DEBUG] Response to AP: %v\n", string(responseJSON))
 	if len(sendToAdminMessages) > 0 {
 		log.Printf("[DEBUG] Messages to the admins: %v", sendToAdminMessages)
 		data := struct {
@@ -1480,6 +1516,5 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 			return
 		}
 	}
-	// TODO: notify the AP of synchronization errors
-	fmt.Fprintln(w, "{}")
+	fmt.Fprintln(w, string(responseJSON))
 }
