@@ -1298,13 +1298,25 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 	}
 
 	var sendToAdminMessages []string
+	responseDictionary := make(map[string]interface{})
 	for apIAstr, reportedStatus := range allStatusMap {
+		addThing := func(subkey string, errorMsg interface{}) {
+			if responseDictionary[apIAstr] == nil {
+				responseDictionary[apIAstr] = make(map[string]interface{})
+			}
+			if responseDictionary[apIAstr].(map[string]interface{})[subkey] == nil {
+				responseDictionary[apIAstr].(map[string]interface{})[subkey] = make([]interface{}, 0)
+			}
+			responseDictionary[apIAstr].(map[string]interface{})[subkey] = append(responseDictionary[apIAstr].(map[string]interface{})[subkey].([]interface{}), errorMsg)
+		}
+		addCriticalError := func(errorMsg string) { addThing("critical", errorMsg) }
 		apIA, err := addr.IAFromString(apIAstr)
 		if err != nil {
 			apIA, err = addr.IAFromFileFmt(apIAstr, false)
 			if err != nil {
 				err = fmt.Errorf("%v is not a valid SCION IA", apIAstr)
-				return
+				addCriticalError(err.Error())
+				continue
 			}
 		}
 		// ensure apIA is always non file format:
@@ -1332,14 +1344,16 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 			}
 			msg := fmt.Sprintf("Could not process set connections from AP %v. Reason: %v. Affected user ASes: %v", apIAstr, reason, ias)
 			sendToAdminMessages = append(sendToAdminMessages, msg)
+			addCriticalError(msg)
 			continue
 		}
 		// find the pending connections in the DB and the AP's received status, and change the status accordingly
 		cnInfosInDB, err := ap.GetRespondConnectionInfo()
 		if err != nil {
-			log.Printf("[ERROR] Error looking up connections for AS %v: %v", apIAstr, err)
-			s.Error500(w, err, "Error looking up SCIONLab ASes from DB")
-			return
+			msg := fmt.Sprintf("[ERROR] Error looking up connections for AS %v: %v", apIAstr, err)
+			log.Print(msg)
+			addCriticalError(msg)
+			continue
 		}
 		// all received connections for this AP, as a map:
 		reportedFromAPmap := make(map[addr.AS][]APConnectionInfo)
