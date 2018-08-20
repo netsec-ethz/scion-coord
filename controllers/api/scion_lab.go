@@ -1187,7 +1187,7 @@ func (s *SCIONLabASController) ConfirmUpdate(w http.ResponseWriter, r *http.Requ
 //     }
 //   }
 func (s *SCIONLabASController) GetConnectionsForAP(w http.ResponseWriter, r *http.Request) {
-	log.Printf("API Call for GetConnectionsForAP = %v", r.URL.Query())
+	log.Printf("API Call for GetConnectionsForAP ----------------- BEGIN ---------------------- %v", r.URL.Query())
 	apIAparam := r.URL.Query().Get("scionLabAP")
 	apUtcTimeDeltaCutoffParam := r.URL.Query().Get("utcTimeDelta")
 	nowUtcSeconds := time.Now().Unix()
@@ -1246,6 +1246,7 @@ func (s *SCIONLabASController) GetConnectionsForAP(w http.ResponseWriter, r *htt
 		return
 	}
 	log.Printf("getUpdatesForAP will return: %v", string(b))
+	log.Printf("API Call for GetConnectionsForAP ----------------- END ------------------------")
 	fmt.Fprintln(w, string(b))
 }
 
@@ -1309,6 +1310,7 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 	}
 
 	var sendToAdminMessages []string
+	var successEmails []emailConfirmation
 	response := make(ResponseToAP)
 	for apIAstr, reportedStatus := range allStatusMap {
 		setCriticalError := func(errorMsg string) {
@@ -1474,9 +1476,11 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 					msg := fmt.Sprintf("[ERROR] Logic error setting connections for AP %v to user AS %v. The connection is inactive but the action %v != REMOVED", apIAstr, userAS.IAString(), cnInfoInDB.Status)
 					log.Print(msg)
 					sendToAdminMessages = append(sendToAdminMessages, msg)
+					continue
 				}
 			}
-		}
+			successEmails = append(successEmails, emailConfirmation{cnInfoInDB.NeighborUser, userASinDBia, actionString})
+		} // for each connection info in DB
 		// check that all the received connections exist as such in the DB
 		for _, reportedConn := range reportedConnections {
 			foundInDB := false
@@ -1494,6 +1498,13 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 			}
 		}
 	} // for each AP,status
+	for _, e := range successEmails {
+		if err := sendConfirmationEmail(e.user, e.IA, e.action); err != nil {
+			msg := fmt.Sprintf("Cannot send confirmation email to user %v about IA %v for action %v. Error is: %v", e.user, e.IA, e.action, err)
+			log.Print(msg)
+			sendToAdminMessages = append(sendToAdminMessages, msg)
+		}
+	}
 
 	responseJSON, err := json.Marshal(response)
 	if err != nil {

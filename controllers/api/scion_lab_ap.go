@@ -123,6 +123,12 @@ func (s *SCIONLabASController) GetUpdatesForAP(w http.ResponseWriter, r *http.Re
 	fmt.Fprintln(w, string(b))
 }
 
+type emailConfirmation struct {
+	user   string
+	IA     string
+	action string
+}
+
 type attachedASAckMessage struct {
 	IA      string
 	Success bool
@@ -224,11 +230,6 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 // out confirmation emails
 func (s *SCIONLabASController) processConfirmedUpdatesFromAP(apAS *models.SCIONLabAS, action string, cns []string) []string {
 	log.Printf("action = %v, cns = %v", action, cns)
-	type emailConfirmation struct {
-		user   string
-		IA     string
-		action string
-	}
 	var failedConfirmations []string
 	var successEmails []emailConfirmation
 	for _, ia := range cns {
