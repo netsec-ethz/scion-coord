@@ -79,6 +79,10 @@ type Connection struct {
 	Updated       time.Time
 }
 
+func (cn *Connection) IsCurrentConnection() bool {
+	return cn.JoinStatus != Remove || cn.RespondStatus != Remove
+}
+
 // Contains all info needed to populate the topology file
 type ConnectionInfo struct {
 	ID                   uint64 // Used to find the BorderRouter
@@ -472,30 +476,6 @@ func (as *SCIONLabAS) UpdateDBConnectionFromJoinConnInfo(cnInfo *ConnectionInfo)
 	return cn.Update()
 }
 
-func (as *SCIONLabAS) UpdateDBConnectionFromRespondConnInfo(cnInfo *ConnectionInfo) error {
-	cn := new(Connection)
-	if err := o.QueryTable(cn).Filter("ID", cnInfo.ID).RelatedSel().One(cn); err != nil {
-		return nil
-	}
-	cn.IsVPN = cnInfo.IsVPN
-	cn.JoinIP = cnInfo.NeighborIP
-	cn.RespondIP = cnInfo.LocalIP
-
-	respondAS := cn.GetRespondAS()
-	joinAS := cn.GetJoinAS()
-	if joinAS.ID == as.ID {
-		cn.RespondStatus = cnInfo.Status
-		cn.JoinStatus = cnInfo.NeighborStatus
-		cn.RespondBRID = cnInfo.BRID
-	}
-	if respondAS.ID == as.ID {
-		cn.JoinStatus = cnInfo.Status
-		cn.RespondStatus = cnInfo.NeighborStatus
-		cn.JoinBRID = cnInfo.BRID
-	}
-	return cn.Update()
-}
-
 // Update both the SCIONLabAS and Connection tables
 func (as *SCIONLabAS) UpdateASAndConnectionFromJoinConnInfo(cnInfo *ConnectionInfo) error {
 	if err := as.UpdateDBConnectionFromJoinConnInfo(cnInfo); err != nil {
@@ -503,11 +483,13 @@ func (as *SCIONLabAS) UpdateASAndConnectionFromJoinConnInfo(cnInfo *ConnectionIn
 	}
 	return as.Update()
 }
-func (as *SCIONLabAS) UpdateASAndConnectionFromRespondConnInfo(cnInfo *ConnectionInfo) error {
-	if err := as.UpdateDBConnectionFromRespondConnInfo(cnInfo); err != nil {
-		return err
+
+func (as *SCIONLabAS) UpdateASAndConnection(cn *Connection) error {
+	err := cn.Update()
+	if err == nil {
+		err = as.Update()
 	}
-	return as.Update()
+	return err
 }
 
 // Returns all Attachment Point ASes
