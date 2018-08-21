@@ -1207,30 +1207,33 @@ func (s *SCIONLabASController) GetConnectionsForAP(w http.ResponseWriter, r *htt
 		s.Error500(w, err, "Error looking up SCIONLab AS from DB")
 		return
 	}
-	cnInfos, err := ap.GetRespondConnectionInfo()
+	cns, err := ap.GetRespondConnections()
 	if err != nil {
 		log.Printf("Error looking up connections for AS %v: %v", apIA, err)
 		s.Error500(w, err, "Error looking up SCIONLab ASes from DB")
 		return
 	}
-	var conns []APConnectionInfo
-	for _, cn := range cnInfos {
-		if cn.UpdatedOn.Unix() > utcTimeDeltaCutoff {
+	// var conns []APConnectionInfo
+	conns := []APConnectionInfo{}
+	for _, cn := range cns {
+		if cn.RespondStatus != models.Active &&
+			cn.RespondStatus != models.Create &&
+			cn.RespondStatus != models.Update {
+			// not pending to add or already active -> don't send info
 			continue
 		}
+		if cn.Updated.Unix() > utcTimeDeltaCutoff {
+			continue
+		}
+		userAS := cn.GetJoinAS()
 		cnInfo := APConnectionInfo{
-			ASID:      utility.IAStringStandard(ap.ISD, cn.NeighborAS),
+			ASID:      userAS.IAString(),
 			IsVPN:     cn.IsVPN,
-			VPNUserID: vpnUserID(cn.NeighborUser, cn.NeighborAS),
-			UserIP:    cn.NeighborIP,
-			UserPort:  cn.NeighborPort,
-			APPort:    cn.LocalPort,
-			APBRID:    cn.BRID,
-		}
-		if cn.Status != models.Active &&
-			cn.Status != models.Create &&
-			cn.Status != models.Update {
-			continue
+			VPNUserID: vpnUserID(userAS.UserEmail, userAS.ASID),
+			UserIP:    cn.JoinIP,
+			UserPort:  userAS.GetPortNumberFromBRID(cn.JoinBRID),
+			APPort:    ap.GetPortNumberFromBRID(cn.RespondBRID),
+			APBRID:    cn.RespondBRID,
 		}
 		conns = append(conns, cnInfo)
 	}
@@ -1363,14 +1366,6 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 			setCriticalError(msg)
 			continue
 		}
-		// find the pending connections in the DB and the AP's received status, and change the status accordingly
-		cnInfosInDB, err := ap.GetRespondConnectionInfo()
-		if err != nil {
-			msg := fmt.Sprintf("[ERROR] Error looking up connections for AS %v: %v", apIAstr, err)
-			log.Print(msg)
-			setCriticalError(msg)
-			continue
-		}
 		// all received connections for this AP, as a map:
 		reportedFromAPmap := make(map[addr.AS][]APConnectionInfo)
 		for _, c := range reportedConnections {
@@ -1383,34 +1378,49 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 			}
 			reportedFromAPmap[ia.A] = append(reportedFromAPmap[ia.A], c)
 		}
-		// find the pending connections in the received ones:
+
+		// find the pending connections in the DB and the AP's received status, and change the status accordingly
+		cnsInDB, err := ap.GetRespondConnections()
+		if err != nil {
+			msg := fmt.Sprintf("[ERROR] Error looking up connections for AS %v: %v", apIAstr, err)
+			log.Print(msg)
+			setCriticalError(msg)
+			continue
+		}
+		// find the pending and active connections in the received ones:
 		allCnInfosInDBmap := make(map[string][]APConnectionInfo)
-		for _, cnInfoInDB := range cnInfosInDB {
-			userASinDBia := utility.IAStringStandard(ap.ISD, cnInfoInDB.NeighborAS)
-			apCnInfo := APConnectionInfo{
-				ASID:      userASinDBia,
-				IsVPN:     cnInfoInDB.IsVPN,
-				VPNUserID: vpnUserID(cnInfoInDB.NeighborUser, cnInfoInDB.NeighborAS),
-				UserIP:    cnInfoInDB.NeighborIP,
-				UserPort:  cnInfoInDB.NeighborPort,
-				APPort:    cnInfoInDB.LocalPort,
-				APBRID:    cnInfoInDB.BRID,
-			}
-			allCnInfosInDBmap[userASinDBia] = append(allCnInfosInDBmap[userASinDBia], apCnInfo)
-			// if the connection status in AP's side is not pending, skip
-			if cnInfoInDB.Status != models.Create && cnInfoInDB.Status != models.Update && cnInfoInDB.Status != models.Remove {
+		for _, cnInDB := range cnsInDB {
+			if cnInDB.Updated.Unix() >= utcTimeDeltaCutoff {
+				// ignore too new connections
 				continue
 			}
+			// if the connection status in AP's side is not pending, skip
 			var actionString string
-			switch cnInfoInDB.Status {
+			switch cnInDB.RespondStatus {
 			case models.Create:
 				actionString = CREATED
 			case models.Update:
 				actionString = UPDATED
 			case models.Remove:
 				actionString = REMOVED
+			case models.Active:
+				actionString = "ACTIVE"
+			default:
+				continue
 			}
-			cnArr := reportedFromAPmap[cnInfoInDB.NeighborAS]
+			userAS := cnInDB.GetJoinAS()
+			userASinDBia := userAS.IAString()
+			apCnInfo := APConnectionInfo{
+				ASID:      userASinDBia,
+				IsVPN:     cnInDB.IsVPN,
+				VPNUserID: vpnUserID(userAS.UserEmail, userAS.ASID),
+				UserIP:    cnInDB.JoinIP,
+				UserPort:  userAS.GetPortNumberFromBRID(cnInDB.JoinBRID),
+				APPort:    ap.GetPortNumberFromBRID(cnInDB.RespondBRID),
+				APBRID:    cnInDB.RespondBRID,
+			}
+			allCnInfosInDBmap[userASinDBia] = append(allCnInfosInDBmap[userASinDBia], apCnInfo)
+			cnArr := reportedFromAPmap[userAS.ASID]
 			foundPendingInReported := false
 			for _, existingConn := range cnArr {
 				if existingConn == apCnInfo {
@@ -1418,69 +1428,62 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 					break
 				}
 			}
-			userAS, err := models.FindSCIONLabASByASID(cnInfoInDB.NeighborAS)
-			if err != nil {
-				msg := fmt.Sprintf("[ERROR] Cannot find user AS with IA %v: %v", cnInfoInDB.NeighborAS.String(), err)
-				log.Print(msg)
-				sendToAdminMessages = append(sendToAdminMessages, msg)
-				setUserASerror(userASinDBia, msg)
-				continue
-			}
+			originalRespondStatus := cnInDB.RespondStatus
 			if foundPendingInReported {
-				cnInfoInDB.Status = models.Active
-			} else {
-				if cnInfoInDB.Status == models.Remove {
-					if cnInfoInDB.IsCurrentConnection() {
-						cnInfoInDB.Status = models.Inactive
-						cnInfoInDB.BRID = 0 // Set BRID to 0 for inactive connections
-					} else {
-						err := models.DeleteConnectionFromDB(cnInfoInDB.ID)
-						if err != nil {
-							msg := fmt.Sprintf("[ERROR] Error removing connection between AP %v and AS %v: %v", apIA, userASinDBia, err)
-							log.Print(msg)
-							setUserASerror(userASinDBia, msg)
-							continue
-						}
-					}
+				cnInDB.RespondStatus = models.Active
+			} else if originalRespondStatus == models.Remove {
+				if cnInDB.IsCurrentConnection() {
+					cnInDB.RespondStatus = models.Inactive
+					cnInDB.JoinBRID = 0 // Set join BRID to 0 for inactive connections
 				} else {
-					// we have a connection to create or update that it's not in the list from the AP
-					// if this connection was updated before our cut off time, complain!
-					if cnInfoInDB.UpdatedOn.Unix() < utcTimeDeltaCutoff {
-						msg := fmt.Sprintf("[ERROR] Could not find pending connection to ASID %v, user %v, DB id %d, updated on %v", userASinDBia, cnInfoInDB.NeighborUser, cnInfoInDB.ID, cnInfoInDB.UpdatedOn)
+					err := models.DeleteConnectionFromDB(cnInDB.ID)
+					if err != nil {
+						msg := fmt.Sprintf("[ERROR] Error removing connection between AP %v and AS %v: %v", apIA, userASinDBia, err)
 						log.Print(msg)
 						setUserASerror(userASinDBia, msg)
-						if err = sendRejectedEmail(cnInfoInDB.NeighborUser, userASinDBia, actionString, apIAstr); err != nil {
-							log.Printf("[ERROR] Could not send email to user %v about failed sync between AP %v and user AS %v", cnInfoInDB.NeighborUser, apIAstr, userASinDBia)
-						}
 						continue
 					}
 				}
-			}
-			// cnInfo was found in the AP, or not found but pending to remove (both cases okay).
-			if cnInfoInDB.IsCurrentConnection() {
-				// If the connection is the current one from the user AS to the AP, update the user AS status:
-				userAS.Status = cnInfoInDB.Status
-				cnInfoInDB.NeighborStatus = userAS.Status
-				if err = userAS.UpdateASAndConnectionFromRespondConnInfo(&cnInfoInDB); err != nil {
-					msg := fmt.Sprintf("[ERROR] Cannot update AS and connection for AS %v: %v", userAS.IAString(), err)
-					log.Print(msg)
-					setUserASerror(userASinDBia, msg)
-					if err = sendRejectedEmail(cnInfoInDB.NeighborUser, userASinDBia, actionString, apIAstr); err != nil {
-						log.Printf("[ERROR] Could not send email to user %v about failed sync between AP %v and user AS %v", cnInfoInDB.NeighborUser, apIAstr, userASinDBia)
+			} else {
+				// this is a not found connection that is active or pending to create or update. Complain
+				msg := fmt.Sprintf("[ERROR] Could not find connection present in DB, but not in AP report. From AP %v to ASID %v, user %v, DB id %d, updated on %v", apIAstr, userASinDBia, userAS.UserEmail, cnInDB.ID, cnInDB.Updated)
+				log.Print(msg)
+				setUserASerror(userASinDBia, msg)
+				if originalRespondStatus == models.Active { // if active, notify admins only
+					sendToAdminMessages = append(sendToAdminMessages, msg)
+				} else {
+					if err = sendRejectedEmail(userAS.UserEmail, userASinDBia, actionString, apIAstr); err != nil {
+						log.Printf("[ERROR] Could not send email to user %v about failed sync between AP %v and user AS %v", userAS.UserEmail, apIAstr, userASinDBia)
 					}
-					continue
+				}
+				continue
+			}
+			// cnInDB was found in the AP, or not found but pending to remove (both cases okay).
+			if cnInDB.IsCurrentConnection() {
+				if originalRespondStatus != models.Active {
+					// If the pending connection is the current one from the user AS to the AP, update the user AS status:
+					userAS.Status = cnInDB.RespondStatus
+					if err = userAS.UpdateASAndConnection(cnInDB); err != nil {
+						msg := fmt.Sprintf("[ERROR] Cannot update AS and connection for AS %v: %v", userAS.IAString(), err)
+						log.Print(msg)
+						setUserASerror(userASinDBia, msg)
+						if err = sendRejectedEmail(userAS.UserEmail, userASinDBia, actionString, apIAstr); err != nil {
+							log.Printf("[ERROR] Could not send email to user %v about failed sync between AP %v and user AS %v", userAS.UserEmail, apIAstr, userASinDBia)
+						}
+						continue
+					}
+					successEmails = append(successEmails, emailConfirmation{userAS.UserEmail, userASinDBia, actionString})
 				}
 			} else {
-				if cnInfoInDB.Status != models.Remove {
+				if originalRespondStatus != models.Remove {
 					// logic error! print failed assertion but don't quit this update
-					msg := fmt.Sprintf("[ERROR] Logic error setting connections for AP %v to user AS %v. The connection is inactive but the action %v != REMOVED", apIAstr, userAS.IAString(), cnInfoInDB.Status)
+					msg := fmt.Sprintf("[ERROR] Logic error setting connections for AP %v to user AS %v. The connection is inactive but the action %v != REMOVED", apIAstr, userAS.IAString(), originalRespondStatus)
 					log.Print(msg)
 					sendToAdminMessages = append(sendToAdminMessages, msg)
 					continue
 				}
 			}
-			successEmails = append(successEmails, emailConfirmation{cnInfoInDB.NeighborUser, userASinDBia, actionString})
-		} // for each connection info in DB
+		} // for each connection in DB
 		// check that all the received connections exist as such in the DB
 		for _, reportedConn := range reportedConnections {
 			foundInDB := false
@@ -1517,9 +1520,9 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 	if len(sendToAdminMessages) > 0 {
 		log.Printf("[DEBUG] Messages to the admins: %v", sendToAdminMessages)
 		data := struct {
-			errorMessages string
+			ErrorMessages string
 		}{
-			errorMessages: strings.Join(sendToAdminMessages, "\n"),
+			ErrorMessages: strings.Join(sendToAdminMessages, "\n"),
 		}
 		err = email.ConstructFromTemplateAndSendToAdmins("setconnections_failed.html", "FAILED SetConnections", data, "")
 		if err != nil {
