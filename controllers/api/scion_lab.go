@@ -723,7 +723,13 @@ func packageConfiguration(asInfo *SCIONLabASInfo) error {
 			portForwarding = fmt.Sprintf("config.vm.network \"forwarded_port\", "+
 				"guest: %[1]v, host: %[1]v, protocol: \"udp\"", asInfo.LocalPort)
 		}
-		data := map[string]string{"PORT_FORWARDING": portForwarding}
+		data := struct {
+			ASID           string
+			PortForwarding string
+		}{
+			ASID:           asInfo.LocalAS.ASID.FileFmt(),
+			PortForwarding: portForwarding,
+		}
 		if err := utility.FillTemplateAndSave("templates/Vagrantfile.tmpl",
 			data, filepath.Join(userPackagePath, "Vagrantfile")); err != nil {
 			return err
