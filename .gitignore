@@ -4,3 +4,5 @@ temp/
 credentials/
 conf/development.conf
 public/img/topology_no_labels.gv.png
+vagrant/scion_install_script.sh
+vagrant/.vagrant/
