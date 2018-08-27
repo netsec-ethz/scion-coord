@@ -1,10 +1,10 @@
 {
     "name": "scion/ubuntu-16.04-64-scion",
     "versions": [{
-        "version": "0.0.1.2",
+        "version": "_VERSION_",
         "providers": [{
             "name": "virtualbox",
-            "url": "file:///home/juan/go/src/github.com/netsec-ethz/scion-coord/vagrant/scion-base.box"
+            "url": "file://_DIRFULLPATH_/scion-base.box"
         }]
     }]
 }
