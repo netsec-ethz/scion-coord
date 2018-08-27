@@ -1,0 +1,8 @@
+Vagrant.configure("2") do |config|
+  config.ssh.username = "scion"
+  $setup_root = <<-SCRIPT
+  echo "[DEBUG] ******** SCION exported VM 1"
+    export DEBIAN_FRONTEND=noninteractive
+  SCRIPT
+  config.vm.provision "shell", privileged: true, run: "once", inline: $setup_root
+end

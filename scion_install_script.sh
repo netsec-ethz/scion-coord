@@ -89,7 +89,7 @@ else
 fi
 
 sudo apt-get -y update
-sudo apt-get -y install git
+sudo apt-get -y install git supervisor
 
 echo 'export GOPATH="$HOME/go"' >> ~/.profile
 echo 'export PATH="$HOME/.local/bin:$GOPATH/bin:/usr/local/go/bin:$PATH"' >> ~/.profile
@@ -250,7 +250,6 @@ then
     sudo systemctl enable scionupgrade.service
     
     sudo systemctl start scionupgrade.timer
-    sudo systemctl start scionupgrade.service
 
     if [ -d "/vagrant" ]; then # iff this is a VM
         # registering the upgrade service also means "manage SCION", including keep time sync'ed

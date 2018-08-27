@@ -1,0 +1,40 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+Vagrant.require_version ">= 1.9.7"
+
+Vagrant.configure("2") do |config|
+  $setup_root = <<-SCRIPT
+    echo "[DEBUG] setup root OS VM"
+    export DEBIAN_FRONTEND=noninteractive
+    update-locale LC_ALL=en_US.UTF-8 LANGUAGE=en_US.UTF-8
+    apt-get update
+    apt-get upgrade -y
+    adduser --gecos ",,," --disabled-password scion
+    usermod -aG sudo scion
+    usermod -aG adm scion
+    echo 'scion ALL=(ALL) NOPASSWD:ALL' >/etc/sudoers.d/99-scion-user
+    cp -rp /home/vagrant/.ssh /home/scion
+    chown -R scion.scion /home/scion/.ssh
+  SCRIPT
+  $cleanup_root = <<-SCRIPT
+  echo "[DEBUG] cleanup root OS VM"
+    apt-get autoremove --purge -y
+    apt-get clean -y
+    apt-get autoclean -y
+    # Remove bash history
+    unset HISTFILE
+    rm -f /root/.bash_history
+    rm -f /home/vagrant/.bash_history
+    # Cleanup log files
+    find /var/log -type f | while read f; do echo -ne '' > $f; done;
+    echo "All clear"
+  SCRIPT
+  config.vm.box = "ubuntu/xenial64"
+  config.vm.provider "virtualbox" do |vb|
+    # vb.name = "SCIONLabVM-os"
+    vb.name = "SCIONLabVM-base"
+  end
+  config.vm.provision "shell", privileged: true, run: "once", inline: $setup_root
+  config.vm.provision "shell", privileged: true, run: "once", inline: $cleanup_root
+  config.ssh.insert_key = false
+end
