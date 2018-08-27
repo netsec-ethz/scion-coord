@@ -6,8 +6,11 @@ Vagrant.configure("2") do |config|
   $setup_root = <<-SCRIPT
     echo "[DEBUG] ******** setup root BASE VM"
     export DEBIAN_FRONTEND=noninteractive
-    # install ntpd so we keep this box time-synchronized:
+    echo "install ntpd to keep this box time-synchronized"
     apt-get install -y --no-remove ntp
+    echo "remove other users than scion"
+    deluser --remove-home ubuntu
+    deluser --remove-home vagrant
   SCRIPT
   $cleanup_root = <<-SCRIPT
     echo "[DEBUG] ******** cleanup root BASE VM"
@@ -18,7 +21,6 @@ Vagrant.configure("2") do |config|
     # Remove bash history
     unset HISTFILE
     rm -f /root/.bash_history
-    rm -f /home/vagrant/.bash_history
     # Cleanup log files
     find /var/log -type f | while read f; do echo -ne '' > $f; done;
     dd if=/dev/zero of=/tmp/EMPTY &>/dev/null || true
@@ -39,6 +41,7 @@ Vagrant.configure("2") do |config|
   # TODO: uncomment
   # config.vm.provision "shell", privileged: true, run: "always", inline: $setup_scion
   config.vm.provision "shell", privileged: true, run: "always", inline: $cleanup_root
+  # https://github.com/hashicorp/vagrant/issues/5186
   config.ssh.username = "scion"
   config.ssh.insert_key = false
 end
