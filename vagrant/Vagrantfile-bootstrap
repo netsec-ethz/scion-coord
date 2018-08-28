@@ -4,11 +4,9 @@ Vagrant.require_version ">= 1.9.7"
 
 Vagrant.configure("2") do |config|
   $setup_root = <<-SCRIPT
-    echo "[DEBUG] setup root OS VM"
+    echo "[DEBUG] setup bootstrap VM"
     export DEBIAN_FRONTEND=noninteractive
     update-locale LC_ALL=en_US.UTF-8 LANGUAGE=en_US.UTF-8
-    apt-get update
-    apt-get upgrade -y
     adduser --gecos ",,," --disabled-password scion
     usermod -aG sudo scion
     usermod -aG adm scion
@@ -17,10 +15,7 @@ Vagrant.configure("2") do |config|
     chown -R scion.scion /home/scion/.ssh
   SCRIPT
   $cleanup_root = <<-SCRIPT
-  echo "[DEBUG] cleanup root OS VM"
-    apt-get autoremove --purge -y
-    apt-get clean -y
-    apt-get autoclean -y
+  echo "[DEBUG] cleanup bootstrap VM"
     # Remove bash history
     unset HISTFILE
     rm -f /root/.bash_history
@@ -31,7 +26,6 @@ Vagrant.configure("2") do |config|
   SCRIPT
   config.vm.box = "ubuntu/xenial64"
   config.vm.provider "virtualbox" do |vb|
-    # vb.name = "SCIONLabVM-os"
     vb.name = "SCIONLabVM-base"
   end
   config.vm.provision "shell", privileged: true, run: "once", inline: $setup_root

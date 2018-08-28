@@ -6,8 +6,11 @@ Vagrant.configure("2") do |config|
   $setup_root = <<-SCRIPT
     echo "[DEBUG] ******** setup root BASE VM"
     export DEBIAN_FRONTEND=noninteractive
-    echo "install ntpd to keep this box time-synchronized"
-    apt-get install -y --no-remove ntp
+    echo "Adding repositories and updating list"
+    add-apt-repository ppa:longsleep/golang-backports
+    apt-get update
+    echo "Install packages"
+    apt-get install -y --no-remove ntp golang-1.9-go
     echo "remove other users than scion"
     deluser --remove-home ubuntu
     deluser --remove-home vagrant
@@ -23,14 +26,20 @@ Vagrant.configure("2") do |config|
     rm -f /root/.bash_history
     # Cleanup log files
     find /var/log -type f | while read f; do echo -ne '' > $f; done;
+    echo "Zeroing empty space"
     dd if=/dev/zero of=/tmp/EMPTY &>/dev/null || true
     rm -f /tmp/EMPTY
-    echo "All clear"
+    echo "All clear."
   SCRIPT
   $setup_scion = <<-SCRIPT
     echo "[DEBUG] ******** setup scion BASE VM"
     export DEBIAN_FRONTEND=noninteractive
     su scion -c '/vagrant/scion_install_script.sh -s /vagrant/scion.service -z /vagrant/scion-viz.service -a ~/.bash_aliases -u /vagrant/scionupgrade.sh -t /vagrant/scionupgrade -c'
+    echo "Cleaning SCION things"
+    $SC/scion.sh stop
+    rm $SC/logs/*
+    rm -r $SC/gen
+    echo "All done."
   SCRIPT
   config.vm.box = "SCIONLabVM-base"
   config.vm.provider "virtualbox" do |vb|
@@ -38,10 +47,9 @@ Vagrant.configure("2") do |config|
     vb.customize [ "setextradata", :id, "VBoxInternal/Devices/VMMDev/0/Config/GetHostTimeDisabled", 1 ]
   end
   config.vm.provision "shell", privileged: true, run: "always", inline: $setup_root
-  # TODO: uncomment
-  # config.vm.provision "shell", privileged: true, run: "always", inline: $setup_scion
+  config.vm.provision "shell", privileged: true, run: "always", inline: $setup_scion
   config.vm.provision "shell", privileged: true, run: "always", inline: $cleanup_root
-  # https://github.com/hashicorp/vagrant/issues/5186
   config.ssh.username = "scion"
+  # https://github.com/hashicorp/vagrant/issues/5186
   config.ssh.insert_key = false
 end
