@@ -87,62 +87,72 @@ else
     echo "ERROR! This script can only be run on Ubuntu 16.04" >&2
     exit 1
 fi
+export DEBIAN_FRONTEND=noninteractive
+sudo apt-get update
+sudo apt-get install -y git supervisor
 
-sudo apt-get -y update
-sudo apt-get -y install git supervisor
-
-echo 'export GOPATH="$HOME/go"' >> ~/.profile
-echo 'export PATH="$HOME/.local/bin:$GOPATH/bin:/usr/local/go/bin:$PATH"' >> ~/.profile
-echo 'export SC="$GOPATH/src/github.com/scionproto/scion"' >> ~/.profile
-echo 'export PYTHONPATH="$SC/python:$SC"' >> ~/.profile
+grep 'export GOPATH="$HOME/go"' ~/.profile >/dev/null || echo 'export GOPATH="$HOME/go"' >> ~/.profile
+grep 'export PATH="$HOME/.local/bin:$GOPATH/bin:/usr/local/go/bin:$PATH"' >/dev/null || echo 'export PATH="$HOME/.local/bin:$GOPATH/bin:/usr/local/go/bin:$PATH"' >> ~/.profile
+grep 'export SC="$GOPATH/src/github.com/scionproto/scion"' >/dev/null || echo 'export SC="$GOPATH/src/github.com/scionproto/scion"' >> ~/.profile
+grep 'export PYTHONPATH="$SC/python:$SC"' >/dev/null || echo 'export PYTHONPATH="$SC/python:$SC"' >> ~/.profile
 source ~/.profile
 mkdir -p "$GOPATH"
 mkdir -p "$GOPATH/src/github.com/scionproto"
 cd "$GOPATH/src/github.com/scionproto"
 
-git config --global url.https://github.com/.insteadOf git@github.com:
-git clone --recursive -b scionlab git@github.com:netsec-ethz/netsec-scion scion
+if [ ! -d scion ]; then
+    git config --global url.https://github.com/.insteadOf git@github.com:
+    git clone --recursive -b scionlab git@github.com:netsec-ethz/netsec-scion scion
+    cd scion
 
-cd scion
-
-# Check if there is a patch directory
-if  [[ ( ! -z ${patch_dir+x} ) && -d ${patch_dir} ]]
-then
-    echo "Applying patches:"
-    patch_files="$patch_dir/*.patch"
-
-    for f in $patch_files;
-    do
-        echo -e "\t$f"
-        git apply "$f"
-    done
-
-    git_username=$(git config user.name || true)
-
-    # We need to have git user in order to commit
-    if [ -z "$git_username" ]
+    # Check if there is a patch directory
+    if  [[ ( ! -z ${patch_dir+x} ) && -d ${patch_dir} ]]
     then
-        echo "GIT user credentials not set, configuring defaults"
-        git config --global user.name "Scion User" 
-        git config --global user.email "scion@scion-architecture.net"
+        echo "Applying patches:"
+        patch_files="$patch_dir/*.patch"
+
+        for f in $patch_files;
+        do
+            echo -e "\t$f"
+            git apply "$f"
+        done
+
+        git_username=$(git config user.name || true)
+
+        # We need to have git user in order to commit
+        if [ -z "$git_username" ]
+        then
+            echo "GIT user credentials not set, configuring defaults"
+            git config --global user.name "Scion User" 
+            git config --global user.email "scion@scion-architecture.net"
+        fi
+
+        git commit -am "Applied platform dependent patches"
+
+        echo "Finished applying patches"
     fi
 
-    git commit -am "Applied platform dependent patches"
+    bash -c 'yes | GO_INSTALL=true ./env/deps'
+    ./scion.sh build
 
-    echo "Finished applying patches"
+    sudo cp docker/zoo.cfg /etc/zookeeper/conf/zoo.cfg
+
+    # Add cron script which removes old zk logs
+    sudo bash -c 'cat > /etc/cron.daily/zookeeper << CRON1
+    #! /bin/sh
+    /usr/share/zookeeper/bin/zkCleanup.sh -n 3
+    CRON1'
+    sudo chmod 755 /etc/cron.daily/zookeeper
+
+    cd sub
+    git clone git@github.com:netsec-ethz/scion-viz
+    cd scion-viz/python/web
+    pip3 install --user --require-hashes -r requirements.txt
+    python3 ./manage.py migrate
+else
+    cd scion
+    echo "SCION already present, not building it."
 fi
-
-bash -c 'yes | GO_INSTALL=true ./env/deps'
-
-sudo cp docker/zoo.cfg /etc/zookeeper/conf/zoo.cfg
-
-# Add cron script which removes old zk logs
-sudo bash -c 'cat > /etc/cron.daily/zookeeper << CRON1
-#! /bin/sh
-/usr/share/zookeeper/bin/zkCleanup.sh -n 3
-CRON1'
-sudo chmod 755 /etc/cron.daily/zookeeper
-
 # Check if gen directory exists
 if  [[ ( ! -z ${gen_dir+x} ) && -d ${gen_dir} ]]
 then
@@ -152,12 +162,9 @@ else
     echo "Gen directory is NOT specified! Generating local (Tiny) topology!"
     ./scion.sh topology -c topology/Tiny.topo
 fi
-
-cd sub
-git clone git@github.com:netsec-ethz/scion-viz
-cd scion-viz/python/web
-pip3 install --user --require-hashes -r requirements.txt
-python3 ./manage.py migrate
+./scion.sh stop
+./supervisor/supervisor.sh reload
+./scion.sh start
 
 # Should we add aliases
 if [[ (! -z ${aliases_file} ) ]]
@@ -288,3 +295,4 @@ Unattended-Upgrade::Automatic-Reboot-Time "02:00";' | sudo tee /etc/apt/apt.conf
 else
     echo "SCION periodic upgrade service and timer files are not provided."
 fi
+echo "SCION install script done."
