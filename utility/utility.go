@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -28,6 +29,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/scionproto/scion/go/lib/addr"
 )
@@ -230,4 +232,17 @@ func MapOldIAToNewOne(ISDid addr.ISD, ASid addr.AS) addr.IA {
 		return addr.IA{I: ISDid + isdOffset, A: ASid + asOffset}
 	}
 	return addr.IA{I: 0, A: 0}
+}
+
+// GetTimeCutoff returns the seconds since Epoch cutoff parameter from a http request
+// It is used to filter out too freshly modified connections in the DB
+func GetTimeCutoff(r *http.Request) int64 {
+	cutoffStr := r.URL.Query().Get("utcTimeDelta")
+	now := time.Now().Unix()
+	cutoff, err := strconv.ParseInt(cutoffStr, 10, 64)
+	if err != nil {
+		cutoff = now
+	}
+	log.Printf("[DEBUG] Using UTC time delta: %d (now is %d)", cutoff, now)
+	return cutoff
 }

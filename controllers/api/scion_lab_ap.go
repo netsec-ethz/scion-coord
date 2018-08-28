@@ -36,6 +36,7 @@ const (
 	CREATED = "Created"
 	UPDATED = "Updated"
 	REMOVED = "Removed"
+	ACTIVE  = "ACTIVE"
 )
 
 // The struct used for API calls between scion-coord and SCIONLab APs
@@ -183,16 +184,17 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 				return
 			}
 		}
-		// ensure apIA is always non file format:
+		// ensure ia is always non file format:
 		ia = IA.String()
-
+		var as *models.SCIONLabAS
 		_, isAuthorized := ownedASes[ia]
 		if !isAuthorized {
 			log.Printf("Unauthorized updates from AS %v", ia)
-		}
-		as, err := models.FindSCIONLabASByIAInt(IA.I, IA.A)
-		if err != nil {
-			log.Printf("Error finding AS %v when processing confirmations: %v", ia, err)
+		} else {
+			as, err = models.FindSCIONLabASByIAInt(IA.I, IA.A)
+			if err != nil {
+				log.Printf("Error finding AS %v when processing confirmations: %v", ia, err)
+			}
 		}
 		if !isAuthorized || err != nil {
 			for _, cns := range event {
