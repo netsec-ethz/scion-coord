@@ -1,5 +1,5 @@
 scionApp
-    .factory('loginService', ["$http", "$q", function ($http, $q) {
+    .factory('loginService', ["$http", "$q", '$httpParamSerializer', function ($http, $q, $httpParamSerializer) {
         return {
             // Log the user in
             login: function (user) {
@@ -18,6 +18,14 @@ scionApp
                 return $http.post('/api/resetPassword?userEmail=' + email).then(function (response) {
                     console.log(response);
                     return response.data;
+                });
+            },
+            resendEmail: function (email){
+                return $http({
+                    method: 'POST',
+                    url: '/api/resendLink',
+                    data: $httpParamSerializer({ 'email': email }),
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }
                 });
             }
         };

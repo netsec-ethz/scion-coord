@@ -116,26 +116,22 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	authFailed := func(err error) {
+		c.Forbidden(w, err, "Authentication failed for user %v", dbUser.Email)
+	}
+
 	// if stored password is invalid due to reset or pre-approved registration
 	if dbUser.PasswordInvalid {
 		log.Printf("Password is not set for user %v.", dbUser.Email)
-		c.Forbidden(w, nil, "902 Password is not set for user %v", dbUser.Email)
+		authFailed(nil)
 		return
 	}
 
 	// if the authentication fails
 	if err := dbUser.Authenticate(password); err != nil {
 		log.Printf("Authentication failed for user %v: %v", dbUser.Email, err)
-		// Distinguish between different authentication errors
-		// The web interface uses this information to react accordingly
-		// 900: Email is not verified, 901: Password invalid
-		if err.Error() == "Email is not verified" {
-			c.Forbidden(w, err, "900 Authentication failed for user %v", dbUser.Email)
-			return
-		} else {
-			c.Forbidden(w, err, "901 Authentication failed for user %v", dbUser.Email)
-			return
-		}
+		authFailed(err)
+		return
 	}
 
 	// otherwise just continue, because the authentication succeeded

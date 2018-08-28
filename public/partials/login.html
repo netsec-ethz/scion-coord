@@ -28,6 +28,7 @@
           <div class="btn-group-vertical btn-block">
             <button ng-click="login(user)" class="btn btn-primary btn-block">Login</button>
             <button ng-click="resetPassword(user.email)" class="btn btn-default btn-block" ng-if="showReset">Reset password</button>
+            <button ng-click="resendEmail(user.email)" class="btn btn-default btn-block" ng-if="showResend">Resend account verification email</button>
           </div>
         </div>
       </div>
@@ -38,9 +39,6 @@
       <br>
       <div class="row">
           <div class="col-xs-6"><a href="#/register" class="text-center">Register a new account</a></div>
-          <div class="col-xs-6"><a href="#/resend" class="text-center" style="float: right">
-            Resend account verification email
-          </a></div>
       </div>
       <br>
  

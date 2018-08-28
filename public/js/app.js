@@ -25,10 +25,6 @@ const scionApp = angular.module('scionApp', [
             templateUrl: '/public/partials/user.html',
             controller: 'userCtrl'
         })
-        .when('/resend', {
-            templateUrl: '/public/partials/resend.html',
-            controller: 'resendCtrl'
-          })
         .when('/admin', {
             templateUrl: '/public/partials/admin.html',
             controller: 'adminCtrl'
