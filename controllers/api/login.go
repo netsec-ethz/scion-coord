@@ -106,18 +106,18 @@ func (c *LoginController) Login(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	authFailed := func(err error) {
+		c.Forbidden(w, err, "Authentication failed for user %v", email)
+	}
+
 	// load the user and verify email and password authentication
 	// if succeeded then, set the information in the user session
 	// otherwise redirect to the home page
 	dbUser, err := models.FindUserByEmail(email)
 	if err != nil || dbUser == nil {
 		log.Printf("User %v not found in database: %v", email, err)
-		c.BadRequest(w, err, "Error: User not found")
+		authFailed(err)
 		return
-	}
-
-	authFailed := func(err error) {
-		c.Forbidden(w, err, "Authentication failed for user %v", dbUser.Email)
 	}
 
 	// if stored password is invalid due to reset or pre-approved registration
