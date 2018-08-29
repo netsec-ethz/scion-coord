@@ -79,6 +79,9 @@ type Connection struct {
 	Updated       time.Time
 }
 
+// IsCurrentConnection returns false if this Connection is scheduled to be removed from the DB,
+// due to a reconfiguration in which another AP is taking the user AS.
+// Any given AS has 0-1 active connection and 0-N non active ones at a given moment.
 func (cn *Connection) IsCurrentConnection() bool {
 	return cn.JoinStatus != Remove || cn.RespondStatus != Remove
 }
@@ -104,6 +107,9 @@ type ConnectionInfo struct {
 	UpdatedOn            time.Time
 }
 
+// IsCurrentConnection returns false if this Connection is scheduled to be removed from the DB,
+// due to a reconfiguration in which another AP is taking the user AS.
+// Any given AS has 0-1 active connection and 0-N non active ones at a given moment.
 func (cn *ConnectionInfo) IsCurrentConnection() bool {
 	return !cn.KeepASStatusOnUpdate
 }
