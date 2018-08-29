@@ -253,7 +253,7 @@ func TestSCIONLabAS(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = s1.UpdateDBConnection(&cns1[0])
+		err = s1.UpdateDBConnectionFromJoinConnInfo(&cns1[0])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -264,7 +264,7 @@ func TestSCIONLabAS(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = s2.UpdateDBConnection(&cns2[0])
+		err = s2.UpdateDBConnectionFromJoinConnInfo(&cns2[0])
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -79,6 +79,13 @@ type Connection struct {
 	Updated       time.Time
 }
 
+// IsCurrentConnection returns false if this Connection is scheduled to be removed from the DB,
+// due to a reconfiguration in which another AP is taking the user AS.
+// Any given AS has 0-1 active connection and 0-N non active ones at a given moment.
+func (cn *Connection) IsCurrentConnection() bool {
+	return cn.JoinStatus != Remove || cn.RespondStatus != Remove
+}
+
 // Contains all info needed to populate the topology file
 type ConnectionInfo struct {
 	ID                   uint64 // Used to find the BorderRouter
@@ -97,8 +104,12 @@ type ConnectionInfo struct {
 	IsVPN                bool
 	Status               uint8
 	KeepASStatusOnUpdate bool // true if this WAS a connection to an AP, but it needs to be deleted in the AP
+	UpdatedOn            time.Time
 }
 
+// IsCurrentConnection returns false if this Connection is scheduled to be removed from the DB,
+// due to a reconfiguration in which another AP is taking the user AS.
+// Any given AS has 0-1 active connection and 0-N non active ones at a given moment.
 func (cn *ConnectionInfo) IsCurrentConnection() bool {
 	return !cn.KeepASStatusOnUpdate
 }
@@ -342,6 +353,7 @@ func (as *SCIONLabAS) GetJoinConnectionInfo() ([]ConnectionInfo, error) {
 			IsVPN:                cn.IsVPN,
 			Status:               cn.JoinStatus,
 			KeepASStatusOnUpdate: cn.RespondStatus == Remove && cn.JoinStatus == Remove,
+			UpdatedOn:            cn.Updated,
 		}
 		cnInfos = append(cnInfos, cnInfo)
 	}
@@ -383,6 +395,7 @@ func (as *SCIONLabAS) GetRespondConnectionInfo() ([]ConnectionInfo, error) {
 			IsVPN:                cn.IsVPN,
 			Status:               cn.RespondStatus,
 			KeepASStatusOnUpdate: cn.RespondStatus == Remove && cn.JoinStatus == Remove,
+			UpdatedOn:            cn.Updated,
 		}
 		cnInfos = append(cnInfos, cnInfo)
 	}
@@ -444,7 +457,7 @@ func FindRespondConnectionInfoByIA(ia string) ([]ConnectionInfo, error) {
 }
 
 // Update the Status of a Connection using a ConnectionInfo Object
-func (as *SCIONLabAS) UpdateDBConnection(cnInfo *ConnectionInfo) error {
+func (as *SCIONLabAS) UpdateDBConnectionFromJoinConnInfo(cnInfo *ConnectionInfo) error {
 	cn := new(Connection)
 	err := o.QueryTable(cn).Filter("ID", cnInfo.ID).RelatedSel().One(cn)
 	if err != nil {
@@ -466,18 +479,23 @@ func (as *SCIONLabAS) UpdateDBConnection(cnInfo *ConnectionInfo) error {
 		cn.JoinStatus = cnInfo.NeighborStatus
 		cn.RespondBRID = cnInfo.BRID
 	}
-	if err := cn.Update(); err != nil {
-		return err
-	}
-	return nil
+	return cn.Update()
 }
 
 // Update both the SCIONLabAS and Connection tables
-func (as *SCIONLabAS) UpdateASAndConnection(cnInfo *ConnectionInfo) error {
-	if err := as.UpdateDBConnection(cnInfo); err != nil {
+func (as *SCIONLabAS) UpdateASAndConnectionFromJoinConnInfo(cnInfo *ConnectionInfo) error {
+	if err := as.UpdateDBConnectionFromJoinConnInfo(cnInfo); err != nil {
 		return err
 	}
 	return as.Update()
+}
+
+func (as *SCIONLabAS) UpdateASAndConnection(cn *Connection) error {
+	err := cn.Update()
+	if err == nil {
+		err = as.Update()
+	}
+	return err
 }
 
 // Returns all Attachment Point ASes
@@ -705,7 +723,7 @@ func (as *SCIONLabAS) FlagAllConnectionsToApToBeDeleted(apIA string) error {
 		}
 		cn.Status = Remove
 		cn.NeighborStatus = Remove
-		err = as.UpdateDBConnection(&cn)
+		err = as.UpdateDBConnectionFromJoinConnInfo(&cn)
 		if err != nil {
 			return fmt.Errorf("error updating previous connection ID %v: %v", cn.ID, err)
 		}
@@ -728,7 +746,7 @@ func (cn *Connection) Delete() error {
 	return err
 }
 
-func DeleteConnection(connectionId uint64) error {
+func DeleteConnectionFromDB(connectionId uint64) error {
 	_, err := o.Delete(&Connection{ID: connectionId})
 	return err
 }

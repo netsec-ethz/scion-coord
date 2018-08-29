@@ -275,7 +275,7 @@ func (s *SCIONBoxController) getPotentialNeighbors(ip string,
 func (s *SCIONBoxController) getCredentialsByEmail(userEmail string) (string, string, error) {
 	user, err := models.FindUserByEmail(userEmail)
 	if err != nil {
-		fmt.Errorf("error looking for user %v", err)
+		err = fmt.Errorf("error looking for user %v", err)
 		return "", "", err
 	}
 	account := user.Account
@@ -619,7 +619,7 @@ func (s *SCIONBoxController) generateCredentialsFile(slas *models.SCIONLabAS) er
 	// find Account
 	id, secret, err := s.getCredentialsByEmail(slas.UserEmail)
 	if err != nil {
-		fmt.Errorf("error looking for credentials %v", err)
+		return fmt.Errorf("error looking for credentials %v", err)
 	}
 	cr := credentials{
 		ID:       id,
@@ -694,14 +694,14 @@ func (s *SCIONBoxController) disconnectBox(sb *models.SCIONBox, slas *models.SCI
 	cns = models.OnlyCurrentConnections(cns)
 	for _, cn := range cns {
 		cn.Status = models.Remove
-		err := slas.UpdateDBConnection(&cn)
+		err := slas.UpdateDBConnectionFromJoinConnInfo(&cn)
 		if err != nil {
 			return err
 		}
 		// If the Box has no gen Folder set own Connection Status to REMOVED
 		if !hasGen {
 			cn.Status = models.Removed
-			err := slas.UpdateDBConnection(&cn)
+			err := slas.UpdateDBConnectionFromJoinConnInfo(&cn)
 			if err != nil {
 				return err
 			}
@@ -899,7 +899,7 @@ func (s *SCIONBoxController) HBChangedIP(slas *models.SCIONLabAS, ip string) err
 	// Update the connections
 	for _, cn := range cns {
 		cn.Status = models.Update
-		if err := slas.UpdateDBConnection(&cn); err != nil {
+		if err := slas.UpdateDBConnectionFromJoinConnInfo(&cn); err != nil {
 			return fmt.Errorf("error updating the Connection: %v",
 				err)
 		}
@@ -936,7 +936,7 @@ func (s *SCIONBoxController) updateDBConnections(slas *models.SCIONLabAS,
 				cn.Status = models.Removed
 			}
 		}
-		err := slas.UpdateDBConnection(&cn)
+		err := slas.UpdateDBConnectionFromJoinConnInfo(&cn)
 		if err != nil {
 			return err
 		}

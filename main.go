@@ -41,7 +41,7 @@ import (
 func initializeISD() error {
 	raw, err := ioutil.ReadFile(config.ISDLocationMapping)
 	if err != nil {
-		fmt.Errorf("ERROR: Cannot access ISD location mapping json file: %v", err)
+		return fmt.Errorf("ERROR: Cannot access ISD location mapping json file: %v", err)
 	}
 	var isdLocs []struct {
 		ISD       addr.ISD
@@ -83,9 +83,8 @@ func checkCredentialsDirectories() error {
 					return fmt.Errorf("ERROR: Credential file %s does not exist. Please make "+
 						"sure that the necessary credential files exist.\n"+
 						"Consult the README.md for further details.", f)
-				} else {
-					return fmt.Errorf("An error occurred when accessing " + f + ".")
 				}
+				return fmt.Errorf("An error occurred when accessing " + f + ".")
 			}
 		}
 	}
@@ -214,6 +213,11 @@ func main() {
 		apiChain.ThenFunc(scionLabASController.QueryUpdateBranch))
 	router.Handle("/api/as/confirmUpdate/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabASController.ConfirmUpdate)).Methods(http.MethodPost)
+	// full synchronization (not only pending changes) for the APs:
+	router.Handle("/api/as/getConnectionsForAP/{account_id}/{secret}",
+		apiChain.ThenFunc(scionLabASController.GetConnectionsForAP))
+	router.Handle("/api/as/setConnectionsForAP/{account_id}/{secret}",
+		apiChain.ThenFunc(scionLabASController.SetConnectionsForAP))
 
 	//SCIONBox API
 	router.Handle("/api/as/initBox", loggingChain.ThenFunc(scionBoxController.InitializeBox))
