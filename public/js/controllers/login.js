@@ -4,52 +4,59 @@ scionApp
 
             // refresh the list of processes
             $scope.login = function (user) {
-
-                loginService.login(user).then(
-                    function (data) {
-                        $location.path('/user');
-                    },
-                    function (response) {
-                        console.log(response);
-
-                        let err;
-                        switch (response.data.substring(0,3)) {
-                            case "901":
-                                err = "Your username/password combination is incorrect. Please " +
-                                    "try again or reset the password with the link below.";
-                                $scope.showReset = true;
-                                break;
-                            case "900":
-	                            $rootScope.resendAddress = user.email;
-	                            $location.path('/resend');
-                                break;
-                            case "902":
-                                err = "You have not set a valid password. Please check your " +
-                                    "email and follow the link to set a new password";
-                                break;
-                            default:
-                                err = "Failed to log you in: Make sure your email address and " +
-                                    "password are correct and your email address is verified.";
-                        }
-                        $scope.error = err;
-                        $scope.message = "";
-                    });
+                if (!$scope.loginForm.$valid) {
+                    $scope.error = "Please enter your email address and password."
+                } else {
+                    loginService.login(user).then(
+                        function (data) {
+                            $location.path('/user');
+                        },
+                        function (response) {
+                            console.log(response);
+                            $scope.error = "Failed to log you in: Make sure your email address and " +
+                                "password are correct and your email address is verified.";
+                            $scope.showReset = true;
+                            $scope.showResend = true;
+                            $scope.message = "";
+                        });
+                }
             };
 
             // reset password
             $scope.resetPassword = function (email) {
-                loginService.resetPassword(email).then(
-                    function (data) {
-                        $scope.error = "";
-                        $scope.message = "Your password has been reset. You will receive an " +
-                            "email with further instructions.";
-                    },
-                    function (response) {
-                        console.log(response);
-                        $scope.error = response.data;
-                        $scope.message = "";
-                    }
-                )
+                if (!$scope.loginForm.$valid) {
+                    $scope.error = "Please enter your email address."
+                } else {
+                    loginService.resetPassword(email).then(
+                        function (data) {
+                            $scope.error = "";
+                            $scope.message = "Your password has been reset. You will receive an " +
+                                "email with further instructions.";
+                        },
+                        function (response) {
+                            console.log(response);
+                            $scope.error = response.data;
+                            $scope.message = "";
+                        }
+                    )
+                }
+            };
+
+            // resend account verification email
+            $scope.resendEmail = function (email){
+                if (!$scope.loginForm.$valid) {
+                    $scope.error = "Please enter your email address."
+                } else {
+                    loginService.resendEmail(email).then(
+                        function (data) {
+                            $scope.message = "The verification email has been resent to " + email;
+                            $scope.error = "";
+                        },
+                        function (response) {
+                            $scope.message = "";
+                            $scope.error = response.data;
+                        });
+                }
             };
 
             $scope.dismissSuccess = function () {
@@ -59,4 +66,5 @@ scionApp
             $scope.dismissError = function () {
                 $scope.error = "";
             };
+
         }]);

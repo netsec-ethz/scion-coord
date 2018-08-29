@@ -94,22 +94,24 @@ func (c *RegistrationController) ResetPassword(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	displayedError := "Error resetting password"
+
 	userEmail := r.FormValue("userEmail")
 	u, err := models.FindUserByEmail(userEmail)
 	if err != nil {
 		log.Println(err)
-		c.BadRequest(w, err, "User not found")
+		c.BadRequest(w, err, displayedError)
 		return
 	}
 
 	if err = u.ResetUUID(); err != nil {
 		log.Printf("Error resetting UUID for user %v: %v", u.Email, err)
-		c.BadRequest(w, err, "Error resetting UUID")
+		c.BadRequest(w, err, displayedError)
 		return
 	}
 	if err = u.UpdatePassword(""); err != nil {
 		log.Printf("Error resetting password for user %v: %v", u.Email, err)
-		c.BadRequest(w, err, "Error resetting password")
+		c.BadRequest(w, err, displayedError)
 		return
 	}
 	data := email.MailData{
@@ -126,7 +128,7 @@ func (c *RegistrationController) ResetPassword(w http.ResponseWriter, r *http.Re
 		userEmail,
 		false); err != nil {
 		log.Printf("Error sending password-reset email to user %v: %v", u.Email, err)
-		c.BadRequest(w, err, "Error sending email")
+		c.BadRequest(w, err, displayedError)
 		return
 	}
 
