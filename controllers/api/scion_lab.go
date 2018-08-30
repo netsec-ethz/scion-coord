@@ -288,6 +288,7 @@ func (s *SCIONLabASController) ConfigureSCIONLabAS(w http.ResponseWriter, r *htt
 	if err != nil {
 		log.Print(err)
 		s.Error500(w, err, "Error generating the configuration")
+		return
 	}
 
 	// Persist the relevant data into the DB
@@ -671,6 +672,9 @@ func generateLocalGen(asInfo *SCIONLabASInfo) error {
 	errOutput, _ := ioutil.ReadAll(cmdErr)
 	fmt.Printf("STDOUT generateLocalGen: %s\n", stdOutput)
 	fmt.Printf("ERROUT generateLocalGen: %s\n", errOutput)
+	if len(errOutput) > 0 {
+		return errors.New("generate local gen command did not succeed")
+	}
 	return nil
 }
 
@@ -726,9 +730,11 @@ func packageConfiguration(asInfo *SCIONLabASInfo) error {
 		data := struct {
 			ASID           string
 			PortForwarding string
+			Hostname       string
 		}{
-			ASID:           asInfo.LocalAS.ASID.FileFmt(),
-			PortForwarding: portForwarding,
+			asInfo.LocalAS.ASID.FileFmt(),
+			portForwarding,
+			strings.Replace(asInfo.LocalAS.ASID.String(), ":", "-", -1),
 		}
 		if err := utility.FillTemplateAndSave("templates/Vagrantfile.tmpl",
 			data, filepath.Join(userPackagePath, "Vagrantfile")); err != nil {
