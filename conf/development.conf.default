@@ -63,8 +63,8 @@ session.path = "/tmp"
 session.encryption_key = "x290jdxmcam9q2dci:LWC92cqwop,0rt"
 session.verification_key = "c23omc2o,pb45,-34l=12ms21odmx1;f"
 
-# Database configs: at the moment only MySQL is supported, although it could be easy to support
-# others
+# Database configs
+# At the moment only MySQL is supported, although it could be easy to support others.
 db.name = "scion_coord_test"
 db.host = "127.0.0.1"
 db.port = 3306
@@ -92,11 +92,11 @@ mtu = 1472
 # Maximal number of border routers in one AS
 max_br_id = 1000
 # First ID given to users' ASes
-base_as_id = 1000
+base_as_id = ffaa:1:b0
 # Reserve first few BR IDs of Infrastructure ASes for custom configuration
 reserved_brs_infrastructure = 10
 # Maximal number of ASes a user or admin can have
-ases_per_user = 2
+ases_per_user = 5
 ases_per_admin = 10
 
 # public address of the image service
@@ -112,7 +112,7 @@ nextversion.python_path = ""
 
 # ASes signing certificates for new ASes in each ISD: [ISD]=ASid
 [signing_ases]
-1=11
-2=21
-3=31
-4=41
+17=ffaa:0:1101
+18=ffaa:0:1201
+19=ffaa:0:1301
+20=ffaa:0:1401
