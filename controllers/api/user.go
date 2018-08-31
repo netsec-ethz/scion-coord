@@ -15,6 +15,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -74,6 +75,12 @@ type userPageData struct {
 	APs         map[string]apInfo
 	ASInfos     []asInfo
 	GrafanaLink string
+}
+
+type passwordChangeRequest struct {
+	CurrentPassword      string `json:"currentPassword"`
+	NewPassword          string `json:"password"`
+	PasswordConfirmation string `json:"passwordConfirmation"`
 }
 
 // generates the structs containing information about the user's AS and the
@@ -240,5 +247,58 @@ func (c *UserController) UserInformation(w http.ResponseWriter, r *http.Request)
 
 // API function that changes password for logged-in users
 func (c *UserController) ChangePassword(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement
+	// parse the form value
+	if err := r.ParseForm(); err != nil {
+		log.Println(err)
+		c.Error500(w, err, "Error parsing form values")
+		return
+	}
+
+	// parse the JSON coming from the client
+	var pwChangeRequest passwordChangeRequest
+	decoder := json.NewDecoder(r.Body)
+
+	// check if the parsing succeeded
+	if err := decoder.Decode(&pwChangeRequest); err != nil {
+		log.Println(err)
+		c.Error500(w, err, "Error decoding JSON")
+		return
+	}
+
+	// get the current user session
+	_, userSession, err := middleware.GetUserSession(r)
+	if err != nil {
+		log.Println(err)
+		c.Forbidden(w, err, "Error getting user session")
+		return
+	}
+
+	// load the user and verify email and password authentication
+	dbUser, err := models.FindUserByEmail(userSession.Email)
+	if err != nil || dbUser == nil {
+		log.Printf("User %v not found in database: %v", userSession.Email, err)
+		c.Forbidden(w, err, "Error authenticating user")
+		return
+	}
+
+	if err := dbUser.CheckPassword(pwChangeRequest.CurrentPassword); err != nil {
+		log.Printf("Incorrect password for user %v", userSession.Email)
+		c.Forbidden(w, err, "Incorrect password")
+		return
+	}
+
+	// check if new passwords are valid
+	if err := passwordsAreValid(pwChangeRequest.NewPassword, pwChangeRequest.PasswordConfirmation); err != nil {
+		log.Println(err)
+		c.Error500(w, err, err.Error())
+		return
+	}
+
+	if err := dbUser.UpdatePassword(pwChangeRequest.NewPassword); err != nil {
+		log.Printf("Error updating the password in the database: %v", err)
+		c.Error500(w, err, "Error updating the password in the database")
+		return
+	}
+
+	return
 }
