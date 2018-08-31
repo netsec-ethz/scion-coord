@@ -20,11 +20,16 @@ import (
 	"net/http"
 
 	"github.com/netsec-ethz/scion-coord/config"
+	"github.com/netsec-ethz/scion-coord/controllers"
 	"github.com/netsec-ethz/scion-coord/controllers/middleware"
 	"github.com/netsec-ethz/scion-coord/models"
 	"github.com/netsec-ethz/scion-coord/utility"
 	"github.com/scionproto/scion/go/lib/addr"
 )
+
+type UserController struct {
+	controllers.HTTPController
+}
 
 type asInfo struct {
 	ISD       addr.ISD  // Current ISD of the user's SCIONLab AS
@@ -205,7 +210,7 @@ func populateUserData(r *http.Request) (u user, a accountData, err error) {
 }
 
 // API function that generates all information necessary for displaying the user page
-func (c *LoginController) UserInformation(w http.ResponseWriter, r *http.Request) {
+func (c *UserController) UserInformation(w http.ResponseWriter, r *http.Request) {
 
 	user, _, err := populateUserData(r)
 	if err != nil {
@@ -231,4 +236,9 @@ func (c *LoginController) UserInformation(w http.ResponseWriter, r *http.Request
 	}
 
 	c.JSON(&userData, w, r)
+}
+
+// API function that changes password for logged-in users
+func (c *UserController) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	// TODO: Implement
 }

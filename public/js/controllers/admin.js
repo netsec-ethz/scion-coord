@@ -1,6 +1,6 @@
 angular.module('scionApp')
-    .controller('adminCtrl', ['$rootScope', '$scope', 'adminService', '$location', '$window', '$http',
-        function ($rootScope, $scope, adminService, $location, $window, $http) {
+    .controller('adminCtrl', ['$rootScope', '$scope', 'adminService', '$location',
+        function ($rootScope, $scope, adminService, $location) {
             $scope.redirectIfNotAdmin = function () {
                 if (!$rootScope.user["IsAdmin"]) {
                     $location.path('/user');

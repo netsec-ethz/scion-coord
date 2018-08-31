@@ -29,6 +29,10 @@ const scionApp = angular.module('scionApp', [
             templateUrl: '/public/partials/admin.html',
             controller: 'adminCtrl'
         })
+        .when('/account', {
+            templateUrl: '/public/partials/account.html',
+            controller: 'accountCtrl'
+        })
         .otherwise({
             redirectTo: '/login'
         });
@@ -75,7 +79,17 @@ const scionApp = angular.module('scionApp', [
 
                 }
             };
-        }]);
+        }])
+        .directive('autoFocus', function($timeout) {
+            return {
+                restrict: 'AC',
+                link: function(_scope, _element) {
+                    $timeout(function(){
+                        _element[0].focus();
+                    }, 0);
+                }
+            };
+        });
 })();
 
 scionApp.filter('toArray', function () {

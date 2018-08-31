@@ -109,6 +109,7 @@ func main() {
 	// controllers
 	registrationController := api.RegistrationController{}
 	loginController := api.LoginController{}
+	userController := api.UserController{}
 	adminController := api.AdminController{}
 	asController := api.ASInfoController{}
 	scionLabASController := api.SCIONLabASController{}
@@ -159,11 +160,11 @@ func main() {
 	router.Handle("/api/captchaSiteKey", loggingChain.ThenFunc(
 		registrationController.LoadCaptchaSiteKey))
 
-	// Resend verification email
+	// resend verification email
 	router.Handle("/api/resendLink", tollbooth.LimitHandler(resendLimit, loggingChain.ThenFunc(
 		registrationController.ResendActivationLink))).Methods(http.MethodPost)
 
-	// Reset user password
+	// reset user password
 	router.Handle("/api/resetPassword", tollbooth.LimitHandler(resendLimit, loggingChain.ThenFunc(
 		registrationController.ResetPassword))).Methods(http.MethodPost)
 
@@ -174,7 +175,11 @@ func main() {
 	router.Handle("/api/logout", loggingChain.ThenFunc(loginController.Logout))
 
 	// user information
-	router.Handle("/api/userPageData", apiChain.ThenFunc(loginController.UserInformation))
+	router.Handle("/api/userPageData", apiChain.ThenFunc(userController.UserInformation))
+
+	// change password by logged-in users
+	router.Handle("/api/changePassword", userChain.ThenFunc(
+		userController.ChangePassword)).Methods(http.MethodPost)
 
 	// email validation
 	router.Handle("/api/verifyEmail/{uuid}", loggingChain.ThenFunc(
