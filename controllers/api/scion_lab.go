@@ -311,10 +311,6 @@ func (s *SCIONLabASController) parseRequestParameters(r *http.Request) (
 		log.Printf("Error getting the user session: %v", err)
 		return
 	}
-	// parse the form value
-	if err = r.ParseForm(); err != nil {
-		return
-	}
 	// parse the JSON coming from the client
 	decoder := json.NewDecoder(r.Body)
 	// check if the parsing succeeded

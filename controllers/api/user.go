@@ -247,12 +247,6 @@ func (c *UserController) UserInformation(w http.ResponseWriter, r *http.Request)
 
 // API function that changes password for logged-in users
 func (c *UserController) ChangePassword(w http.ResponseWriter, r *http.Request) {
-	// parse the form value
-	if err := r.ParseForm(); err != nil {
-		log.Println(err)
-		c.Error500(w, err, "Error parsing form values")
-		return
-	}
 
 	// parse the JSON coming from the client
 	var pwChangeRequest passwordChangeRequest

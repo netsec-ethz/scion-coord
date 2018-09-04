@@ -138,13 +138,6 @@ func (c *RegistrationController) ResetPassword(w http.ResponseWriter, r *http.Re
 // Method used to set password after pre-approved registration or password reset
 func (c *RegistrationController) SetPassword(w http.ResponseWriter, r *http.Request) {
 
-	// parse the form value
-	if err := r.ParseForm(); err != nil {
-		log.Println(err)
-		c.Error500(w, err, "Parsing form values failed")
-		return
-	}
-
 	// parse the JSON coming from the client
 	var passRequest passwordRequest
 	decoder := json.NewDecoder(r.Body)
@@ -227,13 +220,6 @@ func (c *RegistrationController) VerifyEmail(w http.ResponseWriter, r *http.Requ
 
 // This method is used to register a new account via the standard form
 func (c *RegistrationController) Register(w http.ResponseWriter, r *http.Request) {
-
-	// parse the form value
-	if err := r.ParseForm(); err != nil {
-		log.Println(err)
-		c.Error500(w, err, "Error parsing form values")
-		return
-	}
 
 	// parse the JSON coming from the client
 	var regRequest registrationRequest
