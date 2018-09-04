@@ -200,10 +200,6 @@ func (s *SCIONImgBuildController) GenerateImage(w http.ResponseWriter, r *http.R
 	filePath := filepath.Join(PackagePath, fileName)
 
 	// Get build request
-	if err := r.ParseForm(); err != nil {
-		s.BadRequest(w, fmt.Errorf("error parsing the form: %v", err), "Error parsing form")
-		return
-	}
 	var bRequest buildRequest
 	decoder := json.NewDecoder(r.Body)
 

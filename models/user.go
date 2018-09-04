@@ -243,7 +243,7 @@ func (u *user) Authenticate(password string) error {
 
 	// the user did less than N login attempts
 	//if u.FailedAttempts <= MAX_LOGIN_ATTEMPTS {
-	if err := u.checkPassword(password); err != nil {
+	if err := u.CheckPassword(password); err != nil {
 		return err
 	}
 
@@ -256,13 +256,13 @@ func (u *user) Authenticate(password string) error {
 
 	// this means the user tried to log in more than 15 minutes ago
 	// if validLockDownWindow(u.LastLoginAttempt) {
-	// 	return u.checkPassword(password)
+	// 	return u.CheckPassword(password)
 	// }
 
 	// return errors.New("Too many login attempts. Account locked.")
 }
 
-func (u *user) checkPassword(password string) error {
+func (u *user) CheckPassword(password string) error {
 	// update time of attempts
 	// if err := u.UpdateLastLoginAttempt(); err != nil {
 	// 	return err

@@ -3,16 +3,16 @@ scionApp
         '$location', 'vcRecaptchaService',
         function ($scope, registerService, ResolveSiteKey, $interval, $location, vcRecaptchaService)
         {
-
             $scope.user = {};
-            $scope.siteKey = ResolveSiteKey.data;
+            if($scope.siteKey == null) {
+                $scope.siteKey = ResolveSiteKey.data;
+            }
 
             $scope.register = function (user) {
-
                 if (!$scope.user.captcha) {
                     $scope.error = "Please resolve the captcha before submitting.";
                     $scope.message = "";
-                } else if (!$scope.registration.$valid) {
+                } else if (!$scope.registrationForm.$valid) {
                     $scope.error = "Please fill out the form correctly."
                 } else {
                     registerService.register(user).then(
@@ -21,7 +21,7 @@ scionApp
                                 "an email to your inbox with a link to verify your account.";
                             $scope.error = "";
                             $scope.user = {};
-                            $scope.registration.$setPristine();
+                            $scope.registrationForm.$setPristine();
                             vcRecaptchaService.reload();
                         },
                         function (response) {

@@ -15,17 +15,15 @@
     </div>
 
 
-    <form name="registration" ng-submit="register(user)">
+    <form name="registrationForm" ng-submit="register(user)">
       <div class="form-group has-feedback">
         <input type="text" class="form-control" ng-model="user.first" name="first"
-               placeholder="First name"
-               required>
+               placeholder="First name" required auto-focus>
         <span class="glyphicon glyphicon-user form-control-feedback"></span>
       </div>
       <div class="form-group has-feedback">
         <input type="text" class="form-control" ng-model="user.last" name="last"
-               placeholder="Last name"
-               required>
+               placeholder="Last name" required>
         <span class="glyphicon glyphicon-user form-control-feedback"></span>
       </div>
       <div class="form-group has-feedback">
@@ -39,26 +37,26 @@
                required ng-blur="email_entered=true">
         <span class="glyphicon glyphicon-envelope form-control-feedback"></span>
         <span class="error"
-              ng-if="registration.email.$error.email && email_entered">
+              ng-if="registrationForm.email.$error.email && email_entered">
           Please enter a valid email address.
         </span>
       </div>
       <div class="form-group has-feedback">
         <input type="password" class="form-control" ng-model="user.password" name="password"
-               placeholder="Password"
+               placeholder="Password" autocomplete="new-password"
                required ng-minlength="8" ng-blur="password_entered=true">
         <span class="glyphicon glyphicon-lock form-control-feedback"></span>
-        <span class="error" ng-if="registration.password.$error.minlength && password_entered">
+        <span class="error" ng-if="registrationForm.password.$error.minlength && password_entered">
           Please use at least 8 characters.</span>
       </div>
       <div class="form-group has-feedback">
         <input type="password" class="form-control" ng-model="user.password_confirmation"
-               check-match="user.password"
+               check-match="user.password" autocomplete="new-password"
                name="password_confirmation" placeholder="Retype password" required
                ng-blur="password_confirmation_entered=true">
-        <span class="glyphicon glyphicon-log-in form-control-feedback"></span>
+        <span class="glyphicon glyphicon-repeat form-control-feedback"></span>
         <span class="error"
-              ng-if="registration.password_confirmation.$error.match && password_confirmation_entered">
+              ng-if="registrationForm.password_confirmation.$error.match && password_confirmation_entered">
           Please enter matching passwords.
         </span>
       </div>

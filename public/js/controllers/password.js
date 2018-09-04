@@ -1,6 +1,6 @@
 scionApp
-    .controller('passwordCtrl', ['$scope', 'passwordService', '$routeParams', '$interval',
-        '$location', function ($scope, passwordService, $routeParams, $interval, $location) {
+    .controller('passwordCtrl', ['$scope', 'passwordService', '$routeParams',
+        function ($scope, passwordService, $routeParams) {
 
             $scope.message = "";
             $scope.error = "";
@@ -28,7 +28,6 @@ scionApp
             $scope.dismissSuccess = function () {
                 $scope.message = "";
             };
-
             $scope.dismissError = function () {
                 $scope.error = "";
             };

@@ -118,12 +118,6 @@ func preregisterAndSendInvitation(userSession *models.Session, invitation *invit
 
 func (c AdminController) SendInvitationEmails(w http.ResponseWriter, r *http.Request) {
 
-	if err := r.ParseForm(); err != nil {
-		log.Printf("There was an error parsing the form for email invitations: %v", err)
-		c.BadRequest(w, err, "There was an error parsing form for email invitations")
-		return
-	}
-
 	// parse the JSON coming from the client
 	decoder := json.NewDecoder(r.Body)
 	var invitations invitationsData
