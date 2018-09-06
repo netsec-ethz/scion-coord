@@ -26,7 +26,6 @@ import (
 	"github.com/astaxie/beego/orm"
 	"github.com/didip/tollbooth"
 	"github.com/didip/tollbooth/limiter"
-	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/netsec-ethz/scion-coord/config"
 	"github.com/netsec-ethz/scion-coord/controllers"
@@ -291,12 +290,11 @@ func main() {
 			}))
 
 		// listen to HTTPS requests
-		log.Fatal(http.Serve(autocert.NewListener(
-			config.HTTPHostAddress), handlers.CompressHandler(router)))
+		log.Fatal(http.Serve(autocert.NewListener(config.HTTPHostAddress), router))
 	} else {
 		fmt.Printf("Serving website on %v over HTTP\n", config.HTTPHostAddress)
 		log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d",
-			config.HTTPBindAddress, config.HTTPBindPort), handlers.CompressHandler(router)))
+			config.HTTPBindAddress, config.HTTPBindPort), router))
 	}
 
 }
