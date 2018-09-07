@@ -4,16 +4,19 @@ Vagrant.require_version ">= 1.9.7"
 
 Vagrant.configure("2") do |config|
   $setup_root = <<-SCRIPT
+    set -e
     echo "[DEBUG] ******** setup root BASE VM"
     export DEBIAN_FRONTEND=noninteractive
     echo "Adding repositories and updating list"
-    add-apt-repository ppa:longsleep/golang-backports
-    apt-get update
+    sudo add-apt-repository ppa:longsleep/golang-backports
+    sudo apt-get update
     echo "Install packages"
-    apt-get install -y --no-remove ntp golang-1.9-go
+    sudo apt-get install -y --no-remove ntp golang-1.9-go
+    echo 'export PATH="/usr/lib/go-1.9/bin:$PATH"' >> ~/.profile
+    . ~/.profile
     echo "remove other users than scion"
-    deluser --remove-home ubuntu
-    deluser --remove-home vagrant
+    sudo deluser --remove-home ubuntu
+    sudo deluser --remove-home vagrant
   SCRIPT
   $cleanup_root = <<-SCRIPT
     echo "[DEBUG] ******** cleanup root BASE VM"
@@ -32,11 +35,14 @@ Vagrant.configure("2") do |config|
     echo "All clear."
   SCRIPT
   $setup_scion = <<-SCRIPT
+    set -e
     echo "[DEBUG] ******** setup scion BASE VM"
     export DEBIAN_FRONTEND=noninteractive
-    su scion -c '/vagrant/scion_install_script.sh -s /vagrant/scion.service -z /vagrant/scion-viz.service -a ~/.bash_aliases -u /vagrant/scionupgrade.sh -t /vagrant/scionupgrade -c'
+    /vagrant/scion_install_script.sh -s /vagrant/scion.service -z /vagrant/scion-viz.service -a ~/.bash_aliases -u /vagrant/scionupgrade.sh -t /vagrant/scionupgrade -c
+    . ~/.profile
     echo "Cleaning SCION things"
-    $SC/scion.sh stop
+    cd $SC
+    ./scion.sh stop
     rm $SC/logs/*
     rm -r $SC/gen
     echo "All done."
@@ -46,8 +52,8 @@ Vagrant.configure("2") do |config|
     vb.name = "SCIONLabVM-base"
     vb.customize [ "setextradata", :id, "VBoxInternal/Devices/VMMDev/0/Config/GetHostTimeDisabled", 1 ]
   end
-  config.vm.provision "shell", privileged: true, run: "once", inline: $setup_root
-  config.vm.provision "shell", privileged: true, run: "once", inline: $setup_scion
+  config.vm.provision "shell", privileged: false, run: "once", inline: $setup_root
+  config.vm.provision "shell", privileged: false, run: "always", inline: $setup_scion
   config.vm.provision "shell", privileged: true, run: "once", inline: $cleanup_root
   config.ssh.username = "scion"
   # https://github.com/hashicorp/vagrant/issues/5186
