@@ -12,7 +12,7 @@ Type=oneshot
 RemainAfterExit=no
 User=_USER_
 WorkingDirectory=/tmp
-Environment="PATH=/home/_USER_/.local/bin:/home/_USER_/go/bin:/usr/local/go/bin:/home/_USER_/bin:/home/_USER_/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin" "GOPATH=/home/_USER_/go" "SC=/home/_USER_/go/src/github.com/scionproto/scion/" "PYTHONPATH=/home/_USER_/go/src/github.com/scionproto/scion/python:/home/_USER_/go/src/github.com/scionproto/scion"
+Environment="PATH=/home/_USER_/.local/bin:/home/_USER_/go/bin:/usr/lib/go-1.9/bin:/usr/local/go/bin:/home/_USER_/bin:/home/_USER_/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin" "GOPATH=/home/_USER_/go" "SC=/home/_USER_/go/src/github.com/scionproto/scion/" "PYTHONPATH=/home/_USER_/go/src/github.com/scionproto/scion/python:/home/_USER_/go/src/github.com/scionproto/scion"
 ExecStart=/usr/bin/scionupgrade.sh
 KillMode=none
 

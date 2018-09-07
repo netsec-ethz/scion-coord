@@ -5,6 +5,5 @@ credentials/
 conf/development.conf
 vagrant/scion_install_script.sh
 vagrant/.vagrant/
-vagrant/metadata.json
 vagrant/scion-base.box
 vagrant/ubuntu-xenial-*.log
