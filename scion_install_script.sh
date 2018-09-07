@@ -92,9 +92,9 @@ sudo apt-get update
 sudo apt-get install -y git supervisor
 
 grep 'export GOPATH="$HOME/go"' ~/.profile >/dev/null || echo 'export GOPATH="$HOME/go"' >> ~/.profile
-grep 'export PATH="$HOME/.local/bin:$GOPATH/bin:/usr/local/go/bin:$PATH"' >/dev/null || echo 'export PATH="$HOME/.local/bin:$GOPATH/bin:/usr/local/go/bin:$PATH"' >> ~/.profile
-grep 'export SC="$GOPATH/src/github.com/scionproto/scion"' >/dev/null || echo 'export SC="$GOPATH/src/github.com/scionproto/scion"' >> ~/.profile
-grep 'export PYTHONPATH="$SC/python:$SC"' >/dev/null || echo 'export PYTHONPATH="$SC/python:$SC"' >> ~/.profile
+grep 'export PATH="$HOME/.local/bin:$GOPATH/bin:/usr/local/go/bin:$PATH"' ~/.profile >/dev/null || echo 'export PATH="$HOME/.local/bin:$GOPATH/bin:/usr/local/go/bin:$PATH"' >> ~/.profile
+grep 'export SC="$GOPATH/src/github.com/scionproto/scion"' ~/.profile >/dev/null || echo 'export SC="$GOPATH/src/github.com/scionproto/scion"' >> ~/.profile
+grep 'export PYTHONPATH="$SC/python:$SC"' ~/.profile >/dev/null || echo 'export PYTHONPATH="$SC/python:$SC"' >> ~/.profile
 source ~/.profile
 mkdir -p "$GOPATH"
 mkdir -p "$GOPATH/src/github.com/scionproto"
@@ -132,16 +132,18 @@ if [ ! -d scion ]; then
         echo "Finished applying patches"
     fi
 
+    echo "Building dependencies"
     bash -c 'yes | GO_INSTALL=true ./env/deps'
+    echo "Building SCION"
     ./scion.sh build
+    echo "SCION built"
 
     sudo cp docker/zoo.cfg /etc/zookeeper/conf/zoo.cfg
-
     # Add cron script which removes old zk logs
     sudo bash -c 'cat > /etc/cron.daily/zookeeper << CRON1
-    #! /bin/sh
-    /usr/share/zookeeper/bin/zkCleanup.sh -n 3
-    CRON1'
+#! /bin/sh
+/usr/share/zookeeper/bin/zkCleanup.sh -n 3
+CRON1'
     sudo chmod 755 /etc/cron.daily/zookeeper
 
     cd sub
@@ -150,9 +152,9 @@ if [ ! -d scion ]; then
     pip3 install --user --require-hashes -r requirements.txt
     python3 ./manage.py migrate
 else
-    cd scion
     echo "SCION already present, not building it."
 fi
+cd "$SC"
 # Check if gen directory exists
 if  [[ ( ! -z ${gen_dir+x} ) && -d ${gen_dir} ]]
 then
@@ -164,7 +166,6 @@ else
 fi
 ./scion.sh stop
 ./supervisor/supervisor.sh reload
-./scion.sh start
 
 # Should we add aliases
 if [[ (! -z ${aliases_file} ) ]]
@@ -196,13 +197,13 @@ then
     # We need to replace template user with current username
     sed -i "s/_USER_/$USER/g" "$tempfile"
     sudo cp "$tempfile" /etc/systemd/system/scion.service
-
     sudo systemctl enable scion.service
     sudo systemctl start scion.service
 
     rm "$tempfile"
 else
     echo "SCION systemd service file not specified! SCION won't run automatically on startup."
+    ./scion.sh start
 fi
 
 if  [[ ( ! -z ${scion_viz_service+x} ) && -r ${scion_viz_service} ]]
@@ -259,6 +260,7 @@ then
     sudo systemctl start scionupgrade.timer
 
     if [ -d "/vagrant" ]; then # iff this is a VM
+        echo "Detected running inside Vagrant"
         # registering the upgrade service also means "manage SCION", including keep time sync'ed
         sudo apt-get install -y --no-remove ntp || true
         sudo sed -i -- 's/^\(\s*start-stop-daemon\s*--start\s*--quiet\s*--oknodo\s*--exec\s*\/usr\/sbin\/VBoxService\)$/\1 -- --disable-timesync/g' /etc/init.d/virtualbox-guest-utils || true
@@ -295,4 +297,4 @@ Unattended-Upgrade::Automatic-Reboot-Time "02:00";' | sudo tee /etc/apt/apt.conf
 else
     echo "SCION periodic upgrade service and timer files are not provided."
 fi
-echo "SCION install script done."
+echo "done. (SCION install script)"
