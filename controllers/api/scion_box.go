@@ -15,7 +15,6 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -444,8 +443,8 @@ func (s *SCIONBoxController) serveGen(userMail string, w http.ResponseWriter, r 
 	// Send the gzip file to the Box
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
-	w.Header().Set("Content-Transfer-Encoding", "binary")
-	http.ServeContent(w, r, fileName, time.Now(), bytes.NewReader(data))
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	w.Write(data)
 }
 
 //get the source IP from a http request

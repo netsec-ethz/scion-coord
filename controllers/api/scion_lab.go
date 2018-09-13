@@ -15,7 +15,6 @@
 package api
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -805,8 +804,8 @@ func (s *SCIONLabASController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 	}
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
-	w.Header().Set("Content-Transfer-Encoding", "binary")
-	http.ServeContent(w, r, fileName, time.Now(), bytes.NewReader(data))
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	w.Write(data);
 }
 
 func logAndSendError(w http.ResponseWriter, errorMsgFmt string, parms ...interface{}) string {
@@ -1021,8 +1020,8 @@ func (s *SCIONLabASController) RemapASDownloadGen(w http.ResponseWriter, r *http
 	log.Printf("Remap: serving new GEN for %v -> %v", asID, mappedIA)
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
-	w.Header().Set("Content-Transfer-Encoding", "binary")
-	http.ServeContent(w, r, fileName, time.Now(), bytes.NewReader(data))
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	w.Write(data)
 }
 
 // RemapASConfirmStatus receives confirmation from a user AS that they applied the mapping.
