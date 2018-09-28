@@ -118,6 +118,9 @@ echo "Update branch is: ${UPDATE_BRANCH}"
 
 cd $SC
 
+echo "Emptying cache..."
+rm -f gen-cache/*
+
 git_username=$(git config user.name || true)
 if [ -z "$git_username" ]
 then
