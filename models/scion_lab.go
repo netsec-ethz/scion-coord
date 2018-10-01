@@ -711,7 +711,7 @@ func (as *SCIONLabAS) DeleteConnectionFromDB(cnInfo *ConnectionInfo) error {
 	return cn.Delete()
 }
 
-func (as *SCIONLabAS) FlagAllConnectionsToApToBeDeleted(apIA string) error {
+func (as *SCIONLabAS) FlagAllConnectionsToAPToBeDeleted(apIA string) error {
 	cns, err := as.GetJoinConnectionInfo()
 	if err != nil {
 		return fmt.Errorf("Error looking up connections of SCIONLab AS for AS %v: %v", as.IAString(), err)
