@@ -706,7 +706,7 @@ func preserveCerts(asInfo *SCIONLabASInfo) error {
 	if _, err := os.Stat(src); os.IsNotExist(err) {
 		log.Printf("First time generating certificates for %s", packageName)
 		src, dst = dst, src
-		dst = filepath.Join(dst, "V0")
+		dst = filepath.Join(dst, "V1")
 		err = os.MkdirAll(dst, 0700)
 		if err != nil {
 			return fmt.Errorf("Error preserving certificates. Cannot mkdir %s: %v", dst, err)
