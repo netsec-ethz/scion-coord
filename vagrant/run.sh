@@ -46,11 +46,11 @@ run_linux() {
             echo "[SCIONLabVM] $VB is already installed"
         else
             echo "[SCIONLabVM] Installing $VB"
-            # add source and update only once, for performance reasons
-            sudo bash -c 'echo deb http://vagrant-deb.linestarve.com/ any main > /etc/apt/sources.list.d/wolfgang42-vagrant.list'
-            sudo apt-key adv --keyserver pgp.mit.edu --recv-key AD319E0F7CFFA38B4D9F6E55CE3F3DE92099F7A4
-            sudo apt-get update
-            sudo apt-get --no-remove --yes install $VB
+            wget -q https://www.virtualbox.org/download/oracle_vbox_2016.asc -O- | sudo apt-key add -
+            wget -q https://www.virtualbox.org/download/oracle_vbox.asc -O- | sudo apt-key add -
+            sudo sh -c 'echo "deb http://download.virtualbox.org/virtualbox/debian xenial contrib" >> /etc/apt/sources.list.d/virtualbox.list'
+            sudo apt remove virtualbox virtualbox-5.1 || true
+            sudo apt-get --no-remove --yes install virtualbox-5.2
         fi
         VERS=$(vagrant version | grep "Installed Version:" | sed -n 's/^Installed Version: \(.*\)$/\1/p')
         if verleq 1.9 $VERS; then
@@ -60,7 +60,12 @@ run_linux() {
             while true; do
                 read -p "[SCIONLabVM] Do you want upgrade $VG now? If no, it will terminate SCIONLabVM immediately. [y/n]" yesno
                 case $yesno in
-                    [Yy]*) sudo apt-get install --only-upgrade $VG; break;;
+                    [Yy]*)
+                        sudo bash -c 'echo deb http://vagrant-deb.linestarve.com/ any main > /etc/apt/sources.list.d/wolfgang42-vagrant.list'
+                        sudo apt-key adv --keyserver pgp.mit.edu --recv-key AD319E0F7CFFA38B4D9F6E55CE3F3DE92099F7A4
+                        sudo apt-get update
+                        sudo apt-get install --only-upgrade $VG;
+                    break;;
                     [Nn]*) echo "[SCIONLabVM] Closing SCIONLabVM installation."; exit 1;;
                     *) ;;
                 esac
