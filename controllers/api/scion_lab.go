@@ -667,6 +667,9 @@ func generateLocalGen(asInfo *SCIONLabASInfo) error {
 	errOutput, _ := ioutil.ReadAll(cmdErr)
 	fmt.Printf("STDOUT generateLocalGen: %s\n", stdOutput)
 	fmt.Printf("ERROUT generateLocalGen: %s\n", errOutput)
+	if len(errOutput) != 0 {
+		return fmt.Errorf("generate local gen command reported errors: %s", errOutput)
+	}
 	return nil
 }
 
