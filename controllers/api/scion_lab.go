@@ -287,6 +287,7 @@ func (s *SCIONLabASController) ConfigureSCIONLabAS(w http.ResponseWriter, r *htt
 	if err != nil {
 		log.Print(err)
 		s.Error500(w, err, "Error generating the configuration")
+		return
 	}
 
 	// Persist the relevant data into the DB
@@ -496,7 +497,7 @@ func (s *SCIONLabASController) updateDB(asInfo *SCIONLabASInfo) error {
 	if asInfo.IsNewConnection {
 		// flag the old connections for deletion:
 		if asInfo.OldAP != "" {
-			asInfo.LocalAS.FlagAllConnectionsToApToBeDeleted(asInfo.OldAP)
+			asInfo.LocalAS.FlagAllConnectionsToAPToBeDeleted(asInfo.OldAP)
 		}
 		// update the Connections table
 		newCn := models.Connection{
@@ -666,6 +667,9 @@ func generateLocalGen(asInfo *SCIONLabASInfo) error {
 	errOutput, _ := ioutil.ReadAll(cmdErr)
 	fmt.Printf("STDOUT generateLocalGen: %s\n", stdOutput)
 	fmt.Printf("ERROUT generateLocalGen: %s\n", errOutput)
+	if len(errOutput) != 0 {
+		return fmt.Errorf("generate local gen command reported errors: %s", errOutput)
+	}
 	return nil
 }
 
@@ -805,7 +809,7 @@ func (s *SCIONLabASController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
 	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
-	w.Write(data);
+	w.Write(data)
 }
 
 func logAndSendError(w http.ResponseWriter, errorMsgFmt string, parms ...interface{}) string {
