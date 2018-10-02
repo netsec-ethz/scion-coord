@@ -48,7 +48,8 @@ run_linux() {
             echo "[SCIONLabVM] Installing $VB"
             # add source and update only once, for performance reasons
             sudo bash -c 'echo deb http://vagrant-deb.linestarve.com/ any main > /etc/apt/sources.list.d/wolfgang42-vagrant.list'
-            sudo apt-key adv --keyserver pgp.mit.edu --recv-key AD319E0F7CFFA38B4D9F6E55CE3F3DE92099F7A4
+            sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-key AD319E0F7CFFA38B4D9F6E55CE3F3DE92099F7A4 \
+              || { echo "[SCIONLabVM] Fatal: Failed to retrieve key for the vagrant-deb.linestarve.com repository."; exit 1; }
             sudo apt-get update
             sudo apt-get --no-remove --yes install $VB
         fi
