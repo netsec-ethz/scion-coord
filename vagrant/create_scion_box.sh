@@ -45,8 +45,17 @@ done
 # if do_package==1, it will also run `vagrant package` to get a .box file that can be uploaded to vagrant cloud
 # for more info see https://www.vagrantup.com/docs/vagrant-cloud/boxes/create-version.html
 if [ $do_create -eq 1 ]; then
+    FILES=("../scion_install_script.sh"
+           "../files/vagrant_box/scion.service"
+           "../files/vagrant_box/scionupgrade.service"
+           "../files/vagrant_box/scionupgrade.timer"
+           "../files/vagrant_box/scionupgrade.sh"
+           "../files/vagrant_box/scion-viz.service")
+    for f in "${FILES[@]}"; do
+        cp "$f" .
+    done
+
     echo '------------------------------------ destroying old VMs'
-    cp ../scion_install_script.sh .
     vagrant destroy -f
     VAGRANT_VAGRANTFILE=Vagrantfile-bootstrap vagrant destroy -f
     echo '------------------------------------ updating vagrant boxes'
@@ -55,6 +64,10 @@ if [ $do_create -eq 1 ]; then
     VAGRANT_VAGRANTFILE=Vagrantfile-bootstrap vagrant up
     echo '------------------------------------ creating base vagrant VM'
     vagrant up --provision
+
+    for f in "${FILES[@]}"; do
+        rm $(basename $f)
+    done
 fi
 
 if [ $do_package -eq 1 ]; then
