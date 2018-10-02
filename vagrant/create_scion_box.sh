@@ -16,45 +16,45 @@ where:
     -j          only package the VM (don't create it)"
 
 while getopts ":hpj" opt; do
-  case $opt in
-    p)
-      do_package=1
-      ;;
-    j)
-      do_create=0
-      do_package=1
-      ;;
-    h)
-      echo "$usage" >&2
-      exit 0
-      ;;
-    \?)
-      echo "Invalid option: -$OPTARG" >&2
-      echo "$usage" >&2
-      exit 1
-      ;;
-    :)
-      echo "Option -$OPTARG requires an argument." >&2
-      echo "$usage" >&2
-      exit 1
-      ;;
-  esac
+    case $opt in
+        p)
+            do_package=1
+            ;;
+        j)
+            do_create=0
+            do_package=1
+            ;;
+        h)
+            echo "$usage" >&2
+            exit 0
+            ;;
+        \?)
+            echo "Invalid option: -$OPTARG" >&2
+            echo "$usage" >&2
+            exit 1
+            ;;
+        :)
+            echo "Option -$OPTARG requires an argument." >&2
+            echo "$usage" >&2
+            exit 1
+            ;;
+    esac
 done
 
 # running this script will create a new vagrant virtual machine with scion installed and ready to work
 # if do_package==1, it will also run `vagrant package` to get a .box file that can be uploaded to vagrant cloud
 # for more info see https://www.vagrantup.com/docs/vagrant-cloud/boxes/create-version.html
 if [ $do_create -eq 1 ]; then
-  echo '------------------------------------ destroying old VMs'
-  cp ../scion_install_script.sh .
-  vagrant destroy -f
-  VAGRANT_VAGRANTFILE=Vagrantfile-bootstrap vagrant destroy -f
-  echo '------------------------------------ updating vagrant boxes'
-  VAGRANT_VAGRANTFILE=Vagrantfile-bootstrap vagrant box update
-  echo '------------------------------------ creating bootstrap vagrant VM'
-  VAGRANT_VAGRANTFILE=Vagrantfile-bootstrap vagrant up
-  echo '------------------------------------ creating base vagrant VM'
-  vagrant up --provision
+    echo '------------------------------------ destroying old VMs'
+    cp ../scion_install_script.sh .
+    vagrant destroy -f
+    VAGRANT_VAGRANTFILE=Vagrantfile-bootstrap vagrant destroy -f
+    echo '------------------------------------ updating vagrant boxes'
+    VAGRANT_VAGRANTFILE=Vagrantfile-bootstrap vagrant box update
+    echo '------------------------------------ creating bootstrap vagrant VM'
+    VAGRANT_VAGRANTFILE=Vagrantfile-bootstrap vagrant up
+    echo '------------------------------------ creating base vagrant VM'
+    vagrant up --provision
 fi
 
 if [ $do_package -eq 1 ]; then
