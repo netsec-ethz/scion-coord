@@ -56,8 +56,9 @@ var (
 	scionPath       = filepath.Join(githubPath, "scionproto", "scion")
 	scionUtilPath   = filepath.Join(scionCoordPath, "sub", "util")
 	pythonPath      = filepath.Join(scionPath, "python")
-	vagrantPath     = filepath.Join(scionCoordPath, "vagrant")
 	auxFilesPath    = filepath.Join(scionCoordPath, "files")
+	dedicatedPath   = filepath.Join(auxFilesPath, "dedicated_box")
+	vagrantPath     = filepath.Join(auxFilesPath, "vagrant_box")
 	PackagePath     = config.PackageDirectory
 	BoxPackagePath  = filepath.Join(PackagePath, "SCIONBox")
 	credentialsPath = filepath.Join(scionCoordPath, "credentials")
@@ -679,11 +680,10 @@ func addAuxiliaryFiles(asInfo *SCIONLabASInfo) error {
 	userPackagePath := asInfo.UserPackagePath()
 	log.Printf("Adding auxiliary files to the package %v", asInfo.UserPackageName())
 	if asInfo.LocalAS.Type == models.Dedicated {
-		dedicatedAuxFiles := filepath.Join(auxFilesPath, "dedicated_box")
-		err := utility.CopyPath(dedicatedAuxFiles, userPackagePath)
+		err := utility.CopyPath(dedicatedPath, userPackagePath)
 		if err != nil {
 			return fmt.Errorf("failed to copy files for user %v: src: %v, dst: %v, %v",
-				userEmail, dedicatedAuxFiles, userPackagePath, err)
+				userEmail, dedicatedPath, userPackagePath, err)
 		}
 	}
 	return nil
