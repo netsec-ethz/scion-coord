@@ -825,7 +825,7 @@ func packageConfiguration(asInfo *SCIONLabASInfo) error {
 		}
 	}
 
-	cmd := exec.Command("tar", "zcvf", userPackageName+".tar.gz", userPackageName)
+	cmd := exec.Command("tar", "czf", userPackageName+".tar.gz", userPackageName)
 	cmd.Dir = PackagePath
 	err := cmd.Start()
 	if err == nil {
