@@ -287,6 +287,7 @@ func (s *SCIONLabASController) ConfigureSCIONLabAS(w http.ResponseWriter, r *htt
 	if err != nil {
 		log.Print(err)
 		s.Error500(w, err, "Error generating the configuration")
+		return
 	}
 
 	// Persist the relevant data into the DB
@@ -731,7 +732,7 @@ func packageConfiguration(asInfo *SCIONLabASInfo) error {
 		}
 	}
 
-	cmd := exec.Command("tar", "zcvf", userPackageName+".tar.gz", userPackageName)
+	cmd := exec.Command("tar", "czf", userPackageName+".tar.gz", userPackageName)
 	cmd.Dir = PackagePath
 	err := cmd.Start()
 	if err == nil {
@@ -805,7 +806,7 @@ func (s *SCIONLabASController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
 	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
-	w.Write(data);
+	w.Write(data)
 }
 
 func logAndSendError(w http.ResponseWriter, errorMsgFmt string, parms ...interface{}) string {
