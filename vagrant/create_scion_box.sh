@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION="0.0.1.2"
+VERSION="1.0.0"
 BASE=$(realpath $(dirname "$0"))
 cd "$BASE"
 
