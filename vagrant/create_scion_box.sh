@@ -8,7 +8,7 @@ cd "$BASE"
 
 do_create=1
 do_package=0
-usage="$(basename "$0") [-p]
+usage="$(basename "$0") [-h | -p | -j]
 
 where:
     -h          this help
@@ -77,9 +77,7 @@ if [ $do_package -eq 1 ]; then
     vagrant destroy -f
     echo '------------------------------------ locally adding base vagrant VM'
     vagrant box remove -f scion/ubuntu-16.04-64-scion --all || true
-    cp metadata-template.json /tmp/metadata.json
-    sed -i -- "s|_VERSION_|$VERSION|g" /tmp/metadata.json
-    sed -i -- "s|_DIRFULLPATH_|$BASE|g" /tmp/metadata.json
+    sed -e "s|_VERSION_|$VERSION|g;s|_DIRFULLPATH_|$BASE|g" < metadata-template.json > /tmp/metadata.json
     vagrant box add /tmp/metadata.json
 fi
 echo "Done."
