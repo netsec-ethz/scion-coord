@@ -195,7 +195,7 @@ then
 
     cp "$scion_service_path" "$tempfile"
     # We need to replace template user with current username
-    sed -i "s/_USER_/$USER/g" "$tempfile"
+    sed -i "s|_USER_|$USER|g;s|/usr/local/go/bin|$(dirname $(which go))|g" "$tempfile"
     sudo cp "$tempfile" /etc/systemd/system/scion.service
     sudo systemctl enable scion.service
     sudo systemctl start scion.service
@@ -245,7 +245,7 @@ then
     echo "Registering SCION periodic upgrade service"
 
     cp "$upgrade_service" "$tempfile"
-    sed -i "s/_USER_/$USER/g" "$tempfile"
+    sed -i "s|_USER_|$USER|g;s|/usr/local/go/bin|$(dirname $(which go))|g" "$tempfile"
     sudo cp "$tempfile" /etc/systemd/system/scionupgrade.service
     rm "$tempfile"
 
