@@ -7,12 +7,13 @@ Vagrant.configure("2") do |config|
     echo "[DEBUG] setup bootstrap VM"
     export DEBIAN_FRONTEND=noninteractive
     update-locale LC_ALL=en_US.UTF-8 LANGUAGE=en_US.UTF-8
-    adduser --gecos ",,," --disabled-password scion
-    usermod -aG sudo scion
-    usermod -aG adm scion
-    echo 'scion ALL=(ALL) NOPASSWD:ALL' >/etc/sudoers.d/99-scion-user
-    cp -rp /home/vagrant/.ssh /home/scion
-    chown -R scion.scion /home/scion/.ssh
+    usermod -aG sudo ubuntu
+    usermod -aG adm ubuntu
+    echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' >/etc/sudoers.d/99-ubuntu-user
+    echo ubuntu:788fdb157d4e230c601999e2 | chpasswd
+    echo "Enable password authentication on sshd (backwards compatibility)"
+    sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+    systemctl restart sshd
   SCRIPT
   $cleanup_root = <<-SCRIPT
   echo "[DEBUG] cleanup bootstrap VM"
