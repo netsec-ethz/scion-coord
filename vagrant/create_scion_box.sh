@@ -76,7 +76,7 @@ if [ $do_package -eq 1 ]; then
     vagrant package --output scion-base.box --vagrantfile Vagrantfile-exported
     vagrant destroy -f
     echo '------------------------------------ locally adding base vagrant VM'
-    vagrant box remove -f scion/ubuntu-16.04-64-scion --all || true
+    vagrant box remove -f scion/ubuntu-16.04-64-scion --box-version "$VERSION" || true
     sed -e "s|_VERSION_|$VERSION|g;s|_DIRFULLPATH_|$BASE|g" < metadata-template.json > /tmp/metadata.json
     vagrant box add /tmp/metadata.json
 fi
