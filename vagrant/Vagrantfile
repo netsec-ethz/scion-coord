@@ -7,6 +7,8 @@ Vagrant.configure("2") do |config|
     set -e
     echo "[DEBUG] ******** setup root BASE VM"
     export DEBIAN_FRONTEND=noninteractive
+    echo "remove other users than ubuntu"
+    sudo deluser --remove-home vagrant
     echo "Adding repositories and updating list"
     sudo add-apt-repository ppa:longsleep/golang-backports
     sudo apt-get update
@@ -14,16 +16,12 @@ Vagrant.configure("2") do |config|
     sudo apt-get install -y --no-remove ntp golang-1.9-go
     echo 'export PATH="/usr/lib/go-1.9/bin:$PATH"' >> ~/.profile
     . ~/.profile
-    echo "remove other users than scion"
-    sudo deluser --remove-home ubuntu
-    sudo deluser --remove-home vagrant
   SCRIPT
   $cleanup_root = <<-SCRIPT
     echo "[DEBUG] ******** cleanup root BASE VM"
     apt-get autoremove --purge -y
     apt-get clean -y
     apt-get autoclean -y
-    
     # Remove bash history
     unset HISTFILE
     rm -f /root/.bash_history
@@ -55,7 +53,8 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", privileged: false, run: "once", inline: $setup_root
   config.vm.provision "shell", privileged: false, run: "always", inline: $setup_scion
   config.vm.provision "shell", privileged: true, run: "once", inline: $cleanup_root
-  config.ssh.username = "scion"
+  config.ssh.username = "ubuntu"
+  config.ssh.password = "788fdb157d4e230c601999e2"
   # https://github.com/hashicorp/vagrant/issues/5186
   config.ssh.insert_key = false
 end
