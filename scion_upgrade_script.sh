@@ -18,6 +18,7 @@ check_system_files() {
     for f in "${FILES_TO_CHECK[@]}"; do
         VERS=$(grep "^# SCION upgrade version" "$f" | sed -n 's/^# SCION upgrade version \([0-9\.]*\).*$/\1/p')
         if ! verleq "$SERVICE_CURRENT_VERSION" "$VERS"; then
+            echo "Service file ($f) too old ($VERS < $SERVICE_CURRENT_VERSION)"
             # need to upgrade. (1) get the file with wget. (2) copy the file (3) reload systemd things
             bf=$(basename $f)
             tmpfile=$(mktemp)
@@ -27,6 +28,7 @@ check_system_files() {
             need_to_reload=1
         fi
     done
+    echo "Need To Reload = $need_to_reload"
     if [ $need_to_reload -eq 1 ]; then
         if [ -d "/vagrant" ]; then # iff this is a VM
             echo "VM detected, checking time synchronization mechanism ..."
@@ -70,6 +72,8 @@ check_system_files() {
 Unattended-Upgrade::Automatic-Reboot "true";
 Unattended-Upgrade::Automatic-Reboot-Time "02:00";' | sudo tee /etc/apt/apt.conf.d/51unattended-upgrades >/dev/null
             fi
+        else
+            echo "Detected not inside VM"
         fi
         # don't attempt to stop the scionupgrade service as this script is a child of it and will also be killed !
         # even with KillMode=none in the service file, restarting the service here would be really delicate, as it
@@ -102,7 +106,7 @@ DEFAULT_BRANCH_NAME="scionlab"
 REMOTE_REPO="origin"
 SCION_COORD_URL="https://www.scionlab.org"
 
-echo "Invoking update script with $ACCOUNT_ID $ACCOUNT_SECRET $IA"
+echo "Invoking update script with IA=$IA, id=$ACCOUNT_ID, secret=$ACCOUNT_SECRET."
 
 # systemd files upgrade:
 check_system_files
@@ -134,7 +138,7 @@ echo "Running git fetch $REMOTE_REPO $UPDATE_BRANCH &>/dev/null"
 git fetch "$REMOTE_REPO" "$UPDATE_BRANCH" &>/dev/null
 head_commit=$(git rev-parse "$REMOTE_REPO"/"$UPDATE_BRANCH")
 [[ $(git branch "$UPDATE_BRANCH" --contains "$head_commit" 2>/dev/null | wc -l) -gt 0 ]] && needtoreset=0 || needtoreset=1
-[[ -f "scionupgrade.auto.begin" ]] && [[ -f "scionupgrade.auto.end" ]] && dirtybuild=0 || dirtybuild=1
+[[ -f "scionupgrade.auto.begin" ]] && [[ ! -f "scionupgrade.auto.end" ]] && dirtybuild=1 || dirtybuild=0
 echo "Need to reset? $needtoreset . Dirty build? $dirtybuild"
 if [ $needtoreset -eq 0 ] && [ $dirtybuild -eq 0 ]; then
     echo "SCION version is already up to date and ready!"
@@ -192,7 +196,7 @@ else
         echo "Swap space removed."
     fi
     echo "Starting SCION again..."
-    ./scion.sh start || true
+    ./scion.sh start nobuild || true
 fi
 # update scion-viz
 if [ -d "./sub/scion-viz" ]; then
