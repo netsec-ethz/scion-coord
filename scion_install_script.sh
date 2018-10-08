@@ -198,12 +198,11 @@ then
     sed -i "s|_USER_|$USER|g;s|/usr/local/go/bin|$(dirname $(which go))|g" "$tempfile"
     sudo cp "$tempfile" /etc/systemd/system/scion.service
     sudo systemctl enable scion.service
-    sudo systemctl start scion.service
-
+    sudo systemctl restart scion.service || true
     rm "$tempfile"
 else
     echo "SCION systemd service file not specified! SCION won't run automatically on startup."
-    ./scion.sh start
+    ./scion.sh start nobuild
 fi
 
 if  [[ ( ! -z ${scion_viz_service+x} ) && -r ${scion_viz_service} ]]
