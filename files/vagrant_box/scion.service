@@ -1,7 +1,7 @@
 [Unit]
 Description=SCION infrastructure
-After=network-online.target
-Wants=network-online.target
+After=network-online.target openvpn.service
+Wants=network-online.target openvpn.service
 
 [Service]
 Type=oneshot
