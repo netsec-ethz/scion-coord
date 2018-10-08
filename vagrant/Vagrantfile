@@ -6,6 +6,7 @@ Vagrant.configure("2") do |config|
   $setup_root = <<-SCRIPT
     set -e
     echo "[DEBUG] ******** setup root BASE VM"
+    sudo cp /vagrant/apt-get /usr/local/sbin/
     export DEBIAN_FRONTEND=noninteractive
     echo "remove other users than ubuntu"
     sudo deluser --remove-home vagrant
