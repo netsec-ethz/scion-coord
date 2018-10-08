@@ -7,6 +7,27 @@ build_dir="./docker/_build"
 dst_path="${build_dir}/scion-coord.git/"
 
 
+# version less or equal. E.g. verleq 1.9 2.0.8  == true (1.9 <= 2.0.8)
+verleq() {
+    [ ! -z "$1" ] && [ ! -z "$2" ] && [ "$1" = `echo -e "$1\n$2" | sort -V | head -n1` ]
+}
+
+check_docker_binaries() {
+    # example of `docker --version` :
+    # Docker version 17.03.2-ce, build f5ec1e2
+    V=$(docker --version | awk '{print $3}')
+    verleq "18.01" "$V" && return 0 || return 1
+}
+
+install_docker_binaries() {
+    sudo apt-get -y purge 'docker*'
+    echo 'deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable' | sudo tee /etc/apt/sources.list.d/docker.list
+    sudo apt-get update
+    sudo apt-get install -y docker-ce
+    # sudo apt-get -y install docker.io
+    sudo usermod -aG docker "$USER"
+}
+
 build() {
     build_scion_image
 
@@ -55,6 +76,7 @@ copy_tree() {
     set -o pipefail
     echo "Copying current working tree for Docker image"
     echo "============================================="
+    [[ ! -f ./sub/scion-box/.git ]] && { echo "Run `git submodule update` and try again"; exit 1; }
     mkdir -p "${build_dir:?}"
     # Just in case it's sitting there from a previous run
     rm -rf "$dst_path"
@@ -74,11 +96,15 @@ where:
     rebuild         force-builds the Coordinator and test containers
     test            runs the tests"
 
+f=''
 case "$1" in
-    build)          build ;;
-    rebuild)        rebuild ;;
-    test)           test ;;
-    *)              echo "$usage";;
+    build)          f=build ;;
+    rebuild)        f=rebuild ;;
+    test)           f=test ;;
+    *)              echo "$usage"; exit 0 ;;
 esac
 
+check_docker_binaries || { echo "Installing updated docker ..."; install_docker_binaries; }
+# run the function stored above
+$f
 
