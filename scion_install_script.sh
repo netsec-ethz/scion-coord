@@ -132,7 +132,7 @@ if [ ! -d scion ]; then
         echo "Finished applying patches"
     fi
 
-    echo "Building dependencies"
+    echo "Installing dependencies"
     bash -c 'yes | GO_INSTALL=true ./env/deps'
     echo "Building SCION"
     ./scion.sh build
