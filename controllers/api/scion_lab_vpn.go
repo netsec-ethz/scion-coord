@@ -124,7 +124,7 @@ func cleanVPNKeys(asInfo *SCIONLabASInfo) error {
 	// write contents to index.txt:
 	dbData, err := ioutil.ReadFile(dbFile)
 	if err != nil {
-		return nil
+		return err
 	}
 	id := vpnUserID(userEmail, userASID)
 	newData := []byte{}
@@ -139,10 +139,7 @@ func cleanVPNKeys(asInfo *SCIONLabASInfo) error {
 		return err
 	}
 	err = ioutil.WriteFile(dbFile, newData, 0664)
-	if err != nil {
-		return nil
-	}
-	return nil
+	return err
 }
 
 // Creates the keys for VPN setup
