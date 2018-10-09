@@ -93,16 +93,11 @@ func cleanVPNKeys(asInfo *SCIONLabASInfo) error {
 	userEmail := asInfo.LocalAS.UserEmail
 	userASID := asInfo.LocalAS.ASID
 	p := vpnKeyPath(userEmail, userASID)
-	_, err := os.Stat(p)
-	if err == nil {
-		err = os.Remove(p)
-	} else if !os.IsNotExist(err) {
-		err = fmt.Errorf("Cleaning VPN keys: error when stat on %s: %v", p, err)
-	}
-	if err != nil {
-		msg := fmt.Sprintf("Cleaning VPN keys: could not remove file under %s: %v", p, err)
-		log.Print(msg)
-		return fmt.Errorf(msg)
+	err := os.Remove(p)
+	if err != nil && !os.IsNotExist(err) {
+		err = fmt.Errorf("Cleaning VPN keys: could not remove file under %s: %v", p, err)
+		log.Print(err)
+		return err
 	}
 	p = vpnCertPath(userEmail, userASID)
 	_, err = os.Stat(p)
