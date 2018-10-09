@@ -19,6 +19,7 @@ Vagrant.configure("2") do |config|
     . ~/.profile
   SCRIPT
   $cleanup_root = <<-SCRIPT
+    set -e
     echo "[DEBUG] ******** cleanup root BASE VM"
     apt-get autoremove --purge -y
     apt-get clean -y
