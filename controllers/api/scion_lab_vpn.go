@@ -118,12 +118,11 @@ func cleanVPNKeys(asInfo *SCIONLabASInfo) error {
 	}
 	// find the key in the TXT DB and remove it:
 	dbFile := filepath.Join(RSAKeyPath, "index.txt")
-	os.Remove(dbFile + ".bak")
-	dbData, err := ioutil.ReadFile(dbFile)
-	if err != nil {
-		return nil
+	if err = utility.RotateFiles(dbFile+".bak", 4); err != nil {
+		return err
 	}
-	err = ioutil.WriteFile(dbFile+".bak", dbData, 0664)
+	// write contents to index.txt:
+	dbData, err := ioutil.ReadFile(dbFile)
 	if err != nil {
 		return nil
 	}
@@ -135,6 +134,9 @@ func cleanVPNKeys(asInfo *SCIONLabASInfo) error {
 		if strings.Index(line, id) == -1 {
 			newData = append(newData, line...)
 		}
+	}
+	if err = os.Rename(dbFile, dbFile+".bak"); err != nil {
+		return err
 	}
 	err = ioutil.WriteFile(dbFile, newData, 0664)
 	if err != nil {

@@ -246,3 +246,43 @@ func GetTimeCutoff(r *http.Request) int64 {
 	log.Printf("[DEBUG] Using UTC time delta: %d (now is %d)", cutoff, now)
 	return cutoff
 }
+
+// RotateFiles will rename existing files with a suffix .N up to n to "make room" for a new file
+// E.g. if we have {file.bak.1, file.bak, file.bak.2} filename_fixed_part would be "file.bak",
+// and with n=2 we will remove the exiting file.bak.2 and rename file.bak to file.bak.1, and
+// file.bak.1 to file.bak.2
+func RotateFiles(filePath string, n int) error {
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return nil // filename already available
+	}
+	lastToRename := 1
+	for ; lastToRename < n; lastToRename++ {
+		fileName := filePath + fmt.Sprintf(".%d", lastToRename)
+		if _, err := os.Stat(fileName); err != nil {
+			if os.IsNotExist(err) {
+				break
+			} else {
+				return fmt.Errorf("Could no stat %s: %v", fileName, err)
+			}
+		}
+	}
+	// possibly delete the last file, if present
+	fileName := filePath + fmt.Sprintf(".%d", lastToRename)
+	if err := os.Remove(fileName); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("Cannot remove file %s; %v", fileName, err)
+	}
+	lastToRename--
+	// rename those required
+	for i := lastToRename; i > 0; i-- {
+		oldName := filePath + fmt.Sprintf(".%d", i)
+		newName := filePath + fmt.Sprintf(".%d", i+1)
+		if err := os.Rename(oldName, newName); err != nil {
+			return fmt.Errorf("Cannot rename %s to %s: %v", oldName, newName, err)
+		}
+	}
+	newName := filePath + ".1"
+	if err := os.Rename(filePath, newName); err != nil {
+		return fmt.Errorf("Cannot rename %s to %s: %v", filePath, newName, err)
+	}
+	return nil
+}
