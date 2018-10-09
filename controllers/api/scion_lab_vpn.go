@@ -30,27 +30,26 @@ import (
 )
 
 func generateVPNConfig(asInfo *SCIONLabASInfo) error {
-	return generateVPNConfigWithRetries(asInfo, 2)
+	config, err := readVPNConfig(asInfo)
+	if err != nil {
+		err = cleanVPNKeys(asInfo)
+		if err == nil {
+			config, err = readVPNConfig(asInfo)
+		}
+	}
+	if err != nil {
+		return err
+	}
+	err = utility.FillTemplateAndSave("templates/client.conf.tmpl", config,
+		filepath.Join(asInfo.UserPackagePath(), "client.conf"))
+	return err
 }
 
 // Generates client keys and configuration necessary for a VPN-based setup
-func generateVPNConfigWithRetries(asInfo *SCIONLabASInfo, retriesLeft int) error {
-	if retriesLeft <= 0 { // safeguard (just in case)
-		return fmt.Errorf("Generating the VPN configuration: no more retries (see messages above)")
-	}
-	retry := func(originalError error) error {
-		err := originalError
-		if retriesLeft > 1 {
-			err = cleanVPNKeys(asInfo)
-			if err == nil {
-				err = generateVPNConfigWithRetries(asInfo, retriesLeft-1)
-			}
-		}
-		return err
-	}
+func readVPNConfig(asInfo *SCIONLabASInfo) (map[string]string, error) {
 	log.Printf("Creating VPN config for SCIONLab AS")
 	if err := generateVPNKeys(asInfo); err != nil {
-		return retry(err)
+		return nil, err
 	}
 	userEmail := asInfo.LocalAS.UserEmail
 	userASID := asInfo.LocalAS.ASID
@@ -58,23 +57,22 @@ func generateVPNConfigWithRetries(asInfo *SCIONLabASInfo, retriesLeft int) error
 	var caCert, clientCert, clientKey []byte
 	caCert, err := ioutil.ReadFile(CACertPath)
 	if err != nil {
-		return retry(fmt.Errorf("error reading CA certificate file: %v", err))
+		return nil, fmt.Errorf("error reading CA certificate file: %v", err)
 	}
 	vpnCertPath := vpnCertPath(userEmail, userASID)
 	clientCert, err = ioutil.ReadFile(vpnCertPath)
 	if err != nil {
-		return retry(fmt.Errorf("error reading VPN certificate file for user %v: %v", userEmail, err))
+		return nil, fmt.Errorf("error reading VPN certificate file for user %v: %v", userEmail, err)
 	}
 	clientCertStr := string(clientCert)
 	startCert := strings.Index(clientCertStr, "-----BEGIN CERTIFICATE-----")
 	if startCert < 0 {
-		return retry(
-			fmt.Errorf("Internal error: certificate file %s exists but wrong contents. Will try one more time",
-				vpnCertPath))
+		return nil, fmt.Errorf("Internal error: certificate file %s exists but wrong contents. Will try one more time",
+			vpnCertPath)
 	}
 	clientKey, err = ioutil.ReadFile(vpnKeyPath(userEmail, userASID))
 	if err != nil {
-		return retry(fmt.Errorf("error reading VPN key file for user %v: %v", userEmail, err))
+		return nil, fmt.Errorf("error reading VPN key file for user %v: %v", userEmail, err)
 	}
 	config := map[string]string{
 		"ServerIP":   asInfo.VPNServerIP,
@@ -83,9 +81,7 @@ func generateVPNConfigWithRetries(asInfo *SCIONLabASInfo, retriesLeft int) error
 		"ClientCert": clientCertStr[startCert:],
 		"ClientKey":  string(clientKey),
 	}
-	err = utility.FillTemplateAndSave("templates/client.conf.tmpl", config,
-		filepath.Join(asInfo.UserPackagePath(), "client.conf"))
-	return err
+	return config, nil
 }
 
 // removes the files for the VPN keys
