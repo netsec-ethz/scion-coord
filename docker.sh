@@ -76,7 +76,8 @@ copy_tree() {
     set -o pipefail
     echo "Copying current working tree for Docker image"
     echo "============================================="
-    [[ ! -f ./sub/scion-box/.git ]] && { echo "Run `git submodule update` and try again"; exit 1; }
+    # check (somehow) that scion-box is present
+    [ ! -f ./sub/scion-box/scripts/install_attachment_point.sh ] && { echo 'Error: bad scion-box submodule. Run "git submodule update --remote; git submodule update" and try again'; exit 1; }
     mkdir -p "${build_dir:?}"
     # Just in case it's sitting there from a previous run
     rm -rf "$dst_path"
