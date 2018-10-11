@@ -39,4 +39,4 @@ RUN bash -c 'source ./vars && ./clean-all && ./pkitool --initca'
 WORKDIR ${SCIONCOORD}
 COPY --chown=scion ./docker/testscripts/test1.sh ${SCIONCOORD}/docker/testscripts/test1.sh
 
-ENTRYPOINT ${SCIONCOORD}/docker/testscripts/test1.sh
+ENTRYPOINT /tests/test1.sh
