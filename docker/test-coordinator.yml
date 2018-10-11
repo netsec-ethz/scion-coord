@@ -19,6 +19,8 @@ services:
       - zookeeper1
 
     image: "scionlab-coord-test:latest"
+    volumes:
+      - ./testscripts/:/tests
     # build:
     #   dockerfile: "./docker/Dockerfile-coord"
     #   dockerfile: "./docker/Dockerfile-coord-test"
