@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configure a coordinator service and test SCION works with it
-
+sleep 20
 set -e
 
 # check and export paths:
@@ -15,7 +15,7 @@ SCIONCOORD="$NETSEC/scion-coord"
 SCIONBOXLOCATION="$SCIONCOORD/sub/scion-box"
 CONFDIR="$HOME/scionLabConfigs"
 EASYRSADEFAULT="$SCIONCOORD/conf/easy-rsa_vars.default"
-TESTTIMEOUT=8
+TESTTIMEOUT=20
 
 ACC_ID="someid"
 ACC_PW="some_secret"
@@ -87,7 +87,10 @@ sql="INSERT INTO scion_coord_test.scion_lab_as
 (id, user_email,                    public_ip,   start_port, label,        isd, as_id,             status, type,  created, updated)
 VALUES
 (2, 'netsec.test.email@gmail.com', '$INTF_ADDR', 50000,      'old AS12',   1,   0xff0000000111,    1,      0,     now(),   now());"
+echo "Inserting AS for user 'netsec.test.email@gmail.com'"
+echo "echo $sql | $MYSQLCMD 2>&1"
 out=$(runSQL "$sql") && stat=0 || stat=$?
+echo $out
 
 sql="INSERT INTO scion_coord_test.attachment_point
 (vpn_ip, start_vpn_ip, end_vpn_ip, as_id)
@@ -96,7 +99,7 @@ FROM scion_coord_test.scion_lab_as WHERE user_email='netsec.test.email@gmail.com
 out=$(runSQL "$sql") && stat=0 || stat=$?
 
 # run SCION Coordinator in the background:
-./scion-coord &
+./scion-coord 2>&1 &
 scionCoordPid=$!
 
 # wait until the Coordinator HTTP service is up, or 5 seconds
@@ -104,7 +107,6 @@ timeout 5 bash -c "until curl --output /dev/null --silent --head --fail $SCION_C
     echo 'Waiting for SCION Coord. Service to be up ...'
     sleep 1
 done"
-
 
 # TEST SCION COORDINATOR. The requests don't need to have all these headers, but hey were just copied from Chrome for convenience
 echo "Querying SCION Coordinator Service to create an AS, configure it and download its gen folder definition..."
@@ -123,8 +125,17 @@ if [ ! -f "$GENFOLDERTMP/ffaa_1_1.tgz" ]; then
     echo -e "Cannot find the (presumably) downloaded file $GENFOLDERTMP/ffaa_1_1.tgz\nFAIL"
     exit 101
 fi
+if [ $(file "$GENFOLDERTMP/ffaa_1_1.tgz" | awk '{print $2}') != "gzip" ]; then
+    echo -e "The downloaded file $GENFOLDERTMP/ffaa_1_1.tgz is not a valid gzip file.\nFAIL"
+    exit 102
+fi
 cd "$GENFOLDERTMP"
-tar xf "ffaa_1_1.tgz"
+
+echo "gunzipping"
+gunzip "ffaa_1_1.tgz"
+
+echo "Untaring"
+tar xf "ffaa_1_1.tar"
 if [ ! -d "netsec.test.email@gmail.com_1-ffaa_1_1/gen/ISD1/ASffaa_1_1" ]; then
     echo -e "Unknown TGZ structure. Cannot continue\nABORT"
     exit 1

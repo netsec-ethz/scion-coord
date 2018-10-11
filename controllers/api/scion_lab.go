@@ -799,9 +799,9 @@ func (s *SCIONLabASController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 	}
 	as, err := models.FindSCIONLabASByUserEmailAndASID(uSess.Email, asID)
 	if err != nil || as.Status == models.Inactive || as.Status == models.Remove {
-		log.Printf("No active configuration found for user %v\n", uSess.Email)
-		s.BadRequest(w, nil, "No active configuration found for user %v",
-			uSess.Email)
+		log.Printf("No active configuration found for user %v, asID %v\n", uSess.Email, asID)
+		s.BadRequest(w, nil, "No active configuration found for user %v, asID %v",
+			uSess.Email, asID)
 		return
 	}
 
