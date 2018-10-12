@@ -53,6 +53,13 @@ runSQL "CREATE DATABASE scion_coord_test;" || (echo "Failed to create the SCION 
 # create the initial tables:
 cd "$SCIONCOORD"
 rm -f scion-coord
+# Stop previous run
+scioncoord_pid="$(ps aux | grep "\./scion-coord" | grep -v grep | awk '{print $2}')"
+if [[ ${scioncoord_pid} != "" ]]; then
+    echo "./scion-coord already running at PID ${scioncoord_pid}, killing PID ${scioncoord_pid}"
+    kill ${scioncoord_pid}
+fi
+# Build coordinator and check it is runnable
 go build
 ./scion-coord --help >/dev/null
 
