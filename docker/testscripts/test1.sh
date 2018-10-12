@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # Configure a coordinator service and test SCION works with it
-sleep 20
 set -e
 
 # check and export paths:
@@ -95,7 +94,6 @@ sql="INSERT INTO scion_coord_test.scion_lab_as
 VALUES
 (2, 'netsec.test.email@gmail.com', '$INTF_ADDR', 50000,      'old AS12',   1,   0xff0000000111,    1,      0,     now(),   now());"
 echo "Inserting AS for user 'netsec.test.email@gmail.com'"
-echo "echo $sql | $MYSQLCMD 2>&1"
 out=$(runSQL "$sql") && stat=0 || stat=$?
 echo $out
 
