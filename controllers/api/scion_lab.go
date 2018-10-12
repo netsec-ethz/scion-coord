@@ -58,6 +58,7 @@ var (
 	vagrantPath     = filepath.Join(scionCoordPath, "vagrant")
 	auxFilesPath    = filepath.Join(scionCoordPath, "files")
 	PackagePath     = config.PackageDirectory
+	CertsPath       = "certs"
 	BoxPackagePath  = filepath.Join(PackagePath, "SCIONBox")
 	credentialsPath = filepath.Join(scionCoordPath, "credentials")
 	EasyRSAPath     = filepath.Join(PackagePath, "easy-rsa")
@@ -235,6 +236,11 @@ func generateGenForAS(asInfo *SCIONLabASInfo) error {
 	if err = generateLocalGen(asInfo); err != nil {
 		return fmt.Errorf("Error generating local config: %v", err)
 	}
+	// preserve certificates (don't use new ones if we had certs already)
+	if err = preserveCerts(asInfo); err != nil {
+		return fmt.Errorf("Error reusing existing certificates")
+	}
+
 	// Generate VPN config if this is a VPN setup
 	if asInfo.IsVPN {
 		if err = generateVPNConfig(asInfo); err != nil {
@@ -685,6 +691,90 @@ func addAuxiliaryFiles(asInfo *SCIONLabASInfo) error {
 				userEmail, dedicatedAuxFiles, userPackagePath, err)
 		}
 	}
+	return nil
+}
+
+func preserveCerts(asInfo *SCIONLabASInfo) error {
+	packageName := asInfo.UserPackageName()
+	log.Printf("Trying to preserve certificates for %s", packageName)
+	src := filepath.Join(PackagePath, CertsPath, packageName)
+	dst := filepath.Join(asInfo.UserPackagePath(),
+		"gen",
+		fmt.Sprintf("ISD%d", asInfo.LocalAS.ISD),
+		fmt.Sprintf("AS%s", asInfo.LocalAS.IA().A.FileFmt()),
+	)
+	dstSubDirs := []string{"."}
+	if _, err := os.Stat(dst); os.IsNotExist(err) {
+		return fmt.Errorf("Path should exist but does not (%s): %v", dst, err)
+	}
+	if _, err := os.Stat(src); os.IsNotExist(err) {
+		log.Printf("First time generating certificates for %s", packageName)
+		src, dst = dst, src
+		dst = filepath.Join(dst, "V1")
+		err = os.MkdirAll(dst, 0700)
+		if err != nil {
+			return fmt.Errorf("Error preserving certificates. Cannot mkdir %s: %v", dst, err)
+		}
+		src = filepath.Join(src, "endhost")
+	} else if err != nil {
+		return fmt.Errorf("Error when stat on path %s: %v", src, err)
+	} else {
+		log.Printf("We have certificates for %s", packageName)
+		fileInfos, err := ioutil.ReadDir(src)
+		if err != nil {
+			return fmt.Errorf("Could not read directory %s: %v", src, err)
+		}
+		versions := []string{}
+		for _, f := range fileInfos {
+			name := f.Name()
+			if f.IsDir() && strings.HasPrefix(name, "V") {
+				versions = append(versions, name)
+			}
+		}
+		if len(versions) < 1 {
+			return fmt.Errorf("No versions inside the certificate directory for %s", packageName)
+		}
+		sort.Sort(sort.Reverse(sort.StringSlice(versions)))
+		src = filepath.Join(src, versions[0])
+		fileInfos, err = ioutil.ReadDir(dst)
+		if err != nil {
+			return fmt.Errorf("Could not read directory %s: %v", dst, err)
+		}
+		dstSubDirs = nil
+		for _, f := range fileInfos {
+			name := f.Name()
+			if f.IsDir() && strings.HasPrefix(name, "br") ||
+				strings.HasPrefix(name, "cs") ||
+				strings.HasPrefix(name, "bs") ||
+				strings.HasPrefix(name, "ps") ||
+				name == "endhost" {
+				dstSubDirs = append(dstSubDirs, name)
+			}
+		}
+	}
+	// copy from src to dst
+	thingsToCopy := []string{
+		"certs",
+		"keys"}
+	for _, dir := range thingsToCopy {
+		srcItem := filepath.Join(src, dir)
+		_, err := os.Stat(srcItem)
+		if err != nil {
+			return fmt.Errorf("Could not read the directory %s", srcItem)
+		}
+		for _, dstSubDir := range dstSubDirs {
+			dstItem := filepath.Join(dst, dstSubDir, dir)
+			err = os.MkdirAll(dstItem, 0700)
+			if err != nil {
+				return fmt.Errorf("Could not mkdir part of the destination path %s: %v", dstItem, err)
+			}
+			err = utility.CopyPath(srcItem, dstItem)
+			if err != nil {
+				return fmt.Errorf("Could not fully copy %s to %s: %v", srcItem, dstItem, err)
+			}
+		}
+	}
+	log.Printf("Preserve certificates completed")
 	return nil
 }
 
