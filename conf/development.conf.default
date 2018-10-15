@@ -92,7 +92,7 @@ mtu = 1472
 # Maximal number of border routers in one AS
 max_br_id = 1000
 # First ID given to users' ASes
-base_as_id = 1000
+base_as_id = ffaa:1:0
 # Reserve first few BR IDs of Infrastructure ASes for custom configuration
 reserved_brs_infrastructure = 10
 # Maximal number of ASes a user or admin can have
