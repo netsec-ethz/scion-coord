@@ -45,30 +45,32 @@ run_linux() {
         if dpkg --get-selections | grep -q "^$VB.*[[:space:]]\{1,\}install$" >/dev/null; then
             echo "[SCIONLabVM] $VB is already installed"
         else
-            echo "[SCIONLabVM] Installing $VB"
-            # add source and update only once, for performance reasons
-            sudo bash -c 'echo deb http://vagrant-deb.linestarve.com/ any main > /etc/apt/sources.list.d/wolfgang42-vagrant.list'
-            sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-key AD319E0F7CFFA38B4D9F6E55CE3F3DE92099F7A4 \
-              || { echo "[SCIONLabVM] Fatal: Failed to retrieve key for the vagrant-deb.linestarve.com repository."; exit 1; }
-            sudo apt-get update
-            sudo apt-get --no-remove --yes install $VB
-        fi
-        VERS=$(vagrant version | grep "Installed Version:" | sed -n 's/^Installed Version: \(.*\)$/\1/p')
-        if verleq 1.9 $VERS; then
-            echo "[SCIONLabVM] $VG is already installed"
-        elif dpkg --get-selections | grep -q "^$VG[[:space:]]*install$" >/dev/null; then
-            echo "[SCIONLabVM] ${RED}Warning!${NC} Current version of $VG in your system is out of date."
             while true; do
-                read -p "[SCIONLabVM] Do you want upgrade $VG now? If no, it will terminate SCIONLabVM immediately. [y/n]" yesno
+                read -p "[SCIONLabVM] Do you want to install/upgrade $VB now? If no, it will terminate SCIONLabVM immediately. [y/n]" yesno
                 case $yesno in
-                    [Yy]*) sudo apt-get install --only-upgrade $VG; break;;
+                    [Yy]*)
+                        echo "[SCIONLabVM] Installing $VB"
+                        sudo apt-get --no-remove --yes install virtualbox
+                    break;;
                     [Nn]*) echo "[SCIONLabVM] Closing SCIONLabVM installation."; exit 1;;
                     *) ;;
                 esac
             done
+        fi
+        if dpkg --get-selections | grep -q "^$VG.*[[:space:]]\{1,\}install$" >/dev/null; then
+            echo "[SCIONLabVM] $VG is already installed"
         else
-            echo "[SCIONLabVM] Installing $VG"
-            sudo apt-get --no-remove --yes install $VG
+            while true; do
+                read -p "[SCIONLabVM] Do you want to install/upgrade $VG now? If no, it will terminate SCIONLabVM immediately. [y/n]" yesno
+                case $yesno in
+                    [Yy]*)
+                        echo "[SCIONLabVM] Installing $VG"
+                        sudo apt-get --no-remove --yes install $VG
+                    break;;
+                    [Nn]*) echo "[SCIONLabVM] Closing SCIONLabVM installation."; exit 1;;
+                    *) ;;
+                esac
+            done
         fi
         run_vagrant
     else
