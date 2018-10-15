@@ -19,6 +19,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/scionproto/scion/go/lib/addr"
@@ -241,5 +242,161 @@ func TestMapOldIAToNewOne(t *testing.T) {
 			t.Errorf("FAILED mapping #%d (%v,%v) -> (%v,%v). Should be (%v,%v)", index, c.fromISD, c.fromAS, IA.I, IA.A, c.toISD, c.toAS)
 		}
 	}
-	// t.Errorf("we are done")
+}
+
+func TestRotateFiles(t *testing.T) {
+	dirName, err := ioutil.TempDir("", "utility_ut_")
+	if err != nil {
+		t.Fatalf("Error: %v", err)
+	}
+	defer os.RemoveAll(dirName)
+	dir, err := os.Open(dirName)
+	if err != nil {
+		t.Fatalf("failed to open directory %s: %v", dirName, err)
+	}
+	// create new file temp/a.txt
+	filename := filepath.Join(dirName, "a.txt")
+	if err := ioutil.WriteFile(filename, []byte("0\n"), 0666); err != nil {
+		t.Fatalf("Error: %v", err)
+	}
+	if err := RotateFiles(filename, 2); err != nil {
+		t.Fatalf("Error: %v", err)
+	}
+	// check we have now a.txt.1 and nothing else
+	names, err := dir.Readdirnames(-1)
+	if err != nil {
+		t.Fatalf("error listing directory %s: %v", dirName, err)
+	}
+	if len(names) != 1 || names[0] != "a.txt.1" {
+		t.Fatalf("Unexpected directory contents: %v", names)
+	}
+	// write new file temp/a.txt
+	if err := ioutil.WriteFile(filename, []byte("1\n"), 0666); err != nil {
+		t.Fatalf("Error: %v", err)
+	}
+	if err := RotateFiles(filename, 2); err != nil {
+		t.Fatalf("Error: %v", err)
+	}
+	if _, err = dir.Seek(0, 0); err != nil {
+		t.Fatalf("Error: %v", err)
+	}
+	if names, err = dir.Readdirnames(-1); err != nil {
+		t.Fatalf("error listing directory %s: %v", dirName, err)
+	}
+	sort.Strings(names)
+	if len(names) != 2 || names[0] != "a.txt.1" || names[1] != "a.txt.2" {
+		t.Fatalf("Unexpected directory contents: %v", names)
+	}
+	b, err := ioutil.ReadFile(filename + ".2")
+	if err != nil {
+		t.Fatalf("Could not read file %s: %v", filename+".2", err)
+	}
+	if string(b) != "0\n" {
+		t.Fatal("Wrong content")
+	}
+	b, err = ioutil.ReadFile(filename + ".1")
+	if err != nil {
+		t.Fatalf("Could not read file %s: %v", filename+".1", err)
+	}
+	if string(b) != "1\n" {
+		t.Fatal("Wrong content")
+	}
+}
+
+// TestRotateFilesExistingFiles is similar to TestRotateFiles but it rotates the files with some
+// files already in the directory
+func TestRotateFilesExistingFiles(t *testing.T) {
+	dirName, err := ioutil.TempDir("", "utility_ut_")
+	if err != nil {
+		t.Fatalf("Error: %v", err)
+	}
+	defer os.RemoveAll(dirName)
+	dir, err := os.Open(dirName)
+	if err != nil {
+		t.Fatalf("failed to open directory %s: %v", dirName, err)
+	}
+	// create new file temp/a.txt
+	filename := filepath.Join(dirName, "a.txt")
+	if err := ioutil.WriteFile(filename+".2", []byte("2\n"), 0666); err != nil {
+		t.Fatalf("Error: %v", err)
+	}
+	if err := ioutil.WriteFile(filename+".3", []byte("3\n"), 0666); err != nil {
+		t.Fatalf("Error: %v", err)
+	}
+	if err := RotateFiles(filename, 2); err != nil {
+		t.Fatalf("Error: %v", err)
+	}
+	names, err := dir.Readdirnames(-1)
+	if err != nil {
+		t.Fatalf("error listing directory %s: %v", dirName, err)
+	}
+	sort.Strings(names)
+	if len(names) != 2 || names[0] != "a.txt.2" || names[1] != "a.txt.3" {
+		t.Fatalf("Unexpected directory contents: %v", names)
+	}
+	if err := ioutil.WriteFile(filename, []byte("0\n"), 0666); err != nil {
+		t.Fatalf("Error: %v", err)
+	}
+	if err := RotateFiles(filename, 2); err != nil {
+		t.Fatalf("Error: %v", err)
+	}
+	if _, err = dir.Seek(0, 0); err != nil {
+		t.Fatalf("Error: %v", err)
+	}
+	if names, err = dir.Readdirnames(-1); err != nil {
+		t.Fatalf("error listing directory %s: %v", dirName, err)
+	}
+	sort.Strings(names)
+	if len(names) != 3 || names[0] != "a.txt.1" || names[1] != "a.txt.2" || names[2] != "a.txt.3" {
+		t.Fatalf("Unexpected directory contents: %v", names)
+	}
+	var b []byte
+	if b, err = ioutil.ReadFile(filename + ".1"); err != nil {
+		t.Fatalf("Could not read file %s: %v", filename+".1", err)
+	} else if string(b) != "0\n" {
+		t.Fatal("Wrong content")
+	}
+	if b, err = ioutil.ReadFile(filename + ".2"); err != nil {
+		t.Fatalf("Could not read file %s: %v", filename+".2", err)
+	} else if string(b) != "2\n" {
+		t.Fatal("Wrong content")
+	}
+	if b, err = ioutil.ReadFile(filename + ".3"); err != nil {
+		t.Fatalf("Could not read file %s: %v", filename+".3", err)
+	} else if string(b) != "3\n" {
+		t.Fatal("Wrong content")
+	}
+
+	// now write again the new file:
+	if err := ioutil.WriteFile(filename, []byte("00\n"), 0666); err != nil {
+		t.Fatalf("Error: %v", err)
+	}
+	if err := RotateFiles(filename, 2); err != nil {
+		t.Fatalf("Error: %v", err)
+	}
+	if _, err = dir.Seek(0, 0); err != nil {
+		t.Fatalf("Error: %v", err)
+	}
+	if names, err = dir.Readdirnames(-1); err != nil {
+		t.Fatalf("error listing directory %s: %v", dirName, err)
+	}
+	sort.Strings(names)
+	if len(names) != 3 || names[0] != "a.txt.1" || names[1] != "a.txt.2" || names[2] != "a.txt.3" {
+		t.Fatalf("Unexpected directory contents: %v", names)
+	}
+	if b, err = ioutil.ReadFile(filename + ".1"); err != nil {
+		t.Fatalf("Could not read file %s: %v", filename+".1", err)
+	} else if string(b) != "00\n" {
+		t.Fatal("Wrong content")
+	}
+	if b, err = ioutil.ReadFile(filename + ".2"); err != nil {
+		t.Fatalf("Could not read file %s: %v", filename+".2", err)
+	} else if string(b) != "0\n" {
+		t.Fatal("Wrong content")
+	}
+	if b, err = ioutil.ReadFile(filename + ".3"); err != nil {
+		t.Fatalf("Could not read file %s: %v", filename+".3", err)
+	} else if string(b) != "3\n" { // not modified
+		t.Fatal("Wrong content")
+	}
 }

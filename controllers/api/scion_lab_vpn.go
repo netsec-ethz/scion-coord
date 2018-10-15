@@ -15,6 +15,8 @@
 package api
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -27,11 +29,27 @@ import (
 	"github.com/scionproto/scion/go/lib/addr"
 )
 
-// Generates client keys and configuration necessary for a VPN-based setup
 func generateVPNConfig(asInfo *SCIONLabASInfo) error {
+	config, err := readVPNConfig(asInfo)
+	if err != nil {
+		err = cleanVPNKeys(asInfo)
+		if err == nil {
+			config, err = readVPNConfig(asInfo)
+		}
+	}
+	if err != nil {
+		return err
+	}
+	err = utility.FillTemplateAndSave("templates/client.conf.tmpl", config,
+		filepath.Join(asInfo.UserPackagePath(), "client.conf"))
+	return err
+}
+
+// Generates client keys and configuration necessary for a VPN-based setup
+func readVPNConfig(asInfo *SCIONLabASInfo) (map[string]string, error) {
 	log.Printf("Creating VPN config for SCIONLab AS")
 	if err := generateVPNKeys(asInfo); err != nil {
-		return err
+		return nil, err
 	}
 	userEmail := asInfo.LocalAS.UserEmail
 	userASID := asInfo.LocalAS.ASID
@@ -39,21 +57,23 @@ func generateVPNConfig(asInfo *SCIONLabASInfo) error {
 	var caCert, clientCert, clientKey []byte
 	caCert, err := ioutil.ReadFile(CACertPath)
 	if err != nil {
-		return fmt.Errorf("error reading CA certificate file: %v", err)
+		return nil, fmt.Errorf("error reading CA certificate file: %v", err)
 	}
-	clientCert, err = ioutil.ReadFile(vpnCertPath(userEmail, userASID))
+	vpnCertPath := vpnCertPath(userEmail, userASID)
+	clientCert, err = ioutil.ReadFile(vpnCertPath)
 	if err != nil {
-		return fmt.Errorf("error reading VPN certificate file for user %v: %v",
-			userEmail, err)
+		return nil, fmt.Errorf("error reading VPN certificate file for user %v: %v", userEmail, err)
 	}
 	clientCertStr := string(clientCert)
 	startCert := strings.Index(clientCertStr, "-----BEGIN CERTIFICATE-----")
+	if startCert < 0 {
+		return nil, fmt.Errorf("Internal error: certificate file %s exists but wrong contents. Will try one more time",
+			vpnCertPath)
+	}
 	clientKey, err = ioutil.ReadFile(vpnKeyPath(userEmail, userASID))
 	if err != nil {
-		return fmt.Errorf("error reading VPN key file for user %v: %v",
-			userEmail, err)
+		return nil, fmt.Errorf("error reading VPN key file for user %v: %v", userEmail, err)
 	}
-
 	config := map[string]string{
 		"ServerIP":   asInfo.VPNServerIP,
 		"ServerPort": fmt.Sprintf("%v", asInfo.VPNServerPort),
@@ -61,31 +81,78 @@ func generateVPNConfig(asInfo *SCIONLabASInfo) error {
 		"ClientCert": clientCertStr[startCert:],
 		"ClientKey":  string(clientKey),
 	}
+	return config, nil
+}
 
-	if err := utility.FillTemplateAndSave("templates/client.conf.tmpl",
-		config, filepath.Join(asInfo.UserPackagePath(), "client.conf")); err != nil {
+// removes the files for the VPN keys
+func cleanVPNKeys(asInfo *SCIONLabASInfo) error {
+	userEmail := asInfo.LocalAS.UserEmail
+	userASID := asInfo.LocalAS.ASID
+	p := vpnKeyPath(userEmail, userASID)
+	err := os.Remove(p)
+	if err != nil && !os.IsNotExist(err) {
+		err = fmt.Errorf("Cleaning VPN keys: could not remove file under %s: %v", p, err)
+		log.Print(err)
 		return err
 	}
-
-	return nil
+	p = vpnCertPath(userEmail, userASID)
+	_, err = os.Stat(p)
+	if err == nil {
+		err = os.Remove(p)
+	} else if !os.IsNotExist(err) {
+		err = fmt.Errorf("Cleaning VPN keys: error when stat on %s: %v", p, err)
+	}
+	if err != nil {
+		msg := fmt.Sprintf("Cleaning VPN keys: could not remove file under %s: %v", p, err)
+		log.Print(msg)
+		return fmt.Errorf(msg)
+	}
+	// find the key in the TXT DB and remove it:
+	dbFile := filepath.Join(RSAKeyPath, "index.txt")
+	if err = utility.RotateFiles(dbFile+".bak", 4); err != nil {
+		return err
+	}
+	// write contents to index.txt:
+	dbData, err := ioutil.ReadFile(dbFile)
+	if err != nil {
+		return err
+	}
+	id := vpnUserID(userEmail, userASID)
+	newData := []byte{}
+	scanner := bufio.NewScanner(bytes.NewReader(dbData))
+	for scanner.Scan() {
+		line := scanner.Text() + "\n"
+		if strings.Index(line, id) == -1 {
+			newData = append(newData, line...)
+		}
+	}
+	if err = os.Rename(dbFile, dbFile+".bak"); err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(dbFile, newData, 0664)
+	return err
 }
 
 // Creates the keys for VPN setup
 func generateVPNKeys(asInfo *SCIONLabASInfo) error {
 	userEmail := asInfo.LocalAS.UserEmail
 	userASID := asInfo.LocalAS.ASID
-	log.Printf("Generating RSA keys")
-	if _, err := os.Stat(vpnKeyPath(userEmail, userASID)); err == nil {
-		log.Printf("Previous VPN keys exist")
+	log.Printf("Getting RSA keys for %s %s", userEmail, userASID)
+	_, err := os.Stat(vpnKeyPath(userEmail, userASID))
+	if err == nil {
+		_, err = os.Stat(vpnCertPath(userEmail, userASID))
+	}
+	if err == nil {
+		log.Print("Previous VPN keys exist")
 	} else if os.IsNotExist(err) {
+		log.Print("Missing files, will generate them")
 		cmd := exec.Command("/bin/bash", "-c", "source vars; ./build-key --batch "+
 			vpnUserID(userEmail, userASID))
 		cmd.Dir = EasyRSAPath
 		cmdOut, _ := cmd.StdoutPipe()
 		cmdErr, _ := cmd.StderrPipe()
 		if err := cmd.Run(); err != nil {
-			log.Printf("Error during generation of VPN keys for user %v: %v", userEmail,
-				err)
+			log.Printf("Error during generation of VPN keys for user %v: %v", userEmail, err)
 			return err
 		}
 
@@ -95,8 +162,7 @@ func generateVPNKeys(asInfo *SCIONLabASInfo) error {
 		fmt.Printf("STDOUT generateVPNKeys: %s\n", stdOutput)
 		fmt.Printf("ERROUT generateVPNKeys: %s\n", errOutput)
 	} else {
-		log.Printf("Error checking for existence of VPN keys for user %v: %v", userEmail,
-			err)
+		log.Printf("Error checking for existence of VPN keys for user %v: %v", userEmail, err)
 		return err
 	}
 
