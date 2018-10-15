@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 # Configure a coordinator service and test SCION works with it
 set -e
 
@@ -121,8 +122,6 @@ curl "$SCION_COORD_URL/api/login" -H 'Content-Type: application/json;charset=UTF
 curl "$SCION_COORD_URL/api/as/generateAS" -X POST -H 'Content-Length: 0' -b cookies.txt -s >/dev/null
 curl "$SCION_COORD_URL/api/as/configureAS" -H 'Content-Type: application/json;charset=UTF-8' -b cookies.txt --data-binary '{"asID":281105609588737,"userEmail":"netsec.test.email@gmail.com","isVPN":false,"ip":"127.0.0.210","serverIA":"1-ff00:0:111","label":"Label for ASffaa:1:1 (old AS1001)","type":2,"port":50050}' -s >/dev/null
 GENFOLDERTMP=$(mktemp -d)
-rm -rf "$GENFOLDERTMP"
-mkdir -p "$GENFOLDERTMP"
 curl "$SCION_COORD_URL/api/as/downloadTarball/ffaa_1_1" -b cookies.txt --output "$GENFOLDERTMP/ffaa_1_1.tgz" -s >/dev/null
 rm -f cookies.txt
 
@@ -183,18 +182,9 @@ echo "Checking logs for successful arrival of beacons to the new AS (or $TESTTIM
 FOUND=false
 exec 4>&2
 exec 2>/dev/null
-# run timeout tail in a subshell because we need the while read loop in this one, to set FOUND to true iff found
-exec 3< <(timeout $TESTTIMEOUT tail -n0 -f "$SC/logs/bs1-ffaa_1_1-1.DEBUG")
-exec 2>&4 4>&-
-SSPID=$!
-while read -u 3 LINE; do
-    if echo $LINE | grep 'Successfully verified PCB' &> /dev/null; then
-        FOUND=true
-        pkill -P $SSPID "timeout" &> /dev/null || true
-    fi
-done
 
-if [[ "$FOUND" = true ]]; then
+# Check PCBs are received by the user AS
+if timeout $TESTTIMEOUT sh -c 'tail -n0 -f "$SC/logs/bs1-ffaa_1_1-1.DEBUG" | grep -q "Successfully verified PCB"'; then
     echo "SUCCESS"
     exit 0
 else
