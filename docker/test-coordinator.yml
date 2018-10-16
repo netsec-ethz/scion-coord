@@ -1,0 +1,31 @@
+version: '3'
+services:
+  mysql:
+    image: "mysql/mysql-server:5.7"
+    environment:
+      MYSQL_ROOT_PASSWORD: development_pass
+      MYSQL_ROOT_HOST: '%'
+
+  zookeeper1:
+    image: "zookeeper"
+    logging:
+      driver: none
+
+  test:
+    # call e.g.
+    # docker-compose -f docker/test-coordinator.yml up --abort-on-container-exit --exit-code-from test
+    depends_on:
+      - mysql
+      - zookeeper1
+
+    image: "scionlab-coord-test:latest"
+    volumes:
+      - ./testscripts/:/tests
+    # build:
+    #   dockerfile: "./docker/Dockerfile-coord"
+    #   dockerfile: "./docker/Dockerfile-coord-test"
+    #   context: ..
+    # entrypoint:
+    #   - /bin/bash 
+    #   - -l
+    # entrypoint: sleep 30000
