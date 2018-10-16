@@ -178,12 +178,10 @@ cd "$SC"
 ./scion.sh stop || true
 ./scion.sh start
 
-echo "Checking logs for successful arrival of beacons to the new AS (or $TESTTIMEOUT seconds)..."
-FOUND=false
-exec 4>&2
-exec 2>/dev/null
+# Make sure the log file is there
+touch "${SC}/logs/bs1-ffaa_1_1-1.DEBUG"
 
-# Check PCBs are received by the user AS
+echo "Checking logs for successful arrival of beacons to the new AS (or $TESTTIMEOUT seconds)..."
 if timeout $TESTTIMEOUT sh -c 'tail -n0 -f "$SC/logs/bs1-ffaa_1_1-1.DEBUG" | grep -q "Successfully verified PCB"'; then
     echo "SUCCESS"
     exit 0
