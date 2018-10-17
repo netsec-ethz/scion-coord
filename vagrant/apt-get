@@ -1,4 +1,5 @@
 #!/bin/bash
+# from https://askubuntu.com/a/375031
 
 i=0
 tput sc
