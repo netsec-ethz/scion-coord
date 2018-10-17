@@ -62,6 +62,8 @@ if [ $do_create -eq 1 ]; then
     VAGRANT_VAGRANTFILE=Vagrantfile-bootstrap vagrant box update
     echo '------------------------------------ creating bootstrap vagrant VM'
     VAGRANT_VAGRANTFILE=Vagrantfile-bootstrap vagrant up
+    echo '------------------------------------ stopping bootstrapped VM'
+    VAGRANT_VAGRANTFILE=Vagrantfile-bootstrap vagrant halt || { echo 'Ignoring this error and waiting 10 seconds for VM to completely shutdown'; vagrant status; sleep 10; vagrant status; }
     echo '------------------------------------ creating base vagrant VM'
     vagrant up --provision
 

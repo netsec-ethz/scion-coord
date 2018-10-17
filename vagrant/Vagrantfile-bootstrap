@@ -1,9 +1,10 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
-Vagrant.require_version ">= 1.9.7"
+Vagrant.require_version ">= 1.8.1"
 
 Vagrant.configure("2") do |config|
   $setup_root = <<-SCRIPT
+    set -e
     echo "[DEBUG] setup bootstrap VM"
     export DEBIAN_FRONTEND=noninteractive
     update-locale LC_ALL=en_US.UTF-8 LANGUAGE=en_US.UTF-8
@@ -17,13 +18,14 @@ Vagrant.configure("2") do |config|
   SCRIPT
   $cleanup_root = <<-SCRIPT
   echo "[DEBUG] cleanup bootstrap VM"
+    set -e
     # Remove bash history
     unset HISTFILE
     rm -f /root/.bash_history
     rm -f /home/vagrant/.bash_history
     # Cleanup log files
     find /var/log -type f | while read f; do echo -ne '' > $f; done;
-    echo "All clear"
+    echo "Bootstrap clear"
   SCRIPT
   config.vm.box = "ubuntu/xenial64"
   config.vm.provider "virtualbox" do |vb|
