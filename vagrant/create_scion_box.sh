@@ -74,6 +74,7 @@ fi
 
 if [ $do_package -eq 1 ]; then
     echo '------------------------------------ packaging base vagrant VM'
+    vagrant status | grep "default                   running (virtualbox)" && { vagrant halt || sleep 10; } && vagrant status
     rm -f scion-base.box
     vagrant package --output scion-base.box --vagrantfile Vagrantfile-exported
     vagrant destroy -f
