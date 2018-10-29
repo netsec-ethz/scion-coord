@@ -154,10 +154,10 @@ if [ -f "scion-coord.service" ]; then
 fi
 tmpfile=$(mktemp)
 cp "$files/scion-coord.service" "$tmpfile"
-sed -i -- "s/_USER_/$USER/g" "$tmpfile"
+sed -i "s|_USER_|$USER|g;s|/usr/local/go/bin|$(dirname $(which go))|g" "$tmpfile"
 sudo cp "$tmpfile" "scion-coord.service"
 cp "$files/unit-status-mail@.service" "$tmpfile"
-sed -i -- "s/_USER_/$USER/g" "$tmpfile"
+sed -i "s|_USER_|$USER|g;s|/usr/local/go/bin|$(dirname $(which go))|g" "$tmpfile"
 sudo cp "$tmpfile" "unit-status-mail@.service"
 popd >/dev/null
 sudo cp "$files/emailer.py" "/usr/local/bin/emailer"
