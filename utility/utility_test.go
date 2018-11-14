@@ -251,6 +251,7 @@ var mapASIDFromString = []struct {
 }{
 	{"ffaa_1_1", false, 0xFFAA00010001},
 	{"ffaa:1:1", false, 0xFFAA00010001},
+	{"281105609588737", false, 0xFFAA00010001},
 	{"ffaa-1-1", true, 0x0},
 }
 
@@ -258,10 +259,10 @@ func TestASIDFromString(t *testing.T) {
 	for index, c := range mapASIDFromString {
 		ASID, err := ASIDFromString(c.ASIDStr)
 		if c.expectAnError != (err != nil) {
-			t.Errorf("Error mismatch at case index %d", index)
+			t.Fatalf("Error expectation mismatch at case index %d. Expected error? %v, got error? %v", index, c.expectAnError, err != nil)
 		}
 		if ASID != c.ASID {
-			t.Errorf("Failed case index %d. Expected %d, actual %d", index, c.ASID, ASID)
+			t.Fatalf("Failed case index %d. Expected %d, actual %d", index, c.ASID, ASID)
 		}
 	}
 }

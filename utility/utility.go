@@ -148,13 +148,19 @@ func IAString(isd addr.ISD, as addr.AS) string {
 	return fmt.Sprintf("%d-%d", isd, as)
 }
 
-// Obtain the AS ID from a string like ffaa:1:a or ffaa_1_a
+// Obtain the AS ID from a string like ffaa:1:a or ffaa_1_a or decimal
 func ASIDFromString(ASIDstr string) (addr.AS, error) {
 	asID, err := addr.ASFromString(ASIDstr)
 	if err != nil {
 		asID, err = addr.ASFromFileFmt(ASIDstr, false)
 		if err != nil {
-			err = fmt.Errorf("Cannot parse AS ID %v : %v", ASIDstr, err)
+			var asIDuint uint64
+			asIDuint, err = strconv.ParseUint(ASIDstr, 10, 64)
+			if err != nil {
+				err = fmt.Errorf("Cannot parse AS ID %v : %v", ASIDstr, err)
+			} else {
+				asID = addr.AS(asIDuint)
+			}
 		}
 	}
 	return asID, err
