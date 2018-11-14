@@ -529,8 +529,8 @@ func FindSCIONLabASesByUserEmail(email string) ([]SCIONLabAS, error) {
 	return ases, err
 }
 
-// Find a single SCIONLabAS by UserEmail and the AS ID (can be specified as a string or int)
-func FindSCIONLabASByUserEmailAndASID(email string, asID interface{}) (*SCIONLabAS, error) {
+// Find a single SCIONLabAS by UserEmail and the AS ID
+func FindSCIONLabASByUserEmailAndASID(email string, asID addr.AS) (*SCIONLabAS, error) {
 	as := new(SCIONLabAS)
 	err := o.QueryTable(as).Filter("ASID", asID).Filter("UserEmail", email).RelatedSel().One(as)
 	return as, err
