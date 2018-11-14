@@ -184,6 +184,9 @@ func GetAvailableID(ids []int, min, max int) (int, error) {
 	res := min
 	sort.Ints(ids)
 	for _, x := range ids {
+		if x < min {
+			continue
+		}
 		if res < x {
 			break
 		}
@@ -303,4 +306,19 @@ func RotateFiles(filePath string, n int) error {
 		return fmt.Errorf("Cannot rename %s to %s: %v", filePath, newName, err)
 	}
 	return nil
+}
+
+// GetFreeIP finds the first unused IP in [min,max] excludig all of alreadyInUse
+func GetFreeIP(min, max uint32, alreadyInUse []int) (string, error) {
+	invalidIPs := make(map[int]struct{})
+	for _, ip := range alreadyInUse {
+		invalidIPs[ip|0x000000FF] = struct{}{}   // e.g. 10.0.8.255
+		invalidIPs[ip|0x000000FF+1] = struct{}{} // e.g. 10.0.8.255 +1 = 10.0.9.0
+	}
+	for k := range invalidIPs {
+		fmt.Printf("[%v] = %v\n", k, IntToIP(uint32(k)))
+		alreadyInUse = append(alreadyInUse, k)
+	}
+	newIP, err := GetAvailableID(alreadyInUse, int(min), int(max))
+	return IntToIP(uint32(newIP)), err
 }

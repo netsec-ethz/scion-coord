@@ -260,12 +260,11 @@ func (as *SCIONLabAS) GetFreeVPNIP() (string, error) {
 	var vpnIPs []int
 	for _, cn := range cns {
 		if cn.IsVPN {
-			vpnIPs = append(vpnIPs, int(utility.IPToInt(cn.JoinIP)))
+			IPasInt := int(utility.IPToInt(cn.JoinIP))
+			vpnIPs = append(vpnIPs, IPasInt)
 		}
 	}
-	newIP, err := utility.GetAvailableID(vpnIPs, int(utility.IPToInt(as.AP.StartVPNIP)),
-		int(utility.IPToInt(as.AP.EndVPNIP)))
-	return utility.IntToIP(uint32(newIP)), err
+	return utility.GetFreeIP(utility.IPToInt(as.AP.StartVPNIP), utility.IPToInt(as.AP.EndVPNIP), vpnIPs)
 }
 
 // Only returns the connections of the AS in its function as the joining AS

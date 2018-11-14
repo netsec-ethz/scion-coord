@@ -423,3 +423,21 @@ func TestRotateFilesExistingFiles(t *testing.T) {
 		t.Fatal("Wrong content")
 	}
 }
+
+func TestGetFreeIP(t *testing.T) {
+	// prepare a used range:
+	minStr := "10.0.8.2"
+	maxStr := "10.0.9.254"
+	alreadyInUse := []int{}
+	IP, err := GetFreeIP(IPToInt(minStr), IPToInt(maxStr), alreadyInUse)
+	if err != nil || IP != "10.0.8.2" {
+		t.Fatalf("Unexpected result. IP = %v, err = %v", IP, err)
+	}
+	for i := IPToInt(minStr); i <= IPToInt("10.0.8.254"); i++ {
+		alreadyInUse = append(alreadyInUse, int(i))
+	}
+	IP, err = GetFreeIP(IPToInt(minStr), IPToInt(maxStr), alreadyInUse)
+	if err != nil || IP != "10.0.9.1" {
+		t.Fatalf("Unexpected result. IP = %v, err = %v", IP, err)
+	}
+}
