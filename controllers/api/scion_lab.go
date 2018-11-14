@@ -880,9 +880,9 @@ func (s *SCIONLabASController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 	}
 	vars := mux.Vars(r)
 	asIDstr := vars["as_id"]
-	asID, err := addr.ASFromFileFmt(asIDstr, false)
+	asID, err := utility.ASIDFromString(asIDstr)
 	if err != nil {
-		msg := fmt.Sprintf("Cannot parse AS ID %v : %v", asIDstr, err)
+		msg := err.Error()
 		log.Print(msg)
 		s.BadRequest(w, nil, msg)
 		return
@@ -1177,8 +1177,13 @@ func (s *SCIONLabASController) RemoveSCIONLabAS(w http.ResponseWriter, r *http.R
 	}
 	userEmail := uSess.Email
 	vars := mux.Vars(r)
-	asID := vars["as_id"]
-
+	asIDStr := vars["as_id"]
+	asID, err := utility.ASIDFromString(asIDStr)
+	if err != nil {
+		log.Println(err.Error())
+		s.Error500(w, err, "Bad format")
+		return
+	}
 	// check if there is an active AS which can be removed
 	canRemove, as, cn, err := s.canRemove(userEmail, asID)
 	if err != nil {
@@ -1206,7 +1211,7 @@ func (s *SCIONLabASController) RemoveSCIONLabAS(w http.ResponseWriter, r *http.R
 
 // Check if the user's AS is already removed or in the process of being removed.
 // Can remove a AS only if it is in the Active state.
-func (s *SCIONLabASController) canRemove(userEmail, asID string) (bool, *models.SCIONLabAS,
+func (s *SCIONLabASController) canRemove(userEmail string, asID addr.AS) (bool, *models.SCIONLabAS,
 	*models.ConnectionInfo, error) {
 	as, err := models.FindSCIONLabASByUserEmailAndASID(userEmail, asID)
 	if err != nil {

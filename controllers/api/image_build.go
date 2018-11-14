@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/netsec-ethz/scion-coord/utility"
+
 	"github.com/gorilla/mux"
 
 	"github.com/netsec-ethz/scion-coord/config"
@@ -181,7 +183,13 @@ func (s *SCIONImgBuildController) GenerateImage(w http.ResponseWriter, r *http.R
 
 	// Get configuration file for specified AS
 	vars := mux.Vars(r)
-	asID := vars["as_id"]
+	asIDStr := vars["as_id"]
+	asID, err := utility.ASIDFromString(asIDStr)
+	if err != nil {
+		log.Println(err.Error())
+		s.BadRequest(w, err, "Bad Format")
+		return
+	}
 	as, err := models.FindSCIONLabASByUserEmailAndASID(uSess.Email, asID)
 	if err != nil || as.Status == models.Inactive || as.Status == models.Remove {
 		log.Printf("No active configuration found for user %v with asId %v\n", uSess.Email, asID)

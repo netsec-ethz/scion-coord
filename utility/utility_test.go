@@ -244,6 +244,28 @@ func TestMapOldIAToNewOne(t *testing.T) {
 	}
 }
 
+var mapASIDFromString = []struct {
+	ASIDStr       string
+	expectAnError bool
+	ASID          addr.AS
+}{
+	{"ffaa_1_1", false, 0xFFAA00010001},
+	{"ffaa:1:1", false, 0xFFAA00010001},
+	{"ffaa-1-1", true, 0x0},
+}
+
+func TestASIDFromString(t *testing.T) {
+	for index, c := range mapASIDFromString {
+		ASID, err := ASIDFromString(c.ASIDStr)
+		if c.expectAnError != (err != nil) {
+			t.Errorf("Error mismatch at case index %d", index)
+		}
+		if ASID != c.ASID {
+			t.Errorf("Failed case index %d. Expected %d, actual %d", index, c.ASID, ASID)
+		}
+	}
+}
+
 func TestRotateFiles(t *testing.T) {
 	dirName, err := ioutil.TempDir("", "utility_ut_")
 	if err != nil {
