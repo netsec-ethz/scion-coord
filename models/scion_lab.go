@@ -260,8 +260,7 @@ func (as *SCIONLabAS) GetFreeVPNIP() (string, error) {
 	var vpnIPs []int
 	for _, cn := range cns {
 		if cn.IsVPN {
-			IPasInt := int(utility.IPToInt(cn.JoinIP))
-			vpnIPs = append(vpnIPs, IPasInt)
+			vpnIPs = append(vpnIPs, int(utility.IPToInt(cn.JoinIP)))
 		}
 	}
 	return utility.GetFreeIP(utility.IPToInt(as.AP.StartVPNIP), utility.IPToInt(as.AP.EndVPNIP), vpnIPs)
