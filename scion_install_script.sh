@@ -292,6 +292,25 @@ then
 Unattended-Upgrade::Automatic-Reboot "true";
 Unattended-Upgrade::Automatic-Reboot-Time "02:00";' | sudo tee /etc/apt/apt.conf.d/51unattended-upgrades >/dev/null
         fi
+        if [ ! -x /etc/update-motd.d/99-scionlab-upgrade ]; then
+            cat << "MOTD1" | sudo tee /etc/update-motd.d/99-scionlab-upgrade > /dev/null
+#!/bin/bash
+
+SC=/home/ubuntu/go/src/github.com/scionproto/scion
+cd "$SC"
+[[ -f "scionupgrade.auto.begin" ]] && [[ ! -f "scionupgrade.auto.end" ]] && dirtybuild=1 || dirtybuild=0
+if [ $dirtybuild -eq 1 ]; then
+    printf "\n"
+    printf "===========================================================================\n"
+    printf "================= WARNING !! ==============================================\n"
+    printf "===========================================================================\n"
+    printf " SCIONLab is updating. Please wait until it finishes to run scion.sh start\n"
+    printf "===========================================================================\n"
+    printf "\n"
+fi
+MOTD1
+            sudo chmod 755 /etc/update-motd.d/99-scionlab-upgrade
+        fi
     fi
 else
     echo "SCION periodic upgrade service and timer files are not provided."
