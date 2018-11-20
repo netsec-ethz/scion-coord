@@ -26,6 +26,7 @@ check_system_files() {
             sudo cp "$tmpfile" "$f"
             need_to_reload=1
         fi
+        echo "check_system_files $f : is $VERS < $SERVICE_CURRENT_VERSION ? $need_to_reload"
     done
     if [ $need_to_reload -eq 1 ]; then
         if [ -d "/vagrant" ]; then # iff this is a VM
@@ -69,6 +70,25 @@ check_system_files() {
 };
 Unattended-Upgrade::Automatic-Reboot "true";
 Unattended-Upgrade::Automatic-Reboot-Time "02:00";' | sudo tee /etc/apt/apt.conf.d/51unattended-upgrades >/dev/null
+            fi
+            if [ ! -x /etc/update-motd.d/99-scionlab-upgrade ]; then
+                cat << "MOTD1" | sudo tee /etc/update-motd.d/99-scionlab-upgrade > /dev/null
+#!/bin/bash
+
+SC=/home/ubuntu/go/src/github.com/scionproto/scion
+cd "$SC"
+[[ -f "scionupgrade.auto.begin" ]] && [[ ! -f "scionupgrade.auto.end" ]] && dirtybuild=1 || dirtybuild=0
+if [ $dirtybuild -eq 1 ]; then
+    printf "\n"
+    printf "===========================================================================\n"
+    printf "================= WARNING !! ==============================================\n"
+    printf "===========================================================================\n"
+    printf " SCIONLab is updating. Please wait until it finishes to run scion.sh start\n"
+    printf "===========================================================================\n"
+    printf "\n"
+fi
+MOTD1
+                sudo chmod 755 /etc/update-motd.d/99-scionlab-upgrade
             fi
         fi
         # don't attempt to stop the scionupgrade service as this script is a child of it and will also be killed !
@@ -139,7 +159,10 @@ echo "Need to reset? $needtoreset . Dirty build? $dirtybuild"
 if [ $needtoreset -eq 0 ] && [ $dirtybuild -eq 0 ]; then
     echo "SCION version is already up to date and ready!"
 else
+    rm -f "scionupgrade.auto.end" &>/dev/null
     touch "scionupgrade.auto.begin"
+    # anounce we are upgrading now
+    [ -x /etc/update-motd.d/99-scionlab-upgrade ] && /etc/update-motd.d/99-scionlab-upgrade | wall
     git stash >/dev/null # just in case something was locally modified
     git reset --hard "$REMOTE_REPO"/"$UPDATE_BRANCH"
     # apply platform dependent patches, etc:
@@ -191,8 +214,10 @@ else
         sudo swapoff /tmp/swap || true
         echo "Swap space removed."
     fi
+    # announce we are done with the upgrade
+    printf "SCIONLab has been upgraded. You can now run any command involving scion.sh\n\n" | wall
     echo "Starting SCION again..."
-    ./scion.sh start || true
+    ./scion.sh start nobuild || true
 fi
 # update scion-viz
 if [ -d "./sub/scion-viz" ]; then
