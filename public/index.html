@@ -45,6 +45,8 @@
             ng-class="{ active: isActive('/login') }"><a href="#/login">Login</a></li>
         <li role="presentation" ng-if="isActive('/login') || isActive('/register')"
             ng-class="{ active: isActive('/register') }"><a href="#/register">Register</a></li>
+        <li role="presentation" ng-if="isActive('/login') || isActive('/register') || isActive('/user')"><a href="{{.TutorialsLink}}" alt="SCION and SCIONLab Tutorials">Tutorials</a></li>
+        <li role="presentation" ng-if="isActive('/login') || isActive('/register') || isActive('/user')"><a href="https://www.scion-architecture.net">SCION Architecture</a></li>
         <li role="presentation" ng-if="isActive('/account')" ng-class="{ active:
             isActive('/account') }"><a href="#/account">Account</a></li>
         <li role="presentation" ng-if="user.IsAdmin && (isActive('/user') || isActive('/admin') ||
@@ -59,9 +61,6 @@
       </ul>
     </nav>
     <h3 class="text-muted">SCIONLab Coordination Service</h3>
-    <span>
-      <a target="_blank" href="{{.TutorialsLink}}">(SCION and SCIONLab Tutorials)</a>
-    </span>
   </div>
   <div ng-view></div>
 </div>
