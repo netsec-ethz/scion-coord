@@ -176,13 +176,10 @@ func (s *SCIONLabASController) ConfirmUpdatesFromAP(w http.ResponseWriter, r *ht
 	var failedConfirmations []string
 	var rejectedIAs []rejectedAS
 	for ia, event := range updateLists {
-		IA, err := addr.IAFromString(ia)
+		IA, err := utility.IAFromString(ia)
 		if err != nil {
-			IA, err = addr.IAFromFileFmt(ia, false)
-			if err != nil {
-				err = fmt.Errorf("%v is not a valid SCION IA", ia)
-				return
-			}
+			log.Print(err.Error())
+			return
 		}
 		// ensure ia is always non file format:
 		ia = IA.String()
@@ -621,14 +618,10 @@ func (s *SCIONLabASController) SetConnectionsForAP(w http.ResponseWriter, r *htt
 			response[apIAStr].ShouldTryAgain = true
 			response[apIAStr].FailedASesReasons[ia] = msg
 		}
-		apIA, err := addr.IAFromString(apIAStr)
+		apIA, err := utility.IAFromString(apIAStr)
 		if err != nil {
-			apIA, err = addr.IAFromFileFmt(apIAStr, false)
-			if err != nil {
-				err = fmt.Errorf("%v is not a valid SCION IA", apIAStr)
-				setCriticalError(err.Error())
-				continue
-			}
+			setCriticalError(err.Error())
+			continue
 		}
 		// ensure apIA is always non file format:
 		apIAStr = apIA.String()

@@ -149,7 +149,7 @@ func IAString(isd addr.ISD, as addr.AS) string {
 }
 
 // Obtain the AS ID from a string like ffaa:1:a or ffaa_1_a or decimal
-func ASIDFromString(ASIDstr string) (addr.AS, error) {
+func ASAddrFromString(ASIDstr string) (addr.AS, error) {
 	asID, err := addr.ASFromString(ASIDstr)
 	if err != nil {
 		asID, err = addr.ASFromFileFmt(ASIDstr, false)
@@ -164,6 +164,17 @@ func ASIDFromString(ASIDstr string) (addr.AS, error) {
 		}
 	}
 	return asID, err
+}
+
+func IAFromString(ia string) (addr.IA, error) {
+	IA, err := addr.IAFromString(ia)
+	if err != nil {
+		IA, err = addr.IAFromFileFmt(ia, false)
+		if err != nil {
+			return IA, fmt.Errorf("%v is not a valid SCION IA", ia)
+		}
+	}
+	return IA, nil
 }
 
 // Parses a BR name and returns the BRID

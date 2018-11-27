@@ -184,7 +184,7 @@ func (s *SCIONImgBuildController) GenerateImage(w http.ResponseWriter, r *http.R
 	// Get configuration file for specified AS
 	vars := mux.Vars(r)
 	asIDStr := vars["as_id"]
-	asID, err := utility.ASIDFromString(asIDStr)
+	asID, err := utility.ASAddrFromString(asIDStr)
 	if err != nil {
 		log.Println(err.Error())
 		s.BadRequest(w, err, "Bad Format")

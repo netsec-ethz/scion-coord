@@ -210,11 +210,11 @@ func main() {
 		scionLabASController.RemoveSCIONLabAS))
 	router.Handle("/api/as/downloadTarball/{as_id}", userChain.ThenFunc(
 		scionLabASController.ReturnTarball))
-	router.Handle("/api/as/remapId/{as_id}", loggingChain.ThenFunc(
+	router.Handle("/api/as/remapId/{ia}", loggingChain.ThenFunc(
 		scionLabASController.RemapASIdentityChallengeAndSolution)).Methods(http.MethodGet, http.MethodPost)
-	router.Handle("/api/as/remapIdDownloadGen/{as_id}", loggingChain.ThenFunc(
+	router.Handle("/api/as/remapIdDownloadGen/{ia}", loggingChain.ThenFunc(
 		scionLabASController.RemapASDownloadGen)).Methods(http.MethodPost)
-	router.Handle("/api/as/remapIdConfirmStatus/{as_id}", loggingChain.ThenFunc(
+	router.Handle("/api/as/remapIdConfirmStatus/{ia}", loggingChain.ThenFunc(
 		scionLabASController.RemapASConfirmStatus)).Methods(http.MethodPost)
 	router.Handle("/api/as/getUpdatesForAP/{account_id}/{secret}",
 		apiChain.ThenFunc(scionLabASController.GetUpdatesForAP))
