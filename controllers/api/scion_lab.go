@@ -165,6 +165,9 @@ func ownedASes(r *http.Request) (map[string]struct{}, error) {
 // Check if the account is the owner of the specified IA
 func checkAuthorization(r *http.Request, ia string) (addr.IA, error) {
 	IA, err := utility.IAFromString(ia)
+	if err != nil {
+		return IA, err
+	}
 	// ensure apIA is always non file format:
 	ia = IA.String()
 	ases, err := ownedASes(r)
@@ -874,7 +877,7 @@ func (s *SCIONLabASController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 	}
 	vars := mux.Vars(r)
 	asIDstr := vars["as_id"]
-	asID, err := utility.ASAddrFromString(asIDstr)
+	asID, err := utility.ASIDFromString(asIDstr)
 	if err != nil {
 		msg := err.Error()
 		log.Print(msg)
@@ -926,7 +929,6 @@ func getASAndCheckChallenge(r *http.Request, ia string, verifyChallenge bool) (
 	}
 	request := make(map[string]interface{})
 	json.Unmarshal(body, &request)
-	// TODO rename asID to ia
 	as, err := models.FindSCIONLabASByIAString(ia)
 	if err != nil {
 		return nil, nil, newMappingError(true, "Could not find AS with IA %v", ia)
@@ -1059,14 +1061,13 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 	answer := make(map[string]interface{})
 	answer["error"] = false
 	vars := mux.Vars(r)
-	IA, err := utility.IAFromString(vars["ia"])
+	ia, err := utility.NormalizeIAString(vars["ia"])
 	if err != nil {
 		logAndSendError(w, err.Error())
 		return
 	}
-	ia := IA.String()
 	log.Printf("Remap request from %v. Solving challenge? %v", ia, answeringChallenge)
-	as, _, mapErr := getASAndCheckChallenge(r, IA.String(), answeringChallenge)
+	as, _, mapErr := getASAndCheckChallenge(r, ia, answeringChallenge)
 	if mapErr != nil {
 		mapErr.LogAndNotifyAppropriately(w, mapErr.Error())
 		return
@@ -1102,12 +1103,11 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 // new gen folder for a new ID after the remap on the IDs during the summer of 2018
 func (s *SCIONLabASController) RemapASDownloadGen(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	IA, err := utility.IAFromString(vars["ia"])
+	ia, err := utility.NormalizeIAString(vars["ia"])
 	if err != nil {
 		logAndSendError(w, err.Error())
 		return
 	}
-	ia := IA.String()
 	log.Printf("Remap: request download GEN from %v", ia)
 	as, _, mapErr := getASAndCheckChallenge(r, ia, true)
 	if mapErr != nil {
@@ -1133,12 +1133,11 @@ func (s *SCIONLabASController) RemapASDownloadGen(w http.ResponseWriter, r *http
 // The confirmation is writen in the DB with a timestamp.
 func (s *SCIONLabASController) RemapASConfirmStatus(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	IA, err := utility.IAFromString(vars["ia"])
+	ia, err := utility.NormalizeIAString(vars["ia"])
 	if err != nil {
 		logAndSendError(w, err.Error())
 		return
 	}
-	ia := IA.String()
 	log.Printf("Remap: confirming mapping for %v", ia)
 	as, _, mapErr := getASAndCheckChallenge(r, ia, true)
 	if mapErr != nil {
@@ -1187,7 +1186,7 @@ func (s *SCIONLabASController) RemoveSCIONLabAS(w http.ResponseWriter, r *http.R
 	userEmail := uSess.Email
 	vars := mux.Vars(r)
 	asIDStr := vars["as_id"]
-	asID, err := utility.ASAddrFromString(asIDStr)
+	asID, err := utility.ASIDFromString(asIDStr)
 	if err != nil {
 		log.Println(err.Error())
 		s.Error500(w, err, "Bad format")

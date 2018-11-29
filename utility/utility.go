@@ -149,7 +149,7 @@ func IAString(isd addr.ISD, as addr.AS) string {
 }
 
 // Obtain the AS ID from a string like ffaa:1:a or ffaa_1_a or decimal
-func ASAddrFromString(ASIDstr string) (addr.AS, error) {
+func ASIDFromString(ASIDstr string) (addr.AS, error) {
 	asID, err := addr.ASFromString(ASIDstr)
 	if err != nil {
 		asID, err = addr.ASFromFileFmt(ASIDstr, false)
@@ -175,6 +175,17 @@ func IAFromString(ia string) (addr.IA, error) {
 		}
 	}
 	return IA, nil
+}
+
+// NormalizeIAString converts a valid IA into its "normal" one.
+// E.g. ffaa_1_a will be ffaa:1:a
+func NormalizeIAString(ia string) (string, error) {
+	var normalizedIA string
+	IA, err := IAFromString(ia)
+	if err == nil {
+		normalizedIA = IA.String()
+	}
+	return normalizedIA, err
 }
 
 // Parses a BR name and returns the BRID

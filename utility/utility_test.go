@@ -257,7 +257,7 @@ var mapASIDFromString = []struct {
 
 func TestASIDFromString(t *testing.T) {
 	for index, c := range mapASIDFromString {
-		ASID, err := ASAddrFromString(c.ASIDStr)
+		ASID, err := ASIDFromString(c.ASIDStr)
 		if c.expectAnError != (err != nil) {
 			t.Fatalf("Error expectation mismatch at case index %d. Expected error? %v, got error? %v", index, c.expectAnError, err != nil)
 		}
