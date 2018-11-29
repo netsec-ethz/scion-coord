@@ -321,6 +321,11 @@ func (cn *Connection) GetRespondAS() *SCIONLabAS {
 	return cn.RespondAP.AS
 }
 
+func (cn *Connection) GetRespondAP() *AttachmentPoint {
+	o.LoadRelated(cn, "RespondAP")
+	return cn.RespondAP
+}
+
 // Returns a list of ConnectionInfo where the AS is the joining AS
 func (as *SCIONLabAS) GetJoinConnectionInfo() ([]ConnectionInfo, error) {
 	cns, err := as.GetJoinConnections()

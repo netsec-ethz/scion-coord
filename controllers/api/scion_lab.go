@@ -1009,7 +1009,7 @@ func verifySignatureFromAS(as *models.SCIONLabAS, thingToSign, receivedSignature
 }
 
 // RemapASIDComputeNewGenFolder creates a new gen folder using a valid remapped ID
-// e.g. 17-ffaa:0:1 . This does not change IDs in the DB but recomputes topologies and certificates.
+// e.g. 17-ffaa:1:1 . This does not change IDs in the DB but recomputes topologies and certificates.
 // After finishing, there will be a new tgz file ready to download using the mapped ID.
 func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	ia := utility.MapOldIAToNewOne(as.ISD, as.ASID)
@@ -1030,6 +1030,7 @@ func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	}
 	conn := conns[0]
 	conn.JoinAS = conn.GetJoinAS()
+	conn.RespondAP = conn.GetRespondAP()
 	conn.RespondAP.AS = conn.GetRespondAS()
 	asInfo, err := getSCIONLabASInfoFromDB(conn)
 	asInfo.LocalAS = as
