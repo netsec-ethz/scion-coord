@@ -206,7 +206,6 @@ def notify_coordinator_all_okay(answer):
     """
     Returns True if it was successful in notifying
     """
-    challenge_solution= answer["challenge_solution"]
     url = SCION_COORD_URL + "/api/as/remapIdConfirmStatus/" + IA
     try:
         while url:
