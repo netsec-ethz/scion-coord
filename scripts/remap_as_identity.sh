@@ -27,7 +27,7 @@ if [ "$NEWIA" != "$OLDIA" ]; then
     pushd go >/dev/null
     govendor sync
     popd >/dev/null
-    bash -c 'yes | GO_INSTALL=true ./env/deps >/dev/null 2>&1' || echo "ERROR: Dependencies failed. Starting SCION might fail!"
+    bash -c 'yes | GO_INSTALL=true ./env/deps >/dev/null 2>&1' || echo "ERROR: Dependencies failed. Build SCION might fail!"
     ./scion.sh build >/dev/null 2>&1 || echo "Building SCION failed. Starting SCION might fail!"
 else
     echo "remap, IA is the same"
