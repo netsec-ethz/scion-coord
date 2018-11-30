@@ -1017,9 +1017,15 @@ func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	as.ISD = ia.I
 	as.ASID = ia.A
 	// retrieve connection:
-	conns, err := as.GetJoinConnections()
+	allConns, err := as.GetJoinConnections()
 	if err != nil {
 		return nil, err
+	}
+	var conns []*models.Connection
+	for _, c := range allConns {
+		if c.JoinStatus != models.Remove || c.RespondStatus != models.Remove {
+			conns = append(conns, c)
+		}
 	}
 	if len(conns) != 1 {
 		err = fmt.Errorf("User AS should have only 1 connection. %s has %d", ia, len(conns))
