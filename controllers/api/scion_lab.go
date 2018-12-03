@@ -149,13 +149,9 @@ func (e *remappingError) LogAndNotifyAppropriately(w http.ResponseWriter, format
 
 // BadRequestAndLog writes a HTTP 400 error with the message and error, and prints the same in the server log
 func (s *SCIONLabASController) BadRequestAndLog(w http.ResponseWriter, err error, desc string, a ...interface{}) {
-	msg := fmt.Sprintf(desc, a...)
-	s.BadRequest(w, err, msg)
-	if desc == "" {
-		log.Print(err.Error())
-	} else {
-		log.Printf("%s: %v", msg, err)
-	}
+	msg := controllers.Verbosity(err, desc, a...)
+	s.BadRequest(w, nil, msg)
+	log.Print(msg)
 }
 
 // List of all ASes belonging to the account
@@ -218,12 +214,12 @@ func (s *SCIONLabASController) GenerateNewSCIONLabAS(w http.ResponseWriter, r *h
 		return
 	}
 	newAS := models.SCIONLabAS{
-		UserEmail: uSess.Email,
-		StartPort: config.BRStartPort,
-		ASID:      asID,
-		Type:      models.VM,
-		Credits:   config.VirtualCreditStartCredits,
-		Dirty:     true,
+		UserEmail:   uSess.Email,
+		StartPort:   config.BRStartPort,
+		ASID:        asID,
+		Type:        models.VM,
+		Credits:     config.VirtualCreditStartCredits,
+		ConfVersion: 0,
 	}
 	if err := newAS.Insert(); err != nil {
 		log.Printf("Error inserting new AS for %v: %v", uSess.Email, err)
@@ -237,7 +233,6 @@ func (s *SCIONLabASController) GenerateNewSCIONLabAS(w http.ResponseWriter, r *h
 
 func generateGenForAS(asInfo *SCIONLabASInfo) error {
 	var err error
-	asInfo.LocalAS.Dirty = true // invalidate any other copies of the gen folder
 	// Generate topology file
 	if err = generateTopologyFile(asInfo); err != nil {
 		return fmt.Errorf("Error generating topology file: %v", err)
@@ -295,6 +290,7 @@ func (s *SCIONLabASController) ConfigureSCIONLabAS(w http.ResponseWriter, r *htt
 		s.Error500(w, err, "Error getting SCIONLabASInfo")
 		return
 	}
+	asInfo.LocalAS.ConfVersion++ // we are creating a new configuration
 	// Remove all existing files from UserPackagePath
 	os.RemoveAll(asInfo.UserPackagePath() + "/")
 	// generate the gen folder:
@@ -876,6 +872,12 @@ func createUserLoginConfiguration(asInfo *SCIONLabASInfo) error {
 		return fmt.Errorf("failed to write IA to file: %v", err)
 	}
 
+	confVersion := strconv.FormatUint(uint64(asInfo.LocalAS.ConfVersion), 10)
+	ioutil.WriteFile(filepath.Join(userGenDir, "coord_conf.ver"), []byte(confVersion), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write configuration version to file: %v", err)
+	}
+
 	return nil
 }
 
@@ -907,14 +909,6 @@ func (s *SCIONLabASController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 		log.Printf("Error reading the tarball. FileName: %v, %v", fileName, err)
 		s.Error500(w, err, "Error reading tarball")
 		return
-	}
-	if as.Dirty {
-		as.Dirty = false
-		err = as.Update()
-		if err != nil {
-			s.BadRequestAndLog(w, nil, "Could not update AS to not dirty: %v", err)
-			return
-		}
 	}
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
@@ -1029,9 +1023,11 @@ func remapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	if ia.I == 0 || ia.A == 0 {
 		return nil, fmt.Errorf("Invalid source address to map: (%d, %d)", as.ISD, as.ASID)
 	}
-	// replace IDs in the AS entry, but don't save in DB:
+	// replace IDs in the AS entry, but don't save the version to the DB:
 	as.ISD = ia.I
 	as.ASID = ia.A
+	// generate the tarball with +1, as it is a new configuration. But don't save to DB
+	as.ConfVersion++
 	err := computeNewGenFolder(as)
 	ia = as.IA()
 	return &ia, err
@@ -1183,7 +1179,8 @@ func (s *SCIONLabASController) RemapASConfirmStatus(w http.ResponseWriter, r *ht
 		return
 	}
 	as.Status = models.Create
-	as.Dirty = false // the user AS applied the mapping, it's sync'ed again
+	// the expected version is +1 (we generated the tarball with +1). Write to DB
+	as.ConfVersion++
 	err = as.SetMappingStatusAndSave(answer)
 	if err != nil {
 		answer["error"] = true
@@ -1224,7 +1221,7 @@ func (s *SCIONLabASController) RemoveSCIONLabAS(w http.ResponseWriter, r *http.R
 		s.BadRequestAndLog(w, nil, "You currently do not have an active SCIONLab AS.")
 		return
 	}
-	as.Dirty = true
+	as.ConfVersion++
 	as.Status = models.Remove
 	cn.NeighborStatus = models.Remove
 	cn.Status = models.Inactive
@@ -1303,15 +1300,14 @@ func (s *SCIONLabASController) ConfirmUpdate(w http.ResponseWriter, r *http.Requ
 		s.BadRequestAndLog(w, nil, err.Error())
 		return
 	}
-	as.Dirty = false
-	as.Update()
+	as.Update() // just to set the Updated field to Now()
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // GetASData will return either 204 if the AS already obtained the latest AS configuration, or
 // 200 with the TGZ the AS can automatically untar and use. It will include all what the users
 // download from the web page directly (VPN, README, etc).
-// E.g. curl -I http://localhost:8080/api/as/getASData/someid/some_secret/1-ffaa_1_1
+// E.g. curl -s -D - --output myfile.tgz http://localhost:8080/api/as/getASData/someid/some_secret/9-ffaa_1_1?local_version=1
 func (s *SCIONLabASController) GetASData(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	log.Printf("API call for GetASDAta as_id=%s, URL = %v", vars["ia"], r.URL.Query())
@@ -1326,9 +1322,16 @@ func (s *SCIONLabASController) GetASData(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	ia = as.IAString() // because we get the AS ignoring the ISD part, the real ia could be different
-	log.Printf("IA %s, is dirty? %v", as.IAString(), as.Dirty)
-	if as.Dirty {
-		log.Print("AS dirty, we need to (re)create tarball file")
+	str := r.URL.Query().Get("local_version")
+	v64, err := strconv.ParseUint(str, 10, 32)
+	if err != nil {
+		log.Printf("WARNINC! version string (%s) cannot be converted to a 32 uint. Using 0 as version", str)
+	}
+	localVersion := uint(v64)
+	log.Printf("IA %s, current version %d, local version is %d", ia, as.ConfVersion, localVersion)
+	messageToAdmins := ""
+	if as.ConfVersion > localVersion {
+		log.Print("AS local conf is outdated, we need to (re)create tarball file")
 		err = computeNewGenFolder(as)
 		if err != nil {
 			s.BadRequestAndLog(w, nil, "We failed (re)creating the tarball file for IA %s: %v", ia, err)
@@ -1346,7 +1349,20 @@ func (s *SCIONLabASController) GetASData(w http.ResponseWriter, r *http.Request)
 		w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
 		w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 		w.Write(data)
+	} else if localVersion > as.ConfVersion {
+		messageToAdmins = fmt.Sprintf("The AS with IA %s reported a possibly wrong local version "+
+			"> AS.ConvVersion (%d > %d)", ia, localVersion, as.ConfVersion)
 	} else {
 		w.WriteHeader(http.StatusNoContent)
+	}
+
+	if messageToAdmins != "" {
+		err = email.SendEmailToAdmins("ERROR During GetASData", messageToAdmins)
+		if err != nil {
+			fmt.Printf("ERROR (again): could not send email to admins: %v", err)
+		}
+		s.BadRequestAndLog(w, nil, "the request failed with IA %s, current version = %d, local version = %d",
+			ia, as.ConfVersion, localVersion)
+		return
 	}
 }
