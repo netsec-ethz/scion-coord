@@ -1290,5 +1290,61 @@ func (s *SCIONLabASController) ConfirmUpdate(w http.ResponseWriter, r *http.Requ
 		s.BadRequest(w, err, "Incorrect IA parameter")
 		return
 	}
+	as.Dirty = false
 	as.Update()
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// BadRequestAndLog writes a HTTP 400 error with the message and error, and prints the same in the server log
+func (s *SCIONLabASController) BadRequestAndLog(w http.ResponseWriter, err error, desc string, a ...interface{}) {
+	msg := fmt.Sprintf(desc, a...)
+	s.BadRequest(w, err, msg)
+	if desc == "" {
+		log.Print(err.Error())
+	} else {
+		log.Printf("%s: %v", msg, err)
+	}
+}
+
+// GetASData will return either 204 if the AS already obtained the latest AS configuration, or
+// 200 with the TGZ the AS can automatically untar and use. It will include all what the users
+// download from the web page directly (VPN, README, etc).
+// E.g. curl -I http://localhost:8080/api/as/getASData/someid/some_secret/1-ffaa_1_1
+func (s *SCIONLabASController) GetASData(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	log.Printf("API call for GetASDAta as_id=%s, URL = %v", vars["ia"], r.URL.Query())
+	ia, err := utility.NormalizeIAString(vars["ia"])
+	if err != nil {
+		s.BadRequestAndLog(w, err, "Incorrect IA parameter")
+		return
+	}
+	as, err := models.FindSCIONLabASByIAString(ia)
+	if err != nil {
+		s.BadRequestAndLog(w, err, "Cannot find AS with given IA %s", ia)
+		return
+	}
+	ia = as.IAString() // because we get the AS ignoring the ISD part, the real ia could be different
+	log.Printf("IA %s, is dirty? %v", as.IAString(), as.Dirty)
+	if as.Dirty {
+		log.Print("AS dirty, we need to (re)create tarball file")
+		err = computeNewGenFolder(as)
+		if err != nil {
+			s.BadRequestAndLog(w, err, "We failed (re)creating the tarball file for IA %s", ia)
+			return
+		}
+		fileName := UserPackageName(as.UserEmail, as.ISD, as.ASID) + ".tar.gz"
+		filePath := filepath.Join(PackagePath, fileName)
+		data, err := ioutil.ReadFile(filePath)
+		if err != nil {
+			s.BadRequestAndLog(w, err, "Error reading the tarball. FileName: %v, %v", fileName)
+			return
+		}
+		log.Printf("We finished (re)creating the tarball file for %s. Serving it now.", ia)
+		w.Header().Set("Content-Type", "application/gzip")
+		w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
+		w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+		w.Write(data)
+	} else {
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
