@@ -223,6 +223,7 @@ func (s *SCIONLabASController) GenerateNewSCIONLabAS(w http.ResponseWriter, r *h
 		ASID:      asID,
 		Type:      models.VM,
 		Credits:   config.VirtualCreditStartCredits,
+		Dirty:     true,
 	}
 	if err := newAS.Insert(); err != nil {
 		log.Printf("Error inserting new AS for %v: %v", uSess.Email, err)
@@ -236,6 +237,7 @@ func (s *SCIONLabASController) GenerateNewSCIONLabAS(w http.ResponseWriter, r *h
 
 func generateGenForAS(asInfo *SCIONLabASInfo) error {
 	var err error
+	asInfo.LocalAS.Dirty = true // invalidate any other copies of the gen folder
 	// Generate topology file
 	if err = generateTopologyFile(asInfo); err != nil {
 		return fmt.Errorf("Error generating topology file: %v", err)
@@ -906,6 +908,14 @@ func (s *SCIONLabASController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 		s.Error500(w, err, "Error reading tarball")
 		return
 	}
+	if as.Dirty {
+		as.Dirty = false
+		err = as.Update()
+		if err != nil {
+			s.BadRequestAndLog(w, nil, "Could not update AS to not dirty: %v", err)
+			return
+		}
+	}
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
 	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
@@ -1173,6 +1183,7 @@ func (s *SCIONLabASController) RemapASConfirmStatus(w http.ResponseWriter, r *ht
 		return
 	}
 	as.Status = models.Create
+	as.Dirty = false // the user AS applied the mapping, it's sync'ed again
 	err = as.SetMappingStatusAndSave(answer)
 	if err != nil {
 		answer["error"] = true
@@ -1213,6 +1224,7 @@ func (s *SCIONLabASController) RemoveSCIONLabAS(w http.ResponseWriter, r *http.R
 		s.BadRequestAndLog(w, nil, "You currently do not have an active SCIONLab AS.")
 		return
 	}
+	as.Dirty = true
 	as.Status = models.Remove
 	cn.NeighborStatus = models.Remove
 	cn.Status = models.Inactive
