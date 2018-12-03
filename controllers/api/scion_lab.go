@@ -147,6 +147,17 @@ func (e *remappingError) LogAndNotifyAppropriately(w http.ResponseWriter, format
 	}
 }
 
+// BadRequestAndLog writes a HTTP 400 error with the message and error, and prints the same in the server log
+func (s *SCIONLabASController) BadRequestAndLog(w http.ResponseWriter, err error, desc string, a ...interface{}) {
+	msg := fmt.Sprintf(desc, a...)
+	s.BadRequest(w, err, msg)
+	if desc == "" {
+		log.Print(err.Error())
+	} else {
+		log.Printf("%s: %v", msg, err)
+	}
+}
+
 // List of all ASes belonging to the account
 func ownedASes(r *http.Request) (map[string]struct{}, error) {
 	vars := mux.Vars(r)
@@ -266,8 +277,7 @@ func (s *SCIONLabASController) ConfigureSCIONLabAS(w http.ResponseWriter, r *htt
 	// Parse the arguments
 	slReq, err := s.parseRequestParameters(r)
 	if err != nil {
-		log.Printf("Error parsing the parameters: %v", err)
-		s.BadRequest(w, err, "Error parsing the parameters")
+		s.BadRequestAndLog(w, err, "Error parsing the parameters")
 		return
 	}
 	// check if there is already a create or update in progress
@@ -879,16 +889,12 @@ func (s *SCIONLabASController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 	asIDstr := vars["as_id"]
 	asID, err := utility.ASIDFromString(asIDstr)
 	if err != nil {
-		msg := err.Error()
-		log.Print(msg)
-		s.BadRequest(w, nil, msg)
+		s.BadRequestAndLog(w, nil, err.Error())
 		return
 	}
 	as, err := models.FindSCIONLabASByUserEmailAndASID(uSess.Email, asID)
 	if err != nil || as.Status == models.Inactive || as.Status == models.Remove {
-		log.Printf("No active configuration found for user %v, asID %v\n", uSess.Email, asID)
-		s.BadRequest(w, nil, "No active configuration found for user %v, asID %v",
-			uSess.Email, asID)
+		s.BadRequestAndLog(w, nil, "No active configuration found for user %v, asID %v", uSess.Email, asID)
 		return
 	}
 
@@ -1204,7 +1210,7 @@ func (s *SCIONLabASController) RemoveSCIONLabAS(w http.ResponseWriter, r *http.R
 		return
 	}
 	if !canRemove {
-		s.BadRequest(w, nil, "You currently do not have an active SCIONLab AS.")
+		s.BadRequestAndLog(w, nil, "You currently do not have an active SCIONLab AS.")
 		return
 	}
 	as.Status = models.Remove
@@ -1270,7 +1276,7 @@ func (s *SCIONLabASController) QueryUpdateBranch(w http.ResponseWriter, r *http.
 	log.Printf("API Call for queryUpdateBranch = %v", r.URL.Query())
 	as, err := s.getIAParameter(r)
 	if err != nil {
-		s.BadRequest(w, err, "Incorrect IA parameter")
+		s.BadRequestAndLog(w, nil, err.Error())
 		return
 	}
 	s.Plain(as.Branch, w, r)
@@ -1282,23 +1288,12 @@ func (s *SCIONLabASController) ConfirmUpdate(w http.ResponseWriter, r *http.Requ
 	log.Printf("API Call for confirmUpdate = %v", r.URL.Query())
 	as, err := s.getIAParameter(r)
 	if err != nil {
-		s.BadRequest(w, err, "Incorrect IA parameter")
+		s.BadRequestAndLog(w, nil, err.Error())
 		return
 	}
 	as.Dirty = false
 	as.Update()
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// BadRequestAndLog writes a HTTP 400 error with the message and error, and prints the same in the server log
-func (s *SCIONLabASController) BadRequestAndLog(w http.ResponseWriter, err error, desc string, a ...interface{}) {
-	msg := fmt.Sprintf(desc, a...)
-	s.BadRequest(w, err, msg)
-	if desc == "" {
-		log.Print(err.Error())
-	} else {
-		log.Printf("%s: %v", msg, err)
-	}
 }
 
 // GetASData will return either 204 if the AS already obtained the latest AS configuration, or
@@ -1310,7 +1305,7 @@ func (s *SCIONLabASController) GetASData(w http.ResponseWriter, r *http.Request)
 	log.Printf("API call for GetASDAta as_id=%s, URL = %v", vars["ia"], r.URL.Query())
 	ia, err := utility.NormalizeIAString(vars["ia"])
 	if err != nil {
-		s.BadRequestAndLog(w, err, "Incorrect IA parameter")
+		s.BadRequestAndLog(w, nil, err.Error())
 		return
 	}
 	as, err := models.FindSCIONLabASByIAString(ia)
@@ -1324,14 +1319,14 @@ func (s *SCIONLabASController) GetASData(w http.ResponseWriter, r *http.Request)
 		log.Print("AS dirty, we need to (re)create tarball file")
 		err = computeNewGenFolder(as)
 		if err != nil {
-			s.BadRequestAndLog(w, err, "We failed (re)creating the tarball file for IA %s", ia)
+			s.BadRequestAndLog(w, nil, "We failed (re)creating the tarball file for IA %s: %v", ia, err)
 			return
 		}
 		fileName := UserPackageName(as.UserEmail, as.ISD, as.ASID) + ".tar.gz"
 		filePath := filepath.Join(PackagePath, fileName)
 		data, err := ioutil.ReadFile(filePath)
 		if err != nil {
-			s.BadRequestAndLog(w, err, "Error reading the tarball. FileName: %v, %v", fileName)
+			s.BadRequestAndLog(w, nil, "Error reading the tarball. FileName: %v: %v", fileName, err)
 			return
 		}
 		log.Printf("We finished (re)creating the tarball file for %s. Serving it now.", ia)
