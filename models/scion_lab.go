@@ -277,6 +277,22 @@ func (as *SCIONLabAS) GetJoinConnections() ([]*Connection, error) {
 	return as.Connections, err
 }
 
+// GetJoinActiveConnections is similar to GetJoinConnections but it filters the connections scheduled
+// to be removed from APs
+func (as *SCIONLabAS) GetJoinCurrentConnections() ([]*Connection, error) {
+	var conns []*Connection
+	allConns, err := as.GetJoinConnections()
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range allConns {
+		if c.IsCurrentConnection() {
+			conns = append(conns, c)
+		}
+	}
+	return conns, nil
+}
+
 // Only returns the connections of the AS in its function as an AP
 func (as *SCIONLabAS) GetRespondConnections() ([]*Connection, error) {
 	var cns []*Connection
