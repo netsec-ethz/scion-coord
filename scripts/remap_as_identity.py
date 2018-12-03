@@ -20,7 +20,7 @@ from lib.crypto.asymcrypto import sign, verify
 
 
 SCION_COORD_URL = "https://www.scionlab.org"
-# SCION_COORD_URL = "http://192.33.93.150:8080"
+# SCION_COORD_URL = "http://192.33.93.158:8080"
 
 
 def solve_challenge(challenge):
@@ -71,9 +71,6 @@ def something_pending():
     except requests.exceptions.ConnectionError as e:
         print ("Error querying Coordinator: ", e)
         sys.exit(1)
-    except Exception as e:
-        print('Exception when contacting Coordinator: ', e)
-        sys.exit(1)
     if resp.status_code != 200:
         print("Failed getting challenge")
         print(resp.content)
@@ -84,7 +81,8 @@ def something_pending():
         print("ERROR: Wrong answer, does not contain the pending key")
         sys.exit(1)
     if not content["pending"]:
-        return False, content
+        sys.exit(1)
+
     challenge_str = content["challenge"]
     answer = {"challenge": challenge_str}
     challenge = base64.standard_b64decode(challenge_str)
@@ -158,54 +156,12 @@ def install_gen(gen_filename):
         gen_dir = os.path.join(SC,'gen')
         os.rename(gen_dir, os.path.join(SC, 'gen.' + datetime.datetime.now().strftime('%Y-%m-%dT%H-%M-%S')))
         shutil.move(newgen_dir, gen_dir)
-        # now the VPN stuff
-        vpnorigfile = os.path.join(p, 'client.conf')
-        print('VPN configured?',os.path.isfile(vpnorigfile))
-        if not os.path.isfile(vpnorigfile):
-            return
-        vpnclientfile = '/etc/openvpn/client.conf'
-        try:
-            if not os.path.isfile(vpnclientfile):
-                print('--------------------')
-                print('    ATTENTION!')
-                print('--------------------')
-                print('Could not find the default named {} and thus it is not backed up.'.format(vpnclientfile))
-                print('Since the file is not the default one, we have also not stopped the vpn client.')
-                print('Please manually stop the vpn client and rename the client file in /etc/openvpn ')
-                print('to avoid connecting using the old credentials e.g. at boot time.')
-            else:
-                print('Stopping existing VPN connection')
-                subprocess.call(['sudo', 'systemctl', 'stop', 'openvpn@client'])
-                time.sleep(2)
-                print('Renaming existing client file')
-                newname = vpnclientfile + '.bak.' + datetime.datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
-                subprocess.call(['sudo', 'mv', vpnclientfile, newname])
-            print('Moving new config file into place')
-            subprocess.call(['sudo', 'mv', vpnorigfile, vpnclientfile])
-            subprocess.call(['sudo', 'chown', "root:root", vpnclientfile])
-            print('Starting new VPN connection')
-            subprocess.call(['sudo', 'systemctl', 'start', 'openvpn@client'])
-            time.sleep(2)
-            print('Command sequence finished')
-        except Exception as ex:
-            print(ex)
-            print('--------------------')
-            print('    ATTENTION!')
-            print('--------------------')
-            print('Some of the commands failed. Please send us a message to scionlab-admins@sympa.ethz.ch')
-            print('and attach the output.')
-            print('You will probably have to copy the file {} to {}'.format(vpnorigfile, vpnclientfile))
-            print('Then, to stop the old one, assuming the file is called /etc/openvpn/myclient.conf:')
-            print('sudo systemctl stop openvpn@myclient.service')
-            print('And start the new VPN connection:')
-            print('sudo systemctl start openvpn@client.service')
-            print('If you don\'t do so, your AS will not work correctly')
-        print('VPN successfully modified and restarted')
 
 def notify_coordinator_all_okay(answer):
     """
     Returns True if it was successful in notifying
     """
+    challenge_solution= answer["challenge_solution"]
     url = SCION_COORD_URL + "/api/as/remapIdConfirmStatus/" + IA
     try:
         while url:
