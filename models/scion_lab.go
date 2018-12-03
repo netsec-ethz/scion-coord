@@ -57,6 +57,7 @@ type SCIONLabAS struct {
 	AP          *AttachmentPoint `orm:"null;reverse(one)"`
 	Credits     int64            // Credits in virtual credit system
 	Branch      string           `orm:"default(scionlab)"` // Update branch the AS is tracking ("scionlab", "scionlab_testing", "none")
+	Dirty       bool             `orm:"null"`
 	Created     time.Time        // When the AS was first created
 	Updated     time.Time        // Last time the configuration was modified or the AS called `ConfirmUpdate`
 	Connections []*Connection    `orm:"reverse(many)"` // List of Connections
