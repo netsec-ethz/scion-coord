@@ -1052,6 +1052,7 @@ func computeNewGenFolder(as *models.SCIONLabAS) error {
 		defer setPyPath(scionPath)
 		setPyPath(config.NextVersionPythonPath)
 	}
+	os.RemoveAll(asInfo.UserPackagePath())
 	return generateGenForAS(asInfo)
 }
 
