@@ -1005,10 +1005,10 @@ func verifySignatureFromAS(as *models.SCIONLabAS, thingToSign, receivedSignature
 	return err
 }
 
-// RemapASIDComputeNewGenFolder creates a new gen folder using a valid remapped ID
-// e.g. 17-ffaa:1:1 . This does not change IDs in the DB but recomputes topologies and certificates.
+// remapASIDComputeNewGenFolder creates a new gen folder using a valid remapped ID
+// e.g. 17-ffaa:0:1 . This does not change IDs in the DB but recomputes topologies and certificates.
 // After finishing, there will be a new tgz file ready to download using the mapped ID.
-func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
+func remapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	ia := utility.MapOldIAToNewOne(as.ISD, as.ASID)
 	if ia.I == 0 || ia.A == 0 {
 		return nil, fmt.Errorf("Invalid source address to map: (%d, %d)", as.ISD, as.ASID)
@@ -1016,14 +1016,22 @@ func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	// replace IDs in the AS entry, but don't save in DB:
 	as.ISD = ia.I
 	as.ASID = ia.A
+	err := computeNewGenFolder(as)
+	ia = as.IA()
+	return &ia, err
+}
+
+// computeNewGenFolder takes a SCIONLabAS model and (re)creates a tarbal and configuration folder
+func computeNewGenFolder(as *models.SCIONLabAS) error {
+	ia := as.IA()
 	// retrieve connection:
 	conns, err := as.GetJoinCurrentConnections()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if len(conns) != 1 {
 		err = fmt.Errorf("User AS should have only 1 connection. %s has %d", ia, len(conns))
-		return nil, err
+		return err
 	}
 	conn := conns[0]
 	conn.JoinAS = conn.GetJoinAS()
@@ -1032,7 +1040,7 @@ func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	asInfo, err := getSCIONLabASInfoFromDB(conn)
 	asInfo.LocalAS = as
 	if err != nil {
-		return nil, err
+		return err
 	}
 	// finally, generate the gen folder:
 	// modify the paths to point to a new scionproto/scion/python place, and use that one
@@ -1045,12 +1053,7 @@ func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 		defer setPyPath(scionPath)
 		setPyPath(config.NextVersionPythonPath)
 	}
-	err = generateGenForAS(asInfo)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ia, nil
+	return generateGenForAS(asInfo)
 }
 
 // RemapASIdentityChallengeAndSolution returns the challenge the AS should solve if said AS has to map the identity.
@@ -1086,7 +1089,7 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 		log.Printf("Remap: sent challenge for %v", ia)
 		return
 	}
-	answer["ia"], err = RemapASIDComputeNewGenFolder(as)
+	answer["ia"], err = remapASIDComputeNewGenFolder(as)
 	if err != nil {
 		logAndSendErrorAndNotifyAdmins(w, "ERROR in Coordinator: while mapping the ID, cannot generate a gen folder for the AS %s : %s", ia, err.Error())
 		return
@@ -1266,7 +1269,7 @@ func (s *SCIONLabASController) getIAParameter(r *http.Request) (*models.SCIONLab
 	return models.FindSCIONLabASByIAInt(ia.I, ia.A)
 }
 
-// API for SCIONLabASes to query which git branch they should use for updates
+// QueryUpdateBranch API for SCIONLabASes to query which git branch they should use for updates
 func (s *SCIONLabASController) QueryUpdateBranch(w http.ResponseWriter, r *http.Request) {
 	log.Printf("API Call for queryUpdateBranch = %v", r.URL.Query())
 	as, err := s.getIAParameter(r)
@@ -1277,7 +1280,8 @@ func (s *SCIONLabASController) QueryUpdateBranch(w http.ResponseWriter, r *http.
 	s.Plain(as.Branch, w, r)
 }
 
-// API for SCIONLabASes to report a successful update
+// ConfirmUpdate API for SCIONLabASes to report a successful update
+// E.g. curl -X POST -I http://localhost:8080/api/as/confirmUpdate/someid/some_secret?IA=1-ffaa_1_1
 func (s *SCIONLabASController) ConfirmUpdate(w http.ResponseWriter, r *http.Request) {
 	log.Printf("API Call for confirmUpdate = %v", r.URL.Query())
 	as, err := s.getIAParameter(r)
