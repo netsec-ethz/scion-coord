@@ -166,6 +166,28 @@ func ASIDFromString(ASIDstr string) (addr.AS, error) {
 	return asID, err
 }
 
+func IAFromString(ia string) (addr.IA, error) {
+	IA, err := addr.IAFromString(ia)
+	if err != nil {
+		IA, err = addr.IAFromFileFmt(ia, false)
+		if err != nil {
+			return IA, fmt.Errorf("%v is not a valid SCION IA", ia)
+		}
+	}
+	return IA, nil
+}
+
+// NormalizeIAString converts a valid IA into its "normal" one.
+// E.g. ffaa_1_a will be ffaa:1:a
+func NormalizeIAString(ia string) (string, error) {
+	var normalizedIA string
+	IA, err := IAFromString(ia)
+	if err == nil {
+		normalizedIA = IA.String()
+	}
+	return normalizedIA, err
+}
+
 // Parses a BR name and returns the BRID
 func BRIDFromString(s string) (uint16, error) {
 	parts := strings.Split(s, "-")
