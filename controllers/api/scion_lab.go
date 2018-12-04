@@ -1311,8 +1311,11 @@ func (s *SCIONLabASController) ConfirmUpdate(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// GetASData will return either 204 if the AS already obtained the latest AS configuration, or
-// 200 with the TGZ the AS can automatically untar and use. It will include all what the users
+// GetASData will return
+// 400 if there was an error or the local version is higher than the stored one
+// 304 (not modified) if the AS already obtained the latest AS configuration
+// 205 (reset content) if the AS needs to delete its gen folder
+// otherwise 200 with the TGZ the AS can automatically untar and use. It will include all what the users
 // download from the web page directly (VPN, README, etc).
 // E.g. curl -s -D - --output myfile.tgz http://localhost:8080/api/as/getASData/someid/some_secret/9-ffaa_1_1?local_version=1
 func (s *SCIONLabASController) GetASData(w http.ResponseWriter, r *http.Request) {
@@ -1337,8 +1340,14 @@ func (s *SCIONLabASController) GetASData(w http.ResponseWriter, r *http.Request)
 	localVersion := uint(v64)
 	log.Printf("IA %s, current version %d, local version is %d", ia, as.ConfVersion, localVersion)
 	messageToAdmins := ""
-	if as.ConfVersion > localVersion {
-		log.Print("AS local conf is outdated, we need to (re)create tarball file")
+	if localVersion > as.ConfVersion {
+		messageToAdmins = fmt.Sprintf("The AS with IA %s reported a possibly wrong local version "+
+			"> AS.ConvVersion (%d > %d)", ia, localVersion, as.ConfVersion)
+	} else if localVersion == as.ConfVersion {
+		w.WriteHeader(http.StatusNotModified)
+	} else if as.Status == models.Remove {
+		w.WriteHeader(http.StatusResetContent)
+	} else {
 		err = computeNewGenFolder(as)
 		if err != nil {
 			s.BadRequestAndLog(w, nil, "We failed (re)creating the tarball file for IA %s: %v", ia, err)
@@ -1351,13 +1360,7 @@ func (s *SCIONLabASController) GetASData(w http.ResponseWriter, r *http.Request)
 			s.BadRequestAndLog(w, nil, "Error reading the tarball. FileName: %v: %v", fileName, err)
 			return
 		}
-	} else if localVersion > as.ConfVersion {
-		messageToAdmins = fmt.Sprintf("The AS with IA %s reported a possibly wrong local version "+
-			"> AS.ConvVersion (%d > %d)", ia, localVersion, as.ConfVersion)
-	} else {
-		w.WriteHeader(http.StatusNotModified)
 	}
-
 	if messageToAdmins != "" {
 		err = email.SendEmailToAdmins("ERROR During GetASData", messageToAdmins)
 		if err != nil {
