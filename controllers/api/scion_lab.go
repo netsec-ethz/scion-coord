@@ -154,6 +154,18 @@ func (s *SCIONLabASController) BadRequestAndLog(w http.ResponseWriter, err error
 	log.Print(msg)
 }
 
+func sendAlreadyCompressedFile(w http.ResponseWriter, filePath, fileNameInClient string) error {
+	data, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("Error reading the file %v: %v", filePath, err)
+	}
+	w.Header().Set("Content-Type", "application/gzip")
+	w.Header().Set("Content-Disposition", "attachment; filename="+fileNameInClient)
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	w.Write(data)
+	return nil
+}
+
 // List of all ASes belonging to the account
 func ownedASes(r *http.Request) (map[string]struct{}, error) {
 	vars := mux.Vars(r)
@@ -904,16 +916,11 @@ func (s *SCIONLabASController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 
 	fileName := UserPackageName(uSess.Email, as.ISD, as.ASID) + ".tar.gz"
 	filePath := filepath.Join(PackagePath, fileName)
-	data, err := ioutil.ReadFile(filePath)
+	err = sendAlreadyCompressedFile(w, filePath, "scion_lab_"+fileName)
 	if err != nil {
-		log.Printf("Error reading the tarball. FileName: %v, %v", fileName, err)
 		s.Error500(w, err, "Error reading tarball")
 		return
 	}
-	w.Header().Set("Content-Type", "application/gzip")
-	w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
-	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
-	w.Write(data)
 }
 
 func logAndSendError(w http.ResponseWriter, errorMsgFmt string, parms ...interface{}) string {
@@ -1134,16 +1141,11 @@ func (s *SCIONLabASController) RemapASDownloadGen(w http.ResponseWriter, r *http
 	mappedIA := utility.MapOldIAToNewOne(as.ISD, as.ASID)
 	fileName := UserPackageName(as.UserEmail, mappedIA.I, mappedIA.A) + ".tar.gz"
 	filePath := filepath.Join(PackagePath, fileName)
-	data, err := ioutil.ReadFile(filePath)
+	err = sendAlreadyCompressedFile(w, filePath, "scion_lab_"+fileName)
 	if err != nil {
 		logAndSendError(w, "Error reading the tarball. FileName: %v, %v", fileName, err)
 		return
 	}
-	log.Printf("Remap: serving new GEN for %v -> %v", ia, mappedIA)
-	w.Header().Set("Content-Type", "application/gzip")
-	w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
-	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
-	w.Write(data)
 }
 
 // RemapASConfirmStatus receives confirmation from a user AS that they applied the mapping.
@@ -1344,21 +1346,16 @@ func (s *SCIONLabASController) GetASData(w http.ResponseWriter, r *http.Request)
 		}
 		fileName := UserPackageName(as.UserEmail, as.ISD, as.ASID) + ".tar.gz"
 		filePath := filepath.Join(PackagePath, fileName)
-		data, err := ioutil.ReadFile(filePath)
+		err = sendAlreadyCompressedFile(w, filePath, "scion_lab_"+fileName)
 		if err != nil {
 			s.BadRequestAndLog(w, nil, "Error reading the tarball. FileName: %v: %v", fileName, err)
 			return
 		}
-		log.Printf("We finished (re)creating the tarball file for %s. Serving it now.", ia)
-		w.Header().Set("Content-Type", "application/gzip")
-		w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
-		w.Header().Set("Content-Length", strconv.Itoa(len(data)))
-		w.Write(data)
 	} else if localVersion > as.ConfVersion {
 		messageToAdmins = fmt.Sprintf("The AS with IA %s reported a possibly wrong local version "+
 			"> AS.ConvVersion (%d > %d)", ia, localVersion, as.ConfVersion)
 	} else {
-		w.WriteHeader(http.StatusNoContent)
+		w.WriteHeader(http.StatusNotModified)
 	}
 
 	if messageToAdmins != "" {
