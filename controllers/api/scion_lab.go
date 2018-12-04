@@ -1044,7 +1044,7 @@ func remapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 func computeNewGenFolder(as *models.SCIONLabAS) error {
 	ia := as.IA()
 	// retrieve connection:
-	conns, err := as.GetJoinCurrentConnections()
+	conns, err := as.GetJoinNotRemovedConnections()
 	if err != nil {
 		return err
 	}
@@ -1170,7 +1170,7 @@ func (s *SCIONLabASController) RemapASConfirmStatus(w http.ResponseWriter, r *ht
 	answer["pending"] = false
 	answer["date"] = time.Now()
 	// set its status to Create so the AP will create it:
-	conns, err := as.GetJoinCurrentConnections()
+	conns, err := as.GetJoinNotRemovedConnections()
 	if err != nil {
 		logAndSendError(w, err.Error())
 		return
