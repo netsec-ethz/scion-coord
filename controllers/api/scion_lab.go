@@ -1006,7 +1006,7 @@ func verifySignatureFromAS(as *models.SCIONLabAS, thingToSign, receivedSignature
 }
 
 // RemapASIDComputeNewGenFolder creates a new gen folder using a valid remapped ID
-// e.g. 17-ffaa:0:1 . This does not change IDs in the DB but recomputes topologies and certificates.
+// e.g. 17-ffaa:1:1 . This does not change IDs in the DB but recomputes topologies and certificates.
 // After finishing, there will be a new tgz file ready to download using the mapped ID.
 func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	ia := utility.MapOldIAToNewOne(as.ISD, as.ASID)
@@ -1017,7 +1017,7 @@ func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	as.ISD = ia.I
 	as.ASID = ia.A
 	// retrieve connection:
-	conns, err := as.GetJoinConnections()
+	conns, err := as.GetJoinCurrentConnections()
 	if err != nil {
 		return nil, err
 	}
@@ -1027,6 +1027,7 @@ func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	}
 	conn := conns[0]
 	conn.JoinAS = conn.GetJoinAS()
+	conn.RespondAP = conn.GetRespondAP()
 	conn.RespondAP.AS = conn.GetRespondAS()
 	asInfo, err := getSCIONLabASInfoFromDB(conn)
 	asInfo.LocalAS = as
@@ -1151,9 +1152,13 @@ func (s *SCIONLabASController) RemapASConfirmStatus(w http.ResponseWriter, r *ht
 	answer["pending"] = false
 	answer["date"] = time.Now()
 	// set its status to Create so the AP will create it:
-	conns, err := as.GetJoinConnections()
+	conns, err := as.GetJoinCurrentConnections()
 	if err != nil {
 		logAndSendError(w, err.Error())
+		return
+	}
+	if len(conns) != 1 {
+		logAndSendError(w, "User AS should have only 1 connection. %s has %d", ia, len(conns))
 		return
 	}
 	conns[0].RespondStatus = models.Create
