@@ -21,19 +21,17 @@ ACC_PW=$(cat $SC/gen/account_secret)
 
 cd /tmp
 rm -f gen-data.tgz
-curl -s -D - "$SCION_COORD_URL/api/as/getASData/$ACC_ID/$ACC_PW/$IA?local_version=$LOCAL_VER" --output gen-data.tgz
-
-
-
-
-
-# TODO check status out of the curl output. 200 => NEWGEN=1
-NEWGEN=1
-
-if [ $NEWGEN -ne 1 ]; then
+HTTP_CODE=$(curl -s -w "%{http_code}" "$SCION_COORD_URL/api/as/getASData/$ACC_ID/$ACC_PW/$IA?local_version=$LOCAL_VER" --output gen-data.tgz)
+if [ $HTTP_CODE -eq 304 ]; then
     echo "Existing AS configuration is up to date"
     exit 0
 fi
+if [ $HTTP_CODE -ne 200 ]; then
+    echo "Unhandled status code received from Coordinator: $HTTP_CODE"
+    [ -f /tmp/gen-data.tgz ] && file /tmp/gen-data.tgz | grep ASCII >/dev/null 2>&1 &&  echo "Coordinator message is:" && cat /tmp/gen-data.tgz
+    exit 1
+fi
+# we received a new AS configuration
 ./scion.sh stop || true
 
 TMP=$(mktemp -d)
