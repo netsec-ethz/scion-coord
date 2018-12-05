@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# This script asks the Coordinator for its configuration, using the IA account ID and secret and configuration
+# version stored inside the gen folder. The Coordinator can reply saying this AS has the latest version, reply with
+# a new configuration package or reply by requesting this AS to remove its configuration.
+# This script will stop SCION and start it again with the new configuration if needed.
+# This script also stops and starts the VPN client accordingly, depending on the existing configuration and the new
+# one.
+
 set -e
 
 SCION_COORD_URL="https://www.scionlab.org"
@@ -111,5 +118,6 @@ fi
 echo "Reloading AS configuration"
 ./supervisor/supervisor.sh reload
 ./tools/zkcleanslate || true
-rm -f ./gen-cache/*
+rm -f ./gen-cache/* # because we could have even changed IDs !!
+# we are not responsible for (re)building SCION:
 ./scion.sh start nobuild

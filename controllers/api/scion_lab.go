@@ -1317,6 +1317,7 @@ func (s *SCIONLabASController) ConfirmUpdate(w http.ResponseWriter, r *http.Requ
 // 205 (reset content) if the AS needs to delete its gen folder
 // otherwise 200 with the TGZ the AS can automatically untar and use. It will include all what the users
 // download from the web page directly (VPN, README, etc).
+// If the force=true (or force=1) flag was specified, ignore versions and assume client's is older
 // E.g. curl -s -D - --output myfile.tgz http://localhost:8080/api/as/getASData/someid/some_secret/9-ffaa_1_1?local_version=1
 func (s *SCIONLabASController) GetASData(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
