@@ -1332,6 +1332,7 @@ func (s *SCIONLabASController) GetASData(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	ia = as.IAString() // because we get the AS ignoring the ISD part, the real ia could be different
+	forceFlag, _ := strconv.ParseBool(r.URL.Query().Get("force"))
 	str := r.URL.Query().Get("local_version")
 	v64, err := strconv.ParseUint(str, 10, 32)
 	if err != nil {
@@ -1340,10 +1341,10 @@ func (s *SCIONLabASController) GetASData(w http.ResponseWriter, r *http.Request)
 	localVersion := uint(v64)
 	log.Printf("IA %s, current version %d, local version is %d", ia, as.ConfVersion, localVersion)
 	messageToAdmins := ""
-	if localVersion > as.ConfVersion {
+	if !forceFlag && localVersion > as.ConfVersion {
 		messageToAdmins = fmt.Sprintf("The AS with IA %s reported a possibly wrong local version "+
 			"> AS.ConvVersion (%d > %d)", ia, localVersion, as.ConfVersion)
-	} else if localVersion == as.ConfVersion {
+	} else if !forceFlag && localVersion == as.ConfVersion {
 		w.WriteHeader(http.StatusNotModified)
 	} else if as.Status == models.Remove {
 		w.WriteHeader(http.StatusResetContent)
