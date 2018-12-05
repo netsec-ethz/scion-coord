@@ -4,6 +4,33 @@ set -e
 
 SCION_COORD_URL="https://www.scionlab.org"
 
+force=0
+usage="$(basename $0) [-f] [-h]
+
+where:
+    -h      This help
+    -f      (force) Ignore the configuration version
+            and get the configuration from Coordinator"
+while getopts "hf" opt; do
+    case $opt in
+    h)
+        echo "$usage"
+        exit 0
+        ;;
+    f)
+        force=1
+        ;;
+    \?)
+        echo "$usage"
+        exit 1
+        ;;
+    *)
+        echo "$usage"
+        exit 1
+        ;;
+    esac
+done
+
 
 if [ ! -f $SC/gen/ia ] || [ ! -f $SC/gen/account_id ] || [ ! -f $SC/gen/account_secret ]; then
     echo "A required file is missing!"
@@ -15,10 +42,11 @@ IA=$(cat $SC/gen/ia | sed 's/_/\:/g')
 ACC_ID=$(cat $SC/gen/account_id)
 ACC_PW=$(cat $SC/gen/account_secret)
 [ -f $SC/gen/coord_conf.ver ] && LOCAL_VER=$(cat $SC/gen/coord_conf.ver) || LOCAL_VER=0
+[ $force -eq 1 ] && LOCAL_VER="force=1" || LOCAL_VER="local_version=$LOCAL_VER"
 
 cd /tmp
 rm -f gen-data.tgz
-HTTP_CODE=$(curl -s -w "%{http_code}" "$SCION_COORD_URL/api/as/getASData/$ACC_ID/$ACC_PW/$IA?local_version=$LOCAL_VER" --output gen-data.tgz)
+HTTP_CODE=$(curl -s -w "%{http_code}" "$SCION_COORD_URL/api/as/getASData/$ACC_ID/$ACC_PW/$IA?local_version=${LOCAL_VER}${FORCEFLAG}" --output gen-data.tgz)
 if [ $HTTP_CODE -eq 304 ]; then
     echo "Existing AS configuration is up to date"
     exit 0
