@@ -61,6 +61,7 @@ type SCIONLabAS struct {
 	Updated     time.Time        // Last time the configuration was modified or the AS called `ConfirmUpdate`
 	Connections []*Connection    `orm:"reverse(many)"` // List of Connections
 	RemapStatus string           `orm:"size(1000);type(json);null"`
+	ConfVersion uint             `orm:"default(0)"`
 }
 
 type Connection struct {
@@ -279,14 +280,14 @@ func (as *SCIONLabAS) GetJoinConnections() ([]*Connection, error) {
 
 // GetJoinActiveConnections is similar to GetJoinConnections but it filters the connections scheduled
 // to be removed from APs
-func (as *SCIONLabAS) GetJoinCurrentConnections() ([]*Connection, error) {
+func (as *SCIONLabAS) GetJoinNotRemovedConnections() ([]*Connection, error) {
 	var conns []*Connection
 	allConns, err := as.GetJoinConnections()
 	if err != nil {
 		return nil, err
 	}
 	for _, c := range allConns {
-		if c.IsCurrentConnection() {
+		if c.JoinStatus != Remove && c.RespondStatus != Remove {
 			conns = append(conns, c)
 		}
 	}

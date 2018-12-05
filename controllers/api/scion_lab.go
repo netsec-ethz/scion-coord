@@ -147,6 +147,25 @@ func (e *remappingError) LogAndNotifyAppropriately(w http.ResponseWriter, format
 	}
 }
 
+// BadRequestAndLog writes a HTTP 400 error with the message and error, and prints the same in the server log
+func (s *SCIONLabASController) BadRequestAndLog(w http.ResponseWriter, err error, desc string, a ...interface{}) {
+	msg := controllers.Verbosity(err, desc, a...)
+	s.BadRequest(w, nil, msg)
+	log.Print(msg)
+}
+
+func sendAlreadyCompressedFile(w http.ResponseWriter, filePath, fileNameInClient string) error {
+	data, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("Error reading the file %v: %v", filePath, err)
+	}
+	w.Header().Set("Content-Type", "application/gzip")
+	w.Header().Set("Content-Disposition", "attachment; filename="+fileNameInClient)
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	w.Write(data)
+	return nil
+}
+
 // List of all ASes belonging to the account
 func ownedASes(r *http.Request) (map[string]struct{}, error) {
 	vars := mux.Vars(r)
@@ -207,11 +226,12 @@ func (s *SCIONLabASController) GenerateNewSCIONLabAS(w http.ResponseWriter, r *h
 		return
 	}
 	newAS := models.SCIONLabAS{
-		UserEmail: uSess.Email,
-		StartPort: config.BRStartPort,
-		ASID:      asID,
-		Type:      models.VM,
-		Credits:   config.VirtualCreditStartCredits,
+		UserEmail:   uSess.Email,
+		StartPort:   config.BRStartPort,
+		ASID:        asID,
+		Type:        models.VM,
+		Credits:     config.VirtualCreditStartCredits,
+		ConfVersion: 0,
 	}
 	if err := newAS.Insert(); err != nil {
 		log.Printf("Error inserting new AS for %v: %v", uSess.Email, err)
@@ -266,8 +286,7 @@ func (s *SCIONLabASController) ConfigureSCIONLabAS(w http.ResponseWriter, r *htt
 	// Parse the arguments
 	slReq, err := s.parseRequestParameters(r)
 	if err != nil {
-		log.Printf("Error parsing the parameters: %v", err)
-		s.BadRequest(w, err, "Error parsing the parameters")
+		s.BadRequestAndLog(w, err, "Error parsing the parameters")
 		return
 	}
 	// check if there is already a create or update in progress
@@ -283,6 +302,7 @@ func (s *SCIONLabASController) ConfigureSCIONLabAS(w http.ResponseWriter, r *htt
 		s.Error500(w, err, "Error getting SCIONLabASInfo")
 		return
 	}
+	asInfo.LocalAS.ConfVersion++ // we are creating a new configuration
 	// Remove all existing files from UserPackagePath
 	os.RemoveAll(asInfo.UserPackagePath() + "/")
 	// generate the gen folder:
@@ -864,6 +884,12 @@ func createUserLoginConfiguration(asInfo *SCIONLabASInfo) error {
 		return fmt.Errorf("failed to write IA to file: %v", err)
 	}
 
+	confVersion := strconv.FormatUint(uint64(asInfo.LocalAS.ConfVersion), 10)
+	ioutil.WriteFile(filepath.Join(userGenDir, "coord_conf.ver"), []byte(confVersion), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write configuration version to file: %v", err)
+	}
+
 	return nil
 }
 
@@ -879,31 +905,22 @@ func (s *SCIONLabASController) ReturnTarball(w http.ResponseWriter, r *http.Requ
 	asIDstr := vars["as_id"]
 	asID, err := utility.ASIDFromString(asIDstr)
 	if err != nil {
-		msg := err.Error()
-		log.Print(msg)
-		s.BadRequest(w, nil, msg)
+		s.BadRequestAndLog(w, nil, err.Error())
 		return
 	}
 	as, err := models.FindSCIONLabASByUserEmailAndASID(uSess.Email, asID)
 	if err != nil || as.Status == models.Inactive || as.Status == models.Remove {
-		log.Printf("No active configuration found for user %v, asID %v\n", uSess.Email, asID)
-		s.BadRequest(w, nil, "No active configuration found for user %v, asID %v",
-			uSess.Email, asID)
+		s.BadRequestAndLog(w, nil, "No active configuration found for user %v, asID %v", uSess.Email, asID)
 		return
 	}
 
 	fileName := UserPackageName(uSess.Email, as.ISD, as.ASID) + ".tar.gz"
 	filePath := filepath.Join(PackagePath, fileName)
-	data, err := ioutil.ReadFile(filePath)
+	err = sendAlreadyCompressedFile(w, filePath, "scion_lab_"+fileName)
 	if err != nil {
-		log.Printf("Error reading the tarball. FileName: %v, %v", fileName, err)
 		s.Error500(w, err, "Error reading tarball")
 		return
 	}
-	w.Header().Set("Content-Type", "application/gzip")
-	w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
-	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
-	w.Write(data)
 }
 
 func logAndSendError(w http.ResponseWriter, errorMsgFmt string, parms ...interface{}) string {
@@ -1005,25 +1022,35 @@ func verifySignatureFromAS(as *models.SCIONLabAS, thingToSign, receivedSignature
 	return err
 }
 
-// RemapASIDComputeNewGenFolder creates a new gen folder using a valid remapped ID
-// e.g. 17-ffaa:1:1 . This does not change IDs in the DB but recomputes topologies and certificates.
+// remapASIDComputeNewGenFolder creates a new gen folder using a valid remapped ID
+// e.g. 17-ffaa:0:1 . This does not change IDs in the DB but recomputes topologies and certificates.
 // After finishing, there will be a new tgz file ready to download using the mapped ID.
-func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
+func remapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	ia := utility.MapOldIAToNewOne(as.ISD, as.ASID)
 	if ia.I == 0 || ia.A == 0 {
 		return nil, fmt.Errorf("Invalid source address to map: (%d, %d)", as.ISD, as.ASID)
 	}
-	// replace IDs in the AS entry, but don't save in DB:
+	// replace IDs in the AS entry, but don't save the version to the DB:
 	as.ISD = ia.I
 	as.ASID = ia.A
+	// generate the tarball with +1, as it is a new configuration. But don't save to DB
+	as.ConfVersion++
+	err := computeNewGenFolder(as)
+	ia = as.IA()
+	return &ia, err
+}
+
+// computeNewGenFolder takes a SCIONLabAS model and (re)creates a tarbal and configuration folder
+func computeNewGenFolder(as *models.SCIONLabAS) error {
+	ia := as.IA()
 	// retrieve connection:
-	conns, err := as.GetJoinCurrentConnections()
+	conns, err := as.GetJoinNotRemovedConnections()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if len(conns) != 1 {
 		err = fmt.Errorf("User AS should have only 1 connection. %s has %d", ia, len(conns))
-		return nil, err
+		return err
 	}
 	conn := conns[0]
 	conn.JoinAS = conn.GetJoinAS()
@@ -1032,7 +1059,7 @@ func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 	asInfo, err := getSCIONLabASInfoFromDB(conn)
 	asInfo.LocalAS = as
 	if err != nil {
-		return nil, err
+		return err
 	}
 	// finally, generate the gen folder:
 	// modify the paths to point to a new scionproto/scion/python place, and use that one
@@ -1045,12 +1072,8 @@ func RemapASIDComputeNewGenFolder(as *models.SCIONLabAS) (*addr.IA, error) {
 		defer setPyPath(scionPath)
 		setPyPath(config.NextVersionPythonPath)
 	}
-	err = generateGenForAS(asInfo)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ia, nil
+	os.RemoveAll(asInfo.UserPackagePath())
+	return generateGenForAS(asInfo)
 }
 
 // RemapASIdentityChallengeAndSolution returns the challenge the AS should solve if said AS has to map the identity.
@@ -1086,7 +1109,7 @@ func (s *SCIONLabASController) RemapASIdentityChallengeAndSolution(w http.Respon
 		log.Printf("Remap: sent challenge for %v", ia)
 		return
 	}
-	answer["ia"], err = RemapASIDComputeNewGenFolder(as)
+	answer["ia"], err = remapASIDComputeNewGenFolder(as)
 	if err != nil {
 		logAndSendErrorAndNotifyAdmins(w, "ERROR in Coordinator: while mapping the ID, cannot generate a gen folder for the AS %s : %s", ia, err.Error())
 		return
@@ -1118,16 +1141,11 @@ func (s *SCIONLabASController) RemapASDownloadGen(w http.ResponseWriter, r *http
 	mappedIA := utility.MapOldIAToNewOne(as.ISD, as.ASID)
 	fileName := UserPackageName(as.UserEmail, mappedIA.I, mappedIA.A) + ".tar.gz"
 	filePath := filepath.Join(PackagePath, fileName)
-	data, err := ioutil.ReadFile(filePath)
+	err = sendAlreadyCompressedFile(w, filePath, "scion_lab_"+fileName)
 	if err != nil {
 		logAndSendError(w, "Error reading the tarball. FileName: %v, %v", fileName, err)
 		return
 	}
-	log.Printf("Remap: serving new GEN for %v -> %v", ia, mappedIA)
-	w.Header().Set("Content-Type", "application/gzip")
-	w.Header().Set("Content-Disposition", "attachment; filename=scion_lab_"+fileName)
-	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
-	w.Write(data)
 }
 
 // RemapASConfirmStatus receives confirmation from a user AS that they applied the mapping.
@@ -1152,7 +1170,7 @@ func (s *SCIONLabASController) RemapASConfirmStatus(w http.ResponseWriter, r *ht
 	answer["pending"] = false
 	answer["date"] = time.Now()
 	// set its status to Create so the AP will create it:
-	conns, err := as.GetJoinCurrentConnections()
+	conns, err := as.GetJoinNotRemovedConnections()
 	if err != nil {
 		logAndSendError(w, err.Error())
 		return
@@ -1168,6 +1186,8 @@ func (s *SCIONLabASController) RemapASConfirmStatus(w http.ResponseWriter, r *ht
 		return
 	}
 	as.Status = models.Create
+	// the expected version is +1 (we generated the tarball with +1). Write to DB
+	as.ConfVersion++
 	err = as.SetMappingStatusAndSave(answer)
 	if err != nil {
 		answer["error"] = true
@@ -1205,9 +1225,10 @@ func (s *SCIONLabASController) RemoveSCIONLabAS(w http.ResponseWriter, r *http.R
 		return
 	}
 	if !canRemove {
-		s.BadRequest(w, nil, "You currently do not have an active SCIONLab AS.")
+		s.BadRequestAndLog(w, nil, "You currently do not have an active SCIONLab AS.")
 		return
 	}
+	as.ConfVersion++
 	as.Status = models.Remove
 	cn.NeighborStatus = models.Remove
 	cn.Status = models.Inactive
@@ -1266,24 +1287,87 @@ func (s *SCIONLabASController) getIAParameter(r *http.Request) (*models.SCIONLab
 	return models.FindSCIONLabASByIAInt(ia.I, ia.A)
 }
 
-// API for SCIONLabASes to query which git branch they should use for updates
+// QueryUpdateBranch API for SCIONLabASes to query which git branch they should use for updates
 func (s *SCIONLabASController) QueryUpdateBranch(w http.ResponseWriter, r *http.Request) {
 	log.Printf("API Call for queryUpdateBranch = %v", r.URL.Query())
 	as, err := s.getIAParameter(r)
 	if err != nil {
-		s.BadRequest(w, err, "Incorrect IA parameter")
+		s.BadRequestAndLog(w, nil, err.Error())
 		return
 	}
 	s.Plain(as.Branch, w, r)
 }
 
-// API for SCIONLabASes to report a successful update
+// ConfirmUpdate API for SCIONLabASes to report a successful update
+// E.g. curl -X POST -I http://localhost:8080/api/as/confirmUpdate/someid/some_secret?IA=1-ffaa_1_1
 func (s *SCIONLabASController) ConfirmUpdate(w http.ResponseWriter, r *http.Request) {
 	log.Printf("API Call for confirmUpdate = %v", r.URL.Query())
 	as, err := s.getIAParameter(r)
 	if err != nil {
-		s.BadRequest(w, err, "Incorrect IA parameter")
+		s.BadRequestAndLog(w, nil, err.Error())
 		return
 	}
-	as.Update()
+	as.Update() // just to set the Updated field to Now()
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// GetASData will return
+// 400 if there was an error or the local version is higher than the stored one
+// 304 (not modified) if the AS already obtained the latest AS configuration
+// 205 (reset content) if the AS needs to delete its gen folder
+// otherwise 200 with the TGZ the AS can automatically untar and use. It will include all what the users
+// download from the web page directly (VPN, README, etc).
+// E.g. curl -s -D - --output myfile.tgz http://localhost:8080/api/as/getASData/someid/some_secret/9-ffaa_1_1?local_version=1
+func (s *SCIONLabASController) GetASData(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	log.Printf("API call for GetASDAta as_id=%s, URL = %v", vars["ia"], r.URL.Query())
+	ia, err := utility.NormalizeIAString(vars["ia"])
+	if err != nil {
+		s.BadRequestAndLog(w, nil, err.Error())
+		return
+	}
+	as, err := models.FindSCIONLabASByIAString(ia)
+	if err != nil {
+		s.BadRequestAndLog(w, err, "Cannot find AS with given IA %s", ia)
+		return
+	}
+	ia = as.IAString() // because we get the AS ignoring the ISD part, the real ia could be different
+	str := r.URL.Query().Get("local_version")
+	v64, err := strconv.ParseUint(str, 10, 32)
+	if err != nil {
+		log.Printf("WARNINC! version string (%s) cannot be converted to a 32 uint. Using 0 as version", str)
+	}
+	localVersion := uint(v64)
+	log.Printf("IA %s, current version %d, local version is %d", ia, as.ConfVersion, localVersion)
+	messageToAdmins := ""
+	if localVersion > as.ConfVersion {
+		messageToAdmins = fmt.Sprintf("The AS with IA %s reported a possibly wrong local version "+
+			"> AS.ConvVersion (%d > %d)", ia, localVersion, as.ConfVersion)
+	} else if localVersion == as.ConfVersion {
+		w.WriteHeader(http.StatusNotModified)
+	} else if as.Status == models.Remove {
+		w.WriteHeader(http.StatusResetContent)
+	} else {
+		err = computeNewGenFolder(as)
+		if err != nil {
+			s.BadRequestAndLog(w, nil, "We failed (re)creating the tarball file for IA %s: %v", ia, err)
+			return
+		}
+		fileName := UserPackageName(as.UserEmail, as.ISD, as.ASID) + ".tar.gz"
+		filePath := filepath.Join(PackagePath, fileName)
+		err = sendAlreadyCompressedFile(w, filePath, "scion_lab_"+fileName)
+		if err != nil {
+			s.BadRequestAndLog(w, nil, "Error reading the tarball. FileName: %v: %v", fileName, err)
+			return
+		}
+	}
+	if messageToAdmins != "" {
+		err = email.SendEmailToAdmins("ERROR During GetASData", messageToAdmins)
+		if err != nil {
+			fmt.Printf("ERROR (again): could not send email to admins: %v", err)
+		}
+		s.BadRequestAndLog(w, nil, "the request failed with IA %s, current version = %d, local version = %d",
+			ia, as.ConfVersion, localVersion)
+		return
+	}
 }
