@@ -512,11 +512,7 @@ func (s *SCIONLabASController) GetConnectionsForAP(w http.ResponseWriter, r *htt
 	conns := []APConnectionInfo{}
 	shouldStatusBeInAP := func(status uint8) bool {
 		switch status {
-		case models.Active:
-			return true
-		case models.Create:
-			return true
-		case models.Update:
+		case models.Active, models.Create, models.Update:
 			return true
 		default:
 			return false
