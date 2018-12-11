@@ -510,17 +510,22 @@ func (s *SCIONLabASController) GetConnectionsForAP(w http.ResponseWriter, r *htt
 	}
 	// var conns []APConnectionInfo
 	conns := []APConnectionInfo{}
-	for _, cn := range cns {
-		if cn.RespondStatus != models.Active &&
-			cn.RespondStatus != models.Create &&
-			cn.RespondStatus != models.Update {
-			// not pending to add or already active -> don't send info
-			continue
+	shouldStatusBeInAP := func(status uint8) bool {
+		switch status {
+		case models.Active, models.Create, models.Update:
+			return true
+		default:
+			return false
 		}
+	}
+	for _, cn := range cns {
 		if cn.Updated.Unix() > cutoff {
 			continue
 		}
 		userAS := cn.GetJoinAS()
+		if !shouldStatusBeInAP(cn.RespondStatus) || !shouldStatusBeInAP(userAS.Status) {
+			continue
+		}
 		cnInfo := APConnectionInfo{
 			ASID:      userAS.IAString(),
 			IsVPN:     cn.IsVPN,
