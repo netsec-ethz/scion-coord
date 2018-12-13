@@ -664,7 +664,8 @@ func generateLocalGen(asInfo *SCIONLabASInfo) error {
 		"--core_sign_priv_key_file="+CoreSigKey(isd),
 		"--core_cert_file="+CoreCertFile(isd),
 		"--trc_file="+TrcFile(isd),
-		"--package_path="+PackagePath)
+		"--package_path="+PackagePath,
+		"--no-prometheus")
 	pyPaths := []string{}
 	if pythonPath != "" {
 		pyPaths = []string{pythonPath}

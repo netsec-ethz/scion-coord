@@ -38,17 +38,14 @@ from lib.crypto.certificate import Certificate
 from lib.crypto.certificate_chain import CertificateChain
 from lib.packet.scion_addr import ISD_AS
 from lib.util import read_file
-from topology.generator import (
-    INITIAL_CERT_VERSION,
-    INITIAL_TRC_VERSION,
-    TopoID
-)
 
-# SCION-Utilities
+from topology.cert import INITIAL_TRC_VERSION, INITIAL_CERT_VERSION
+from topology.common import TopoID
+
+# # SCION-Utilities
 from local_config_util import (
     ASCredential,
     generate_sciond_config,
-    generate_zk_config,
     get_elem_dir,
     prep_supervisord_conf,
     write_as_conf_and_path_policy,
@@ -58,6 +55,8 @@ from local_config_util import (
     write_topology_file,
     write_zlog_file,
     write_overlay_config,
+    write_toml_files,
+    generate_prom_config,
     TYPES_TO_EXECUTABLES,
     TYPES_TO_KEYS,
 )
@@ -70,7 +69,7 @@ DEFAULT_CORE_CERT_FILE = os.path.join(SCION_COORD_PATH, "credentials", "ISD1.crt
 DEFAULT_CORE_SIG_KEY = os.path.join(SCION_COORD_PATH, "credentials", "ISD1.key")
 DEFAULT_TRC_FILE = os.path.join(SCION_COORD_PATH, "credentials", "ISD1.trc")
 
-
+# don't forget to commit local_config_util.py in scion-utilities
 def create_scionlab_as_local_gen(args, tp):
     """
     Creates the usual gen folder structure for an ISD/AS under web_scion/gen,
@@ -78,12 +77,13 @@ def create_scionlab_as_local_gen(args, tp):
     :param str isdas: ISD-AS as a string
     :param dict tp: the topology parameter file as a dict of dicts
     """
-    new_ia = ISD_AS(args.joining_ia)
+    new_ia = TopoID(args.joining_ia)
     core_ia = ISD_AS(args.core_ia)
     local_gen_path = os.path.join(args.package_path, args.user_id, 'gen')
     as_obj = generate_certificate(
         new_ia, core_ia, args.core_sign_priv_key_file, args.core_cert_file, args.trc_file)
     write_dispatcher_config(local_gen_path)
+    write_toml_files(local_gen_path, {new_ia: tp})
     for service_type, type_key in TYPES_TO_KEYS.items():
         executable_name = TYPES_TO_EXECUTABLES[service_type]
         instances = tp[type_key].keys()
@@ -91,23 +91,21 @@ def create_scionlab_as_local_gen(args, tp):
             config = prep_supervisord_conf(tp[type_key][instance_name], executable_name,
                                            service_type, instance_name, new_ia)
             instance_path = get_elem_dir(local_gen_path, new_ia, instance_name)
-            # TODO(ercanucan): pass the TRC file as a parameter
             write_certs_trc_keys(new_ia, as_obj, instance_path)
+
+
+
             write_as_conf_and_path_policy(new_ia, as_obj, instance_path)
             write_supervisord_config(config, instance_path)
             write_topology_file(tp, type_key, instance_path)
             write_zlog_file(service_type, instance_name, instance_path)
-    generate_zk_config(tp, new_ia, local_gen_path, simple_conf_mode=True)
     generate_sciond_config(TopoID(args.joining_ia), as_obj, tp, local_gen_path)
-    # We don't initiate the prometheous service for user ASes.
-    # generate_prom_config(ia, tp, gen_path)
     write_overlay_config(local_gen_path)
-
-
+    if not args.no_prometheus:
+        generate_prom_config(new_ia, tp, local_gen_path)
 
 def generate_certificate(joining_ia, core_ia, core_sign_priv_key_file, core_cert_file, trc_file):
-    """
-    """
+    """:returns an ASCredential object with every key and certificate for this AS"""
     core_ia_chain = CertificateChain.from_raw(read_file(core_cert_file))
     # AS cert is always expired one second before the expiration of the Core AS cert
     validity = core_ia_chain.core_as_cert.expiration_time - int(time.time()) - 1
@@ -123,12 +121,14 @@ def generate_certificate(joining_ia, core_ia, core_sign_priv_key_file, core_cert
     sig_priv_key_raw = base64.b64encode(SigningKey(private_key_sign)._signing_key).decode()
     joining_ia_chain = CertificateChain([cert, core_ia_chain.core_as_cert]).to_json()
     trc = open(trc_file).read()
-    master_as_key = base64.b64encode(Random.new().read(16)).decode('utf-8')
+    master0_as_key = base64.b64encode(os.urandom(16)).decode('utf-8')
+    master1_as_key = base64.b64encode(os.urandom(16)).decode('utf-8')
     key_dict = {
         'enc_key': enc_priv_key,
         'sig_key': sig_priv_key,
         'sig_key_raw': sig_priv_key_raw,
-        'master_as_key': master_as_key,
+        'master0_as_key': master0_as_key,
+        'master1_as_key': master1_as_key,
     }
     as_obj = ASCredential(joining_ia_chain, trc, key_dict)
     return as_obj
@@ -161,6 +161,9 @@ def main():
                         default=DEFAULT_PACKAGE_PATH)
     parser.add_argument("--user_id",
                         help='User Identifier (email + IA)')
+    parser.add_argument("--no-prometheus",
+                        help='Don\'t generate prometheus configuration',
+                        action='store_true',)
     args = parser.parse_args()
 
     with open(args.topo_file) as json_data:
