@@ -21,8 +21,11 @@
   },
   "BorderRouters": {
     "br{{.ISD_ID}}-{{.AS_ID}}-1": {
+      "CtrlAddr": {
+        "IPv4": {"Public": {"Addr": "{{.LOCAL_ADDR}}", "L4Port": 30042}}
+      },
       "InternalAddrs": {
-        "IPv4": {"PublicOverlay": {"Addr": "{{.LOCAL_ADDR}}","L4Port": 31042}}
+        "IPv4": {"PublicOverlay": {"Addr": "{{.LOCAL_ADDR}}","OverlayPort": 31042}}
       },
       "Interfaces": {
         "1": {
@@ -31,21 +34,15 @@
           "LinkTo": "PARENT",
           "Bandwidth": 1000,
           "MTU": 1472,
-          "PublicOverlay": {"Addr": "{{.IP}}","L4Port": {{.LOCAL_PORT}}},
-          "RemoteOverlay": {"Addr": "{{.REMOTE_ADDR}}","L4Port": {{.REMOTE_PORT}}},
-          "BindOverlay": {"Addr": "{{.BIND_IP}}","L4Port": {{.LOCAL_PORT}}}
+          "PublicOverlay": {"Addr": "{{.IP}}","OverlayPort": {{.LOCAL_PORT}}},
+          "RemoteOverlay": {"Addr": "{{.REMOTE_ADDR}}","OverlayPort": {{.REMOTE_PORT}}}{{if ne .BIND_IP .IP}},
+          "BindOverlay": {"Addr": "{{.BIND_IP}}","OverlayPort": {{.LOCAL_PORT}}} {{end}}
         }
       }
     }
   },
   "SibraService": {
-    "sb{{.ISD_ID}}-{{.AS_ID}}-1": {
-      "Public": [
-        {
-          "Addr": "{{.LOCAL_ADDR}}",
-          "L4Port": 31045
-        }
-      ]
-    }
+    "sb{{.ISD_ID}}-{{.AS_ID}}-1": {"Addrs": {
+        "IPv4": {"Public": {"Addr": "{{.LOCAL_ADDR}}","L4Port": 31045}}}}
   }
 }

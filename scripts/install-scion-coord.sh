@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # Installs the Coordinator and requirements, prepares the DB and runs the Coordinator.
-# If invoked with the docker switch, it will just do the installation and return.
 
 set -e
 
@@ -28,29 +27,6 @@ CONFDIR="$HOME/scionLabConfigs"
 basedir="$(realpath $(dirname $(realpath $0))/../)"
 files="$basedir/files/install-coordinator"
 
-usage="$(basename $0) [-n]
-Installs the Coordinator in this machine
-where:
-    -d      Install inside docker container. This means no service files and not starting services in this script."
-while getopts ":h" opt; do
-case $opt in
-    h)
-        echo "$usage"
-        exit 0
-        ;;
-    \?)
-        echo "Invalid option: -$OPTARG" >&2
-        echo "$usage" >&2
-        exit 1
-        ;;
-    :)
-        echo "Option -$OPTARG requires an argument." >&2
-        echo "$usage" >&2
-        exit 1
-        ;;
-esac
-done
-
 # coordinator sources
 echo "Coordinator Installer [CoIn]: Installing Coordinator..."
 mkdir -p "$NETSEC"
@@ -71,7 +47,7 @@ govendor sync
 echo "[CoIn]: done (Coordinator installed)."
 
 # SCION
-if [ -x "$basedir/scion_install_script.sh" ]; then
+if [ -x "$basedir/scion_install_script.sh" ] && [ ! -d $SC ]; then
     echo "[CoIn]: Installing / Checking SCION ..."
     bash "$basedir/scion_install_script.sh"
     source ~/.profile
@@ -118,9 +94,10 @@ echo "[CoIn]: done (SCION Coordinator binary built)."
 mkdir -p "$SCIONCOORD/credentials"
 if [ ! -f "$CONFDIR/easy-rsa/keys/ca.crt" ]; then
     # generate certificate for openVPN
-    echo "[CoIn]: Certificate for OpenVPN not found. Manually copy it from the backup to $CONFDIR/easy-rsa/keys/"
-    mkdir -p "$CONFDIR/easy-rsa/keys"
-    exit 1
+    echo "[CoIn]: Certificate for OpenVPN not found. Copy it manually from the backup to $CONFDIR/easy-rsa/keys/"
+    mkdir -p "$CONFDIR/"
+    [ ! -d "$CONFDIR/easy-rsa" ] && cp -r /usr/share/easy-rsa "$CONFDIR/"
+    (cd $CONFDIR/easy-rsa&& ls -l && source vars && ./clean-all && ./build-ca || exit 1)
 fi
 
 # check if mysqld is running:
@@ -156,6 +133,9 @@ tmpfile=$(mktemp)
 cp "$files/scion-coord.service" "$tmpfile"
 sed -i "s|_USER_|$USER|g;s|/usr/local/go/bin|$(dirname $(which go))|g" "$tmpfile"
 sudo cp "$tmpfile" "scion-coord.service"
+sudo systemctl daemon-reload
+sudo systemctl enable "scion-coord"
+
 cp "$files/unit-status-mail@.service" "$tmpfile"
 sed -i "s|_USER_|$USER|g;s|/usr/local/go/bin|$(dirname $(which go))|g" "$tmpfile"
 sudo cp "$tmpfile" "unit-status-mail@.service"
@@ -163,20 +143,27 @@ popd >/dev/null
 sudo cp "$files/emailer.py" "/usr/local/bin/emailer"
 
 # if it doesn't exist, create the default configuration for the emailer:
-if [ ! -f "$HOME/.config/scion-coord/email.conf" ] || [ ! -f "$HOME/.config/scion-coord/recipients.txt" ][ ! -f "$HOME/.config/scion-coord/recipients.txt" ] then
-    echo "[CoIn]: We need the email.conf file. Please read the $files/README.md file"
+if [ ! -f "$HOME/.config/scion-coord/email.conf" ] || [ ! -f "$HOME/.config/scion-coord/recipients.txt" ]; then
+    echo "[CoIn]: We need the email.conf file. Please read the scripts/README.md file"
     exit 1
 fi
 
 # submodules
 pushd "$basedir" >/dev/null
 git submodule update --remote --recursive
-# in particular for the update V2, sub/scion_nextversion needs to be updated with one file, by running make:
-cd "sub/scion_nextversion/go"
-make ../proto/go.capnp
+if [ -d "sub/scion_nextversion/go" ]; then
+    # in particular for the update V2, sub/scion_nextversion needs to be updated with one file, by running make:
+    cd "sub/scion_nextversion/go"
+    make ../proto/go.capnp
+fi
 popd >/dev/null
 
-sudo systemctl daemon-reload
+if [ ! -f "$SCIONCOORD/conf/development.conf" ]; then
+    cp "$SCIONCOORD/conf/development.conf.default" "$SCIONCOORD/conf/"
+    echo "Copied the template configuration file. You must review it before running the coordinator"
+    exit 1
+fi
+
 sudo systemctl start "scion-coord"
 sleep 1
 systemctl status "scion-coord" >/dev/null && fail=0 || fail=1
@@ -184,5 +171,5 @@ if [ $fail -ne 0 ]; then
     echo "[CoIn]: Problem starting the service. Please check with systemctl status scion-coord or journalctl -xe"
     exit 1
 fi
-sudo systemctl enable "scion-coord"
+
 echo "[CoIn]: Success."

@@ -24,6 +24,7 @@ import base64
 import json
 import os
 import time
+import shutil
 
 # External packages
 from Crypto import Random
@@ -56,6 +57,7 @@ from local_config_util import (
     write_zlog_file,
     write_overlay_config,
     write_toml_files,
+    generate_zk_config,
     generate_prom_config,
     TYPES_TO_EXECUTABLES,
     TYPES_TO_KEYS,
@@ -79,11 +81,21 @@ def create_scionlab_as_local_gen(args, tp):
     """
     new_ia = TopoID(args.joining_ia)
     core_ia = ISD_AS(args.core_ia)
-    local_gen_path = os.path.join(args.package_path, args.user_id, 'gen')
+    local_gen_path = os.path.join(args.package_path, args.user_id)
+    try:
+        os.makedirs(local_gen_path)
+    except:
+        pass
+    os.chdir(local_gen_path) # functions from $SC/python/topology use relative paths
+    local_gen_path = os.path.join(local_gen_path, 'gen')
+    try:
+        shutil.rmtree(local_gen_path)
+    except:
+        pass
     as_obj = generate_certificate(
         new_ia, core_ia, args.core_sign_priv_key_file, args.core_cert_file, args.trc_file)
     write_dispatcher_config(local_gen_path)
-    write_toml_files(local_gen_path, {new_ia: tp})
+    write_toml_files(tp, new_ia)
     for service_type, type_key in TYPES_TO_KEYS.items():
         executable_name = TYPES_TO_EXECUTABLES[service_type]
         instances = tp[type_key].keys()
@@ -99,6 +111,7 @@ def create_scionlab_as_local_gen(args, tp):
             write_supervisord_config(config, instance_path)
             write_topology_file(tp, type_key, instance_path)
             write_zlog_file(service_type, instance_name, instance_path)
+    generate_zk_config(tp, new_ia, local_gen_path, simple_conf_mode=True)
     generate_sciond_config(TopoID(args.joining_ia), as_obj, tp, local_gen_path)
     write_overlay_config(local_gen_path)
     if not args.no_prometheus:
@@ -113,8 +126,9 @@ def generate_certificate(joining_ia, core_ia, core_sign_priv_key_file, core_cert
     core_ia_sig_priv_key = base64.b64decode(read_file(core_sign_priv_key_file))
     public_key_sign, private_key_sign = generate_sign_keypair()
     public_key_encr, private_key_encr = generate_enc_keypair()
+    # using INITIAL_CERT_VERSION + 1 from 2019.01. update to always generate a new version of the certificate
     cert = Certificate.from_values(
-        str(joining_ia), str(core_ia), INITIAL_TRC_VERSION, INITIAL_CERT_VERSION, comment,
+        str(joining_ia), str(core_ia), INITIAL_TRC_VERSION, INITIAL_CERT_VERSION + 1, comment,
         False, validity, public_key_encr, public_key_sign, core_ia_sig_priv_key)
     sig_priv_key = base64.b64encode(private_key_sign).decode()
     enc_priv_key = base64.b64encode(private_key_encr).decode()
@@ -166,8 +180,18 @@ def main():
                         action='store_true',)
     args = parser.parse_args()
 
+    def jsonhook(d):
+        ret = {}
+        for k,v in d.items():
+            try:
+                k = int(k)
+            except:
+                pass
+            ret[k] = v
+        return ret
+
     with open(args.topo_file) as json_data:
-        topo_dict = json.load(json_data)
+        topo_dict = json.load(json_data, object_hook=jsonhook)
     create_scionlab_as_local_gen(args, topo_dict)
 
 
