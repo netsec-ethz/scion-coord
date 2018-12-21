@@ -104,9 +104,6 @@ def create_scionlab_as_local_gen(args, tp):
                                            service_type, instance_name, new_ia)
             instance_path = get_elem_dir(local_gen_path, new_ia, instance_name)
             write_certs_trc_keys(new_ia, as_obj, instance_path)
-
-
-
             write_as_conf_and_path_policy(new_ia, as_obj, instance_path)
             write_supervisord_config(config, instance_path)
             write_topology_file(tp, type_key, instance_path)
@@ -140,7 +137,6 @@ def generate_certificate(joining_ia, core_ia, core_sign_priv_key_file, core_cert
     key_dict = {
         'enc_key': enc_priv_key,
         'sig_key': sig_priv_key,
-        'sig_key_raw': sig_priv_key_raw,
         'master0_as_key': master0_as_key,
         'master1_as_key': master1_as_key,
     }
