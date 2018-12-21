@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -255,7 +256,7 @@ func generateGenForAS(asInfo *SCIONLabASInfo) error {
 	}
 	// preserve certificates (don't use new ones if we had certs already)
 	if err = preserveCerts(asInfo); err != nil {
-		return fmt.Errorf("Error reusing existing certificates")
+		return fmt.Errorf("Error reusing existing certificates: %v", err)
 	}
 
 	// Generate VPN config if this is a VPN setup
@@ -715,7 +716,11 @@ func addAuxiliaryFiles(asInfo *SCIONLabASInfo) error {
 	return nil
 }
 
+// the generated AS will have new certificates. Only if they have a higher version that our cache
+// we will keep them. Otherwise we will replace them with our cache's
 func preserveCerts(asInfo *SCIONLabASInfo) error {
+	// this functions copies "certs" and "keys" from "src" to all
+	// "dstSubDirs" in "dst"
 	packageName := asInfo.UserPackageName()
 	log.Printf("Trying to preserve certificates for %s", packageName)
 	src := filepath.Join(PackagePath, CertsPath, packageName)
@@ -724,40 +729,78 @@ func preserveCerts(asInfo *SCIONLabASInfo) error {
 		fmt.Sprintf("ISD%d", asInfo.LocalAS.ISD),
 		fmt.Sprintf("AS%s", asInfo.LocalAS.IA().A.FileFmt()),
 	)
-	dstSubDirs := []string{"."}
+	dstSubDirs := []string{"."} // we assume we'll copy to the cache
 	if _, err := os.Stat(dst); os.IsNotExist(err) {
 		return fmt.Errorf("Path should exist but does not (%s): %v", dst, err)
 	}
-	if _, err := os.Stat(src); os.IsNotExist(err) {
-		log.Printf("First time generating certificates for %s", packageName)
-		src, dst = dst, src
-		dst = filepath.Join(dst, "V1")
-		err = os.MkdirAll(dst, 0700)
-		if err != nil {
-			return fmt.Errorf("Error preserving certificates. Cannot mkdir %s: %v", dst, err)
-		}
-		src = filepath.Join(src, "endhost")
-	} else if err != nil {
-		return fmt.Errorf("Error when stat on path %s: %v", src, err)
-	} else {
-		log.Printf("We have certificates for %s", packageName)
-		fileInfos, err := ioutil.ReadDir(src)
-		if err != nil {
-			return fmt.Errorf("Could not read directory %s: %v", src, err)
-		}
-		versions := []string{}
-		for _, f := range fileInfos {
-			name := f.Name()
-			if f.IsDir() && strings.HasPrefix(name, "V") {
-				versions = append(versions, name)
+	// get the highest version from the new AS:
+	newCertsPath := filepath.Join(dst, "endhost", "certs")
+	newCerts, err := filepath.Glob(filepath.Join(newCertsPath, "*.crt"))
+	if err != nil {
+		return fmt.Errorf("Could not read %s: %v", newCertsPath, err)
+	}
+	maxNewVersion := -1
+	for _, f := range newCerts {
+		re := regexp.MustCompile(`ISD.+-AS.+-(V\d+).crt$`)
+		groups := re.FindStringSubmatch(f)
+		if len(groups) == 2 {
+			v, err := strconv.Atoi(groups[1][1:])
+			if err != nil {
+				log.Printf(`skipping version "%s": cannot parse: %v`, groups[1][1:], err)
+				continue
+			}
+			if v > maxNewVersion {
+				maxNewVersion = v
 			}
 		}
-		if len(versions) < 1 {
-			return fmt.Errorf("No versions inside the certificate directory for %s", packageName)
+	}
+	if maxNewVersion < 0 {
+		return fmt.Errorf("Could not find a valid certificate version for AS in %s", packageName)
+	}
+	// get the highest version from the cache:
+	maxExistingVersion := -1
+	if _, err := os.Stat(src); os.IsNotExist(err) {
+		// we don't have a cache yet. Create it with no version yet
+		log.Printf("No certificate cache, creating empty one")
+		err = os.MkdirAll(src, 0700)
+		if err != nil {
+			return fmt.Errorf("Error calling mkdir on %s: %v", dst, err)
 		}
-		sort.Sort(sort.Reverse(sort.StringSlice(versions)))
-		src = filepath.Join(src, versions[0])
-		fileInfos, err = ioutil.ReadDir(dst)
+	} else if err == nil {
+		// we have a cache. Find out the newest version
+		log.Printf("Certificate cache found.")
+		existingVersions, err := filepath.Glob(filepath.Join(src, "V*"))
+		if err != nil {
+			return fmt.Errorf("Could not read %s: %v", newCertsPath, err)
+		}
+		for _, d := range existingVersions {
+			d = filepath.Base(d)
+			v, err := strconv.Atoi(d[1:])
+			if err != nil {
+				log.Printf(`skipping version "%s": cannot parse: %v`, d[1:], err)
+				continue
+			}
+			if v > maxExistingVersion {
+				maxExistingVersion = v
+			}
+		}
+	} else {
+		return fmt.Errorf("Error when stat on path %s: %v", src, err)
+	}
+	log.Printf("Cert. versions. Existing is %d, generated is %d", maxExistingVersion, maxNewVersion)
+	if maxNewVersion > maxExistingVersion {
+		// new generated certificate version is newer. Swap src and dst
+		src, dst = dst, src
+		dst = filepath.Join(dst, fmt.Sprintf("V%d", maxNewVersion))
+		err = os.MkdirAll(dst, 0700)
+		if err != nil {
+			return fmt.Errorf("Error calling mkdir on %s: %v", dst, err)
+		}
+		src = filepath.Join(src, "endhost") // use the certs from endhost
+	} else {
+		// "normal" case, from cache to AS folder. Find the dstSubDirs
+		src = filepath.Join(src, fmt.Sprintf("V%d", maxExistingVersion))
+		fileInfos, err := ioutil.ReadDir(dst)
 		if err != nil {
 			return fmt.Errorf("Could not read directory %s: %v", dst, err)
 		}
@@ -773,11 +816,8 @@ func preserveCerts(asInfo *SCIONLabASInfo) error {
 			}
 		}
 	}
-	// copy from src to dst
-	thingsToCopy := []string{
-		"certs",
-		"keys"}
-	for _, dir := range thingsToCopy {
+	// in any case, copy from src to dst:
+	for _, dir := range []string{"certs", "keys"} {
 		srcItem := filepath.Join(src, dir)
 		_, err := os.Stat(srcItem)
 		if err != nil {
