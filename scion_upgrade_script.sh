@@ -127,6 +127,10 @@ echo "Invoking update script with $ACCOUNT_ID $ACCOUNT_SECRET $IA"
 # systemd files upgrade:
 check_system_files
 
+if [ -f "$SC/gen/coord_url" ]; then
+    SCION_COORD_URL=$(cat "$SC/gen/coord_url")
+    echo "Special Coordinator in use. URL: $SCION_COORD_URL"
+fi
 UPDATE_BRANCH=$(curl --fail "${SCION_COORD_URL}/api/as/queryUpdateBranch/${ACCOUNT_ID}/${ACCOUNT_SECRET}?IA=${IA}" || true)
 
 if [  -z "$UPDATE_BRANCH"  ]
