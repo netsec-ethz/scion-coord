@@ -132,16 +132,20 @@ fi
 
 echo "Running git fetch $REMOTE_REPO $UPDATE_BRANCH &>/dev/null"
 git fetch "$REMOTE_REPO" "$UPDATE_BRANCH" &>/dev/null
-head_commit=$(git rev-parse "$REMOTE_REPO"/"$UPDATE_BRANCH")
+head_commit=$(git rev-parse "${REMOTE_REPO}/${UPDATE_BRANCH}")
 [[ $(git branch "$UPDATE_BRANCH" --contains "$head_commit" 2>/dev/null | wc -l) -gt 0 ]] && needtoreset=0 || needtoreset=1
+[[ $(git rev-parse --abbrev-ref --symbolic-full-name @{u}) == "${REMOTE_REPO}/${UPDATE_BRANCH}" ]] && badtracking=0 || badtracking=1
 [[ -f "scionupgrade.auto.begin" ]] && [[ -f "scionupgrade.auto.end" ]] && dirtybuild=0 || dirtybuild=1
-echo "Need to reset? $needtoreset . Dirty build? $dirtybuild"
-if [ $needtoreset -eq 0 ] && [ $dirtybuild -eq 0 ]; then
+echo "Need to reset? $needtoreset . Dirty build? $dirtybuild . Bad tracked branch? $badtracking"
+if [ $needtoreset -eq 0 ] && [ $badtracking -eq 0 ] && [ $dirtybuild -eq 0 ]; then
     echo "SCION version is already up to date and ready!"
 else
     touch "scionupgrade.auto.begin"
     git stash >/dev/null # just in case something was locally modified
-    git reset --hard "$REMOTE_REPO"/"$UPDATE_BRANCH"
+    if [ $badtracking -ne 0 ]; then
+        git checkout "${REMOTE_REPO}/${UPDATE_BRANCH}" -b "$UPDATE_BRANCH" || git checkout "$UPDATE_BRANCH"
+    fi
+    git reset --hard "${REMOTE_REPO}/${UPDATE_BRANCH}"
     # apply platform dependent patches, etc:
     ARCH=$(dpkg --print-architecture)
     echo -n "This architecture: $ARCH. "
