@@ -154,7 +154,7 @@ echo "Running git fetch $REMOTE_REPO $UPDATE_BRANCH &>/dev/null"
 git fetch "$REMOTE_REPO" "$UPDATE_BRANCH" &>/dev/null
 head_commit=$(git rev-parse "${REMOTE_REPO}/${UPDATE_BRANCH}")
 [[ $(git branch "$UPDATE_BRANCH" --contains "$head_commit" 2>/dev/null | wc -l) -gt 0 ]] && needtoreset=0 || needtoreset=1
-[[ $(git rev-parse --abbrev-ref --symbolic-full-name @{u}) == "${REMOTE_REPO}/${UPDATE_BRANCH}" ]] && badtracking=0 || badtracking=1
+[[ $(git rev-parse --abbrev-ref --symbolic-full-name @{upstream}) == "${REMOTE_REPO}/${UPDATE_BRANCH}" ]] && badtracking=0 || badtracking=1
 [[ -f "scionupgrade.auto.inprogress" ]] && dirtybuild=1 || dirtybuild=0
 echo "Need to reset? $needtoreset . Dirty build? $dirtybuild . Bad tracked branch? $badtracking"
 if [ $needtoreset -eq 0 ] && [ $badtracking -eq 0 ] && [ $dirtybuild -eq 0 ]; then
