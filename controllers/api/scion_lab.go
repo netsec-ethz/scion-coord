@@ -1103,16 +1103,6 @@ func computeNewGenFolder(as *models.SCIONLabAS) error {
 		return err
 	}
 	// finally, generate the gen folder:
-	// modify the paths to point to a new scionproto/scion/python place, and use that one
-	setPyPath := func(oldScionPath string) {
-		scionPath = oldScionPath
-		pythonPath = filepath.Join(scionPath, "python")
-	}
-	if config.NextVersionPythonPath != "" {
-		// two step ready, use the next version of SCION
-		defer setPyPath(scionPath)
-		setPyPath(config.NextVersionPythonPath)
-	}
 	os.RemoveAll(asInfo.UserPackagePath())
 	return generateGenForAS(asInfo)
 }

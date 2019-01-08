@@ -151,11 +151,6 @@ fi
 # submodules
 pushd "$basedir" >/dev/null
 git submodule update --remote --recursive
-if [ -d "sub/scion_nextversion/go" ]; then
-    # in particular for the update V2, sub/scion_nextversion needs to be updated with one file, by running make:
-    cd "sub/scion_nextversion/go"
-    make ../proto/go.capnp
-fi
 popd >/dev/null
 
 if [ ! -f "$SCIONCOORD/conf/development.conf" ]; then
