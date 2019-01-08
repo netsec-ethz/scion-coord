@@ -233,6 +233,7 @@ func (s *SCIONLabASController) GenerateNewSCIONLabAS(w http.ResponseWriter, r *h
 		Type:        models.VM,
 		Credits:     config.VirtualCreditStartCredits,
 		ConfVersion: 0,
+		Branch:      config.TestingCoordinatorBranch,
 	}
 	if err := newAS.Insert(); err != nil {
 		log.Printf("Error inserting new AS for %v: %v", uSess.Email, err)
@@ -929,9 +930,17 @@ func createUserLoginConfiguration(asInfo *SCIONLabASInfo) error {
 	}
 
 	confVersion := strconv.FormatUint(uint64(asInfo.LocalAS.ConfVersion), 10)
-	ioutil.WriteFile(filepath.Join(userGenDir, "coord_conf.ver"), []byte(confVersion), 0644)
+	err = ioutil.WriteFile(filepath.Join(userGenDir, "coord_conf.ver"), []byte(confVersion), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write configuration version to file: %v", err)
+	}
+
+	if config.TestingCoordinatorBranch != "" {
+		// this is a testing Coordinator, write down its URL
+		err = ioutil.WriteFile(filepath.Join(userGenDir, "coord_url"), []byte(config.HTTPHostAddress), 0644)
+		if err != nil {
+			return fmt.Errorf("failed to write Coordinator URL to file: %v", err)
+		}
 	}
 
 	return nil

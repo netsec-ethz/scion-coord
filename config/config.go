@@ -88,6 +88,8 @@ var (
 	IMGBuilderAddressInternal = goconf.AppConf.String("img_builder.address.internal")
 	IMGBuilderSecretToken     = goconf.AppConf.String("img_builder.secret_token")
 	IMGBuilderBuildDelay, _   = goconf.AppConf.Int64("img_builder.build_delay")
+
+	TestingCoordinatorBranch = goconf.AppConf.String("testing_coordinator.branch")
 )
 
 func init() {
