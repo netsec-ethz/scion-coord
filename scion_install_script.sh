@@ -298,7 +298,7 @@ Unattended-Upgrade::Automatic-Reboot-Time "02:00";' | sudo tee /etc/apt/apt.conf
 
 SC=/home/ubuntu/go/src/github.com/scionproto/scion
 cd "$SC"
-[[ -f "scionupgrade.auto.begin" ]] && [[ ! -f "scionupgrade.auto.end" ]] && dirtybuild=1 || dirtybuild=0
+[[ -f "scionupgrade.auto.inprogress" ]] && dirtybuild=1 || dirtybuild=0
 if [ $dirtybuild -eq 1 ]; then
     printf "\n"
     printf "===========================================================================\n"
