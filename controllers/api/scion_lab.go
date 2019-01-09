@@ -1337,17 +1337,25 @@ func (s *SCIONLabASController) GetASData(w http.ResponseWriter, r *http.Request)
 	str := r.URL.Query().Get("local_version")
 	v64, err := strconv.ParseUint(str, 10, 32)
 	if err != nil {
-		log.Printf("WARNINC! version string (%s) cannot be converted to a 32 uint. Using 0 as version", str)
+		log.Printf("WARNING! version string (%s) cannot be converted to a 32 uint. Using 0 as version", str)
 	}
 	localVersion := uint(v64)
 	log.Printf("IA %s, current version %d, local version is %d", ia, as.ConfVersion, localVersion)
-	messageToAdmins := ""
 	if !forceFlag && localVersion > as.ConfVersion {
-		messageToAdmins = fmt.Sprintf("The AS with IA %s reported a possibly wrong local version "+
+		messageToAdmins := fmt.Sprintf("The AS with IA %s reported a possibly wrong local version "+
 			"> AS.ConvVersion (%d > %d)", ia, localVersion, as.ConfVersion)
-	} else if !forceFlag && localVersion == as.ConfVersion {
+		err = email.SendEmailToAdmins("ERROR During GetASData", messageToAdmins)
+		if err != nil {
+			fmt.Printf("ERROR (again): could not send email to admins: %v", err)
+		}
+		// try to recover by sending the configuration or the code to remove the AS:
+		forceFlag = true
+	}
+	if !forceFlag && localVersion == as.ConfVersion {
 		w.WriteHeader(http.StatusNotModified)
 	} else if as.Status == models.Remove {
+		// write the version in the header "Coord_conv.ver" for the client to remember
+		w.Header().Add("Coord_conf.ver", strconv.FormatUint(uint64(as.ConfVersion), 10))
 		w.WriteHeader(http.StatusResetContent)
 	} else {
 		err = computeNewGenFolder(as)
@@ -1362,14 +1370,5 @@ func (s *SCIONLabASController) GetASData(w http.ResponseWriter, r *http.Request)
 			s.BadRequestAndLog(w, nil, "Error reading the tarball. FileName: %v: %v", fileName, err)
 			return
 		}
-	}
-	if messageToAdmins != "" {
-		err = email.SendEmailToAdmins("ERROR During GetASData", messageToAdmins)
-		if err != nil {
-			fmt.Printf("ERROR (again): could not send email to admins: %v", err)
-		}
-		s.BadRequestAndLog(w, nil, "the request failed with IA %s, current version = %d, local version = %d",
-			ia, as.ConfVersion, localVersion)
-		return
 	}
 }
