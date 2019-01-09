@@ -213,6 +213,9 @@ else
     pushd go >/dev/null
     govendor sync || true
     popd >/dev/null
+    # because upgrading to SCIONLab 2019-01 will fail if installed, remove it:
+    sudo apt-get remove -y parallel
+    mkdir -p gen-cache/
     bash -c 'yes | GO_INSTALL=true ./env/deps' || echo "ERROR: Dependencies failed. Starting SCION might fail!"
     echo "Rebuilding SCION..."
     ./scion.sh build && rm -f "scionupgrade.auto.inprogress" || true
