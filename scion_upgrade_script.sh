@@ -77,7 +77,7 @@ Unattended-Upgrade::Automatic-Reboot-Time "02:00";' | sudo tee /etc/apt/apt.conf
 
 SC=/home/ubuntu/go/src/github.com/scionproto/scion
 cd "$SC"
-[[ -f "scionupgrade.auto.begin" ]] && [[ ! -f "scionupgrade.auto.end" ]] && dirtybuild=1 || dirtybuild=0
+[[ -f "scionupgrade.auto.inprogress" ]] && dirtybuild=1 || dirtybuild=0
 if [ $dirtybuild -eq 1 ]; then
     printf "\n"
     printf "===========================================================================\n"
@@ -154,13 +154,12 @@ echo "Running git fetch $REMOTE_REPO $UPDATE_BRANCH &>/dev/null"
 git fetch "$REMOTE_REPO" "$UPDATE_BRANCH" &>/dev/null
 head_commit=$(git rev-parse "$REMOTE_REPO"/"$UPDATE_BRANCH")
 [[ $(git branch "$UPDATE_BRANCH" --contains "$head_commit" 2>/dev/null | wc -l) -gt 0 ]] && needtoreset=0 || needtoreset=1
-[[ -f "scionupgrade.auto.begin" ]] && [[ ! -f "scionupgrade.auto.end" ]] && dirtybuild=1 || dirtybuild=0
+[[ -f "scionupgrade.auto.inprogress" ]] && dirtybuild=1 || dirtybuild=0
 echo "Need to reset? $needtoreset . Dirty build? $dirtybuild"
 if [ $needtoreset -eq 0 ] && [ $dirtybuild -eq 0 ]; then
     echo "SCION version is already up to date and ready!"
 else
-    rm -f "scionupgrade.auto.end" &>/dev/null
-    touch "scionupgrade.auto.begin"
+    touch "scionupgrade.auto.inprogress"
     # anounce we are upgrading now
     [ -x /etc/update-motd.d/99-scionlab-upgrade ] && /etc/update-motd.d/99-scionlab-upgrade | wall
     git stash >/dev/null # just in case something was locally modified
@@ -208,7 +207,7 @@ else
     popd >/dev/null
     bash -c 'yes | GO_INSTALL=true ./env/deps' || echo "ERROR: Dependencies failed. Starting SCION might fail!"
     echo "Rebuilding SCION..."
-    ./scion.sh build && touch "scionupgrade.auto.end" || true
+    ./scion.sh build && rm -f "scionupgrade.auto.inprogress" || true
     if [ $swapadded -eq 1 ]; then
         echo "Removing swap space..."
         sudo swapoff /tmp/swap || true
