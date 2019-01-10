@@ -45,7 +45,6 @@ onexit() {
         exit $CODE
     fi
     [ ! -z "$TEMPTGZ" ] && rm -f "$TEMPTGZ"
-    [ ! -z "$TEMPHEADERS" ] && rm -f "$TEMPHEADERS"
     [ ! -z "$TMP" ] && rm -rf "$TMP"
 }
 trap onexit EXIT
@@ -68,16 +67,18 @@ ACC_PW=$(cat $SC/gen/account_secret)
 
 cd /tmp
 TEMPTGZ=$(mktemp -u /tmp/gen-data-XXXXXX.tgz)
-TEMPHEADERS=$(mktemp -u /tmp/headers-XXXXXX.txt)
-HTTP_CODE=$(curl -s -w "%{http_code}" "$SCION_COORD_URL/api/as/getASData/$ACC_ID/$ACC_PW/$IA?${LOCAL_VER}" --output ${TEMPTGZ} -D ${TEMPHEADERS}) || { echo "curl failed with code $?. Aborting"; exit 1; }
-VERSION_IN_COORD=$(grep -oP 'Coord_conf\.ver: \K\w+' $TEMPHEADERS || true)
+HTTP_CODE=$(curl -s -w "%{http_code}" "$SCION_COORD_URL/api/as/getASData/$ACC_ID/$ACC_PW/$IA?${LOCAL_VER}" --output ${TEMPTGZ}) || { echo "curl failed with code $?. Aborting"; exit 1; }
 if [ $HTTP_CODE -eq 304 ]; then
     echo "Existing AS configuration is up to date"
     exit 0
 elif [ $HTTP_CODE -eq 205 ]; then
-    echo "AS is detached"
+    echo "AS should be detached"
+    if [ ! -d $SC/gen/ISD* ] && [ ! -d $SC/gen/dispatcher ]; then
+        echo "AS is already detached"
+        exit 0
+    fi
 elif [ $HTTP_CODE -eq 200 ]; then
-    echo "New AS configuration"
+    echo "There is a new AS configuration"
 else
     echo "Unhandled status code received from Coordinator: $HTTP_CODE"
     [ -f $TEMPTGZ ] && file $TEMPTGZ | grep ASCII >/dev/null 2>&1 &&  echo "Coordinator message is:" && cat $TEMPTGZ
@@ -104,7 +105,6 @@ else # must be code 205: detaching AS
     cp -rL "$SC/gen" .
     DIR="$TMP"
     rm -rf $DIR/gen/ISD* $DIR/gen/dispatcher
-    echo "$VERSION_IN_COORD" > "$DIR/gen/coord_conf.ver"
 fi
 cd $SC
 # backup_gen

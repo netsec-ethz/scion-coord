@@ -1354,8 +1354,6 @@ func (s *SCIONLabASController) GetASData(w http.ResponseWriter, r *http.Request)
 	if !forceFlag && localVersion == as.ConfVersion {
 		w.WriteHeader(http.StatusNotModified)
 	} else if as.Status == models.Remove {
-		// write the version in the header "Coord_conv.ver" for the client to remember
-		w.Header().Add("Coord_conf.ver", strconv.FormatUint(uint64(as.ConfVersion), 10))
 		w.WriteHeader(http.StatusResetContent)
 	} else {
 		err = computeNewGenFolder(as)
