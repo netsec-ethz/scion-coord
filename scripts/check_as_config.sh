@@ -44,8 +44,8 @@ onexit() {
     if [ $CODE -ne 0 ]; then
         exit $CODE
     fi
-    [ ! -z "$TEMPTGZ" ] && rm -f "/tmp/${TEMPTGZ}"
-    [ ! -z "$TEMPHEADERS" ] && rm -f "/tmp/${TEMPHEADERS}"
+    [ ! -z "$TEMPTGZ" ] && rm -f "$TEMPTGZ"
+    [ ! -z "$TEMPHEADERS" ] && rm -f "$TEMPHEADERS"
     [ ! -z "$TMP" ] && rm -rf "$TMP"
 }
 trap onexit EXIT
@@ -67,9 +67,8 @@ ACC_PW=$(cat $SC/gen/account_secret)
 [ $force -eq 1 ] && LOCAL_VER="force=1" || LOCAL_VER="local_version=$LOCAL_VER"
 
 cd /tmp
-TEMPTGZ=$(mktemp gen-data-XXXXXX.tgz)
-TEMPHEADERS=$(mktemp headers-XXXXXX.txt)
-rm -f $TEMPTGZ $TEMPHEADERS
+TEMPTGZ=$(mktemp -u /tmp/gen-data-XXXXXX.tgz)
+TEMPHEADERS=$(mktemp -u /tmp/headers-XXXXXX.txt)
 HTTP_CODE=$(curl -s -w "%{http_code}" "$SCION_COORD_URL/api/as/getASData/$ACC_ID/$ACC_PW/$IA?${LOCAL_VER}" --output ${TEMPTGZ} -D ${TEMPHEADERS}) || { echo "curl failed with code $?. Aborting"; exit 1; }
 VERSION_IN_COORD=$(grep -oP 'Coord_conf\.ver: \K\w+' $TEMPHEADERS || true)
 if [ $HTTP_CODE -eq 304 ]; then
@@ -81,7 +80,7 @@ elif [ $HTTP_CODE -eq 200 ]; then
     echo "New AS configuration"
 else
     echo "Unhandled status code received from Coordinator: $HTTP_CODE"
-    [ -f /tmp/${TEMPTGZ} ] && file /tmp/${TEMPTGZ} | grep ASCII >/dev/null 2>&1 &&  echo "Coordinator message is:" && cat /tmp/${TEMPTGZ}
+    [ -f $TEMPTGZ ] && file $TEMPTGZ | grep ASCII >/dev/null 2>&1 &&  echo "Coordinator message is:" && cat $TEMPTGZ
     exit 1
 fi
 # we received a new AS configuration or AS was detached
@@ -92,12 +91,12 @@ TMP=$(mktemp -d)
 cd $TMP
 if [ $HTTP_CODE -eq 200 ]; then
     echo "Expanding tar file in $TMP"
-    tar xf /tmp/${TEMPTGZ}
+    tar xf $TEMPTGZ
     # copy gen folder:
     DIR=$(ls)
     if [ $(echo $DIR | wc -l) -ne 1 ]; then
         # failed assertion
-        echo "Expected exactly one entry in the downloaded tar file /tmp/${TEMPTGZ} but found a different number. Aborting"
+        echo "Expected exactly one entry in the downloaded tar file $TEMPTGZ but found a different number. Aborting"
         exit 1
     fi
     DIR=$(realpath $TMP/$DIR)
@@ -105,7 +104,6 @@ else # must be code 205: detaching AS
     cp -rL "$SC/gen" .
     DIR="$TMP"
     rm -rf $DIR/gen/ISD* $DIR/gen/dispatcher
-    echo "Guessing the new AS configuration version to be $((LOCAL_VER + 1))"
     echo "$VERSION_IN_COORD" > "$DIR/gen/coord_conf.ver"
 fi
 cd $SC
