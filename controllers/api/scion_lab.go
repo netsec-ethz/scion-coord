@@ -1317,6 +1317,7 @@ func (s *SCIONLabASController) ConfirmUpdate(w http.ResponseWriter, r *http.Requ
 // 205 (reset content) if the AS needs to delete its gen folder
 // otherwise 200 with the TGZ the AS can automatically untar and use. It will include all what the users
 // download from the web page directly (VPN, README, etc).
+// If the force=true (or force=1) flag was specified, ignore versions and assume client's is older
 // E.g. curl -s -D - --output myfile.tgz http://localhost:8080/api/as/getASData/someid/some_secret/9-ffaa_1_1?local_version=1
 func (s *SCIONLabASController) GetASData(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -1332,18 +1333,25 @@ func (s *SCIONLabASController) GetASData(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	ia = as.IAString() // because we get the AS ignoring the ISD part, the real ia could be different
+	forceFlag, _ := strconv.ParseBool(r.URL.Query().Get("force"))
 	str := r.URL.Query().Get("local_version")
 	v64, err := strconv.ParseUint(str, 10, 32)
 	if err != nil {
-		log.Printf("WARNINC! version string (%s) cannot be converted to a 32 uint. Using 0 as version", str)
+		log.Printf("WARNING! version string (%s) cannot be converted to a 32 uint. Using 0 as version", str)
 	}
 	localVersion := uint(v64)
 	log.Printf("IA %s, current version %d, local version is %d", ia, as.ConfVersion, localVersion)
-	messageToAdmins := ""
-	if localVersion > as.ConfVersion {
-		messageToAdmins = fmt.Sprintf("The AS with IA %s reported a possibly wrong local version "+
+	if !forceFlag && localVersion > as.ConfVersion {
+		messageToAdmins := fmt.Sprintf("The AS with IA %s reported a possibly wrong local version "+
 			"> AS.ConvVersion (%d > %d)", ia, localVersion, as.ConfVersion)
-	} else if localVersion == as.ConfVersion {
+		err = email.SendEmailToAdmins("ERROR During GetASData", messageToAdmins)
+		if err != nil {
+			fmt.Printf("ERROR (again): could not send email to admins: %v", err)
+		}
+		// try to recover by sending the configuration or the code to remove the AS:
+		forceFlag = true
+	}
+	if !forceFlag && localVersion == as.ConfVersion {
 		w.WriteHeader(http.StatusNotModified)
 	} else if as.Status == models.Remove {
 		w.WriteHeader(http.StatusResetContent)
@@ -1360,14 +1368,5 @@ func (s *SCIONLabASController) GetASData(w http.ResponseWriter, r *http.Request)
 			s.BadRequestAndLog(w, nil, "Error reading the tarball. FileName: %v: %v", fileName, err)
 			return
 		}
-	}
-	if messageToAdmins != "" {
-		err = email.SendEmailToAdmins("ERROR During GetASData", messageToAdmins)
-		if err != nil {
-			fmt.Printf("ERROR (again): could not send email to admins: %v", err)
-		}
-		s.BadRequestAndLog(w, nil, "the request failed with IA %s, current version = %d, local version = %d",
-			ia, as.ConfVersion, localVersion)
-		return
 	}
 }
