@@ -3,7 +3,7 @@
 set -e
 
 # version of the systemd files:
-SERVICE_CURRENT_VERSION="0.6"
+SERVICE_CURRENT_VERSION="0.7"
 
 # version less or equal. E.g. verleq 1.9 2.0.8  == true (1.9 <= 2.0.8)
 verleq() {
@@ -26,6 +26,7 @@ check_system_files() {
             sudo cp "$tmpfile" "$f"
             need_to_reload=1
         fi
+        echo "check_system_files $f : is $VERS < $SERVICE_CURRENT_VERSION ? $need_to_reload"
     done
     if [ $need_to_reload -eq 1 ]; then
         if [ -d "/vagrant" ]; then # iff this is a VM
@@ -69,6 +70,25 @@ check_system_files() {
 };
 Unattended-Upgrade::Automatic-Reboot "true";
 Unattended-Upgrade::Automatic-Reboot-Time "02:00";' | sudo tee /etc/apt/apt.conf.d/51unattended-upgrades >/dev/null
+            fi
+            if [ ! -x /etc/update-motd.d/99-scionlab-upgrade ]; then
+                cat << "MOTD1" | sudo tee /etc/update-motd.d/99-scionlab-upgrade > /dev/null
+#!/bin/bash
+
+SC=/home/ubuntu/go/src/github.com/scionproto/scion
+cd "$SC"
+[[ -f "scionupgrade.auto.inprogress" ]] && dirtybuild=1 || dirtybuild=0
+if [ $dirtybuild -eq 1 ]; then
+    printf "\n"
+    printf "===========================================================================\n"
+    printf "================= WARNING !! ==============================================\n"
+    printf "===========================================================================\n"
+    printf " SCIONLab is updating. Please wait until it finishes to run scion.sh start\n"
+    printf "===========================================================================\n"
+    printf "\n"
+fi
+MOTD1
+                sudo chmod 755 /etc/update-motd.d/99-scionlab-upgrade
             fi
         fi
         # don't attempt to stop the scionupgrade service as this script is a child of it and will also be killed !
@@ -134,12 +154,14 @@ echo "Running git fetch $REMOTE_REPO $UPDATE_BRANCH &>/dev/null"
 git fetch "$REMOTE_REPO" "$UPDATE_BRANCH" &>/dev/null
 head_commit=$(git rev-parse "$REMOTE_REPO"/"$UPDATE_BRANCH")
 [[ $(git branch "$UPDATE_BRANCH" --contains "$head_commit" 2>/dev/null | wc -l) -gt 0 ]] && needtoreset=0 || needtoreset=1
-[[ -f "scionupgrade.auto.begin" ]] && [[ -f "scionupgrade.auto.end" ]] && dirtybuild=0 || dirtybuild=1
+[[ -f "scionupgrade.auto.inprogress" ]] && dirtybuild=1 || dirtybuild=0
 echo "Need to reset? $needtoreset . Dirty build? $dirtybuild"
 if [ $needtoreset -eq 0 ] && [ $dirtybuild -eq 0 ]; then
     echo "SCION version is already up to date and ready!"
 else
-    touch "scionupgrade.auto.begin"
+    touch "scionupgrade.auto.inprogress"
+    # anounce we are upgrading now
+    [ -x /etc/update-motd.d/99-scionlab-upgrade ] && /etc/update-motd.d/99-scionlab-upgrade | wall
     git stash >/dev/null # just in case something was locally modified
     git reset --hard "$REMOTE_REPO"/"$UPDATE_BRANCH"
     # apply platform dependent patches, etc:
@@ -185,14 +207,16 @@ else
     popd >/dev/null
     bash -c 'yes | GO_INSTALL=true ./env/deps' || echo "ERROR: Dependencies failed. Starting SCION might fail!"
     echo "Rebuilding SCION..."
-    ./scion.sh build && touch "scionupgrade.auto.end" || true
+    ./scion.sh build && rm -f "scionupgrade.auto.inprogress" || true
     if [ $swapadded -eq 1 ]; then
         echo "Removing swap space..."
         sudo swapoff /tmp/swap || true
         echo "Swap space removed."
     fi
+    # announce we are done with the upgrade
+    printf "SCIONLab has been upgraded. You can now run any command involving scion.sh\n\n" | wall
     echo "Starting SCION again..."
-    ./scion.sh start || true
+    ./scion.sh start nobuild || true
 fi
 # update scion-viz
 if [ -d "./sub/scion-viz" ]; then
