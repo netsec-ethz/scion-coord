@@ -127,6 +127,10 @@ echo "Invoking update script with $ACCOUNT_ID $ACCOUNT_SECRET $IA"
 # systemd files upgrade:
 check_system_files
 
+if [ -f "$SC/gen/coord_url" ]; then
+    SCION_COORD_URL=$(cat "$SC/gen/coord_url")
+    echo "Special Coordinator in use. URL: $SCION_COORD_URL"
+fi
 UPDATE_BRANCH=$(curl --fail "${SCION_COORD_URL}/api/as/queryUpdateBranch/${ACCOUNT_ID}/${ACCOUNT_SECRET}?IA=${IA}" || true)
 
 if [  -z "$UPDATE_BRANCH"  ]
@@ -152,18 +156,22 @@ fi
 
 echo "Running git fetch $REMOTE_REPO $UPDATE_BRANCH &>/dev/null"
 git fetch "$REMOTE_REPO" "$UPDATE_BRANCH" &>/dev/null
-head_commit=$(git rev-parse "$REMOTE_REPO"/"$UPDATE_BRANCH")
+head_commit=$(git rev-parse "${REMOTE_REPO}/${UPDATE_BRANCH}")
 [[ $(git branch "$UPDATE_BRANCH" --contains "$head_commit" 2>/dev/null | wc -l) -gt 0 ]] && needtoreset=0 || needtoreset=1
+[[ $(git rev-parse --abbrev-ref --symbolic-full-name @{upstream}) == "${REMOTE_REPO}/${UPDATE_BRANCH}" ]] && badtracking=0 || badtracking=1
 [[ -f "scionupgrade.auto.inprogress" ]] && dirtybuild=1 || dirtybuild=0
-echo "Need to reset? $needtoreset . Dirty build? $dirtybuild"
-if [ $needtoreset -eq 0 ] && [ $dirtybuild -eq 0 ]; then
+echo "Need to reset? $needtoreset . Dirty build? $dirtybuild . Bad tracked branch? $badtracking"
+if [ $needtoreset -eq 0 ] && [ $badtracking -eq 0 ] && [ $dirtybuild -eq 0 ]; then
     echo "SCION version is already up to date and ready!"
 else
     touch "scionupgrade.auto.inprogress"
     # anounce we are upgrading now
     [ -x /etc/update-motd.d/99-scionlab-upgrade ] && /etc/update-motd.d/99-scionlab-upgrade | wall
     git stash >/dev/null # just in case something was locally modified
-    git reset --hard "$REMOTE_REPO"/"$UPDATE_BRANCH"
+    if [ $badtracking -ne 0 ]; then
+        git checkout "${REMOTE_REPO}/${UPDATE_BRANCH}" -b "$UPDATE_BRANCH" || git checkout "$UPDATE_BRANCH"
+    fi
+    git reset --hard "${REMOTE_REPO}/${UPDATE_BRANCH}"
     # apply platform dependent patches, etc:
     ARCH=$(dpkg --print-architecture)
     echo -n "This architecture: $ARCH. "
@@ -205,6 +213,9 @@ else
     pushd go >/dev/null
     govendor sync || true
     popd >/dev/null
+    # because upgrading to SCIONLab 2019-01 will fail if installed, remove it:
+    sudo apt-get remove -y parallel
+    mkdir -p gen-cache/
     bash -c 'yes | GO_INSTALL=true ./env/deps' || echo "ERROR: Dependencies failed. Starting SCION might fail!"
     echo "Rebuilding SCION..."
     ./scion.sh build && rm -f "scionupgrade.auto.inprogress" || true
