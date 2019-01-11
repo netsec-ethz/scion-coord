@@ -496,6 +496,9 @@ func (s *SCIONLabASController) getSCIONLabASInfo(slReq SCIONLabRequest) (*SCIONL
 }
 
 func getSCIONLabASInfoFromDB(conn *models.Connection) (*SCIONLabASInfo, error) {
+	conn.JoinAS = conn.GetJoinAS()
+	conn.RespondAP = conn.GetRespondAP()
+	conn.RespondAP.AS = conn.GetRespondAS()
 	asInfo := SCIONLabASInfo{
 		IsNewConnection: false,
 		IsVPN:           conn.IsVPN,
@@ -506,7 +509,7 @@ func getSCIONLabASInfoFromDB(conn *models.Connection) (*SCIONLabASInfo, error) {
 		RemoteIP:        conn.RespondIP,
 		RemoteBRID:      conn.RespondBRID,
 		RemotePort:      conn.RespondAP.AS.GetPortNumberFromBRID(conn.RespondBRID),
-		VPNServerIP:     conn.RespondAP.VPNIP,
+		VPNServerIP:     conn.RespondAP.AS.PublicIP,
 		VPNServerPort:   conn.RespondAP.VPNPort,
 		LocalAS:         conn.JoinAS,
 		RemoteAS:        conn.RespondAP.AS,
@@ -1053,9 +1056,6 @@ func computeNewGenFolder(as *models.SCIONLabAS) error {
 		return err
 	}
 	conn := conns[0]
-	conn.JoinAS = conn.GetJoinAS()
-	conn.RespondAP = conn.GetRespondAP()
-	conn.RespondAP.AS = conn.GetRespondAS()
 	asInfo, err := getSCIONLabASInfoFromDB(conn)
 	asInfo.LocalAS = as
 	if err != nil {

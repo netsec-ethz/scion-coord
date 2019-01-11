@@ -331,10 +331,7 @@ func (cn *Connection) GetJoinAS() *SCIONLabAS {
 }
 
 func (cn *Connection) GetRespondAS() *SCIONLabAS {
-	// TODO: Question: same as the above method. Now we only ensure the AS is loaded:
-	if cn.RespondAP.AS == nil {
-		o.LoadRelated(cn.RespondAP, "AS")
-	}
+	o.LoadRelated(cn.RespondAP, "AS")
 	return cn.RespondAP.AS
 }
 
