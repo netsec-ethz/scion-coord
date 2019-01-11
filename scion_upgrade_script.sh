@@ -191,8 +191,6 @@ else
     # rebuild scion
     ./scion.sh stop || true
     ~/.local/bin/supervisorctl -c supervisor/supervisord.conf shutdown || true
-    ./tools/zkcleanslate || true
-    sudo systemctl restart zookeeper || true
     MEMTOTAL=$(grep MemTotal /proc/meminfo  | awk '{print $2}')
     echo "Available memory is: $MEMTOTAL"
     # if less than 1920Mb
@@ -224,6 +222,13 @@ else
         sudo swapoff /tmp/swap || true
         echo "Swap space removed."
     fi
+    # get a new gen folder:
+    echo "We will get the AS configuration from the Coordinator now."
+    pushd /tmp >/dev/null
+    wget https://raw.githubusercontent.com/netsec-ethz/scion-coord/master/scripts/check_as_config.sh -O check_as_config.sh
+    bash check_as_config.sh -f && echo "Done getting the AS configuration from the Coordinator." || echo "[ERROR] Checking the AS configuration. This AS might be misconfigured!"
+    popd >/dev/null
+    ./tools/zkcleanslate || true
     # announce we are done with the upgrade
     printf "SCIONLab has been upgraded. You can now run any command involving scion.sh\n\n" | wall
     echo "Starting SCION again..."
