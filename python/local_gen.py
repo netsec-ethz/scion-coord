@@ -56,7 +56,6 @@ from local_config_util import (
     write_zlog_file,
     write_overlay_config,
     write_toml_files,
-    generate_zk_config,
     generate_prom_config,
     TYPES_TO_EXECUTABLES,
     TYPES_TO_KEYS,
@@ -107,7 +106,6 @@ def create_scionlab_as_local_gen(args, tp):
             write_supervisord_config(config, instance_path)
             write_topology_file(tp, type_key, instance_path)
             write_zlog_file(service_type, instance_name, instance_path)
-    generate_zk_config(tp, new_ia, local_gen_path, simple_conf_mode=True)
     generate_sciond_config(TopoID(args.joining_ia), as_obj, tp, local_gen_path)
     write_overlay_config(local_gen_path)
     if not args.no_prometheus:
