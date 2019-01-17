@@ -27,7 +27,6 @@ import time
 import shutil
 
 # External packages
-from Crypto import Random
 from nacl.signing import SigningKey
 
 # SCION
