@@ -89,7 +89,7 @@ else
 fi
 
 sudo apt-get -y update
-sudo apt-get -y install git
+sudo apt-get -y install git zookeeperd
 
 echo 'export GOPATH="$HOME/go"' >> ~/.profile
 echo 'export PATH="$HOME/.local/bin:$GOPATH/bin:/usr/local/go/bin:$PATH"' >> ~/.profile
