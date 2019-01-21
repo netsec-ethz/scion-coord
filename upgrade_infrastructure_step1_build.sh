@@ -101,7 +101,7 @@ if [ $(git status --untracked-files=no --short | wc -l) != 0 ]; then
 fi
 
 
-if [ "$MAKECHANGES" -ne 1 ]; then
+if [ "$MAKECHANGES" != 1 ]; then
     echo "Read only. Quitting now"
     exit 0
 fi

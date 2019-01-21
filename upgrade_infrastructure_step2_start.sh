@@ -24,13 +24,13 @@ if [ ! -d "gen" ]; then
     echo "gen folder not found"
     exit 1
 fi
-if [ ! -d "gen_scionlab_nextversion" ]; then
-    echo "gen_scionlab_nextversion folder not found"
+if [ ! -d "gen_nextversion" ]; then
+    echo "gen_nextversion folder not found"
     exit 1
 fi
 
 mv gen gen.bk`date +%Y%m%d%H%M`
-mv gen_scionlab_nextversion gen
+mv gen_nextversion gen
 
 mv gen-cache gen-cache.bk`date +%Y%m%d%H%M`
 mkdir gen-cache
