@@ -35,7 +35,7 @@ mv gen_nextversion gen
 mv gen-cache gen-cache.bk`date +%Y%m%d%H%M`
 mkdir gen-cache
 
-exit 1
+sudo systemctl start zookeeper
 output=$(./tools/zkcleanslate --zk 127.0.0.1:2181 2>&1) && success=1 || success=0
 if [ $success != 1 ]; then
     echo "Zookeeper cleanslate failed:"
