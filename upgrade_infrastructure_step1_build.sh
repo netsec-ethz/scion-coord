@@ -1,11 +1,24 @@
 #!/bin/bash
+# Copyright 2018 ETH Zurich
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 set -e
 
 GITREPO="origin"
 GITBRANCH="scionlab"
 BACKUPBRANCH="backup_upgrade1"
-MAKECHANGES=0
+#MAKECHANGES=0
 # This script should be run on each of the ASes that are part of the infrastructure.
 # Ideally called with ansible or forallASes -f
 
@@ -61,15 +74,9 @@ if [ "$currentref" != "${GITREPO}/${GITBRANCH}" ]; then
     exit 1
 fi
 
-if git branch | grep "$BACKUPBRANCH"; then
-    echo "Branch $BACKUPBRANCH exists already. Aborting."
-    exit 1
-fi
-
-if [ $(git status --untracked-files=no --short | wc -l) != 0 ]; then
-    echo "Local copy of repository modified:"
-    git status --untracked-files=no
-    echo "Aborting."
+output=$(git remote update) && success=1 || success=0
+if [ $success != 1 ]; then
+    echo "Error updating remote: $output"
     exit 1
 fi
 
@@ -79,33 +86,32 @@ if [ $success != 1 ]; then
     exit 1
 fi
 
+if [ $(git rev-parse HEAD) != $(git rev-parse "$GITREPO/$GITBRANCH") ]; then
+  if git branch | grep "$BACKUPBRANCH"; then
+      echo "Branch $BACKUPBRANCH exists already. Aborting."
+      exit 1
+  fi
+fi
+
+if [ $(git status --untracked-files=no --short | wc -l) != 0 ]; then
+    echo "Local copy of repository modified:"
+    git status --untracked-files=no
+    echo "Aborting."
+    exit 1
+fi
+
+
 if [ "$MAKECHANGES" -ne 1 ]; then
     echo "Read only. Quitting now"
     exit 0
 fi
 echo "All checks OK."
 ########################################################## MODIFYING THE AS HERE ###############
-git branch "$BACKUPBRANCH"
 output=$(./scion.sh stop 2>&1) && success=1 || success=0
 if [ $success != 1 ]; then
     echo "SCION stop failed:"
     echo "$output"
     exit 1
-fi
-# git pull
-output=$(git pull --ff-only 2>&1) && success=1 || success=0
-if [ $success != 1 ]; then
-    echo "Problem updating copy:"
-    echo "$output"
-    exit 1
-fi
-echo "Updated. Restarting."
-
-output=$(./scion.sh clean 2>&1) && success=1 || success=0
-if [ $success != 1 ]; then
-    echo "SCION clean failed:"
-    echo "$output"
-    # exit 1
 fi
 output=$(./supervisor/supervisor.sh shutdown 2>&1) && success=1 || success=0
 if [ $success != 1 ]; then
@@ -113,20 +119,36 @@ if [ $success != 1 ]; then
     echo "$output"
     # exit 1
 fi
-output=$(./tools/zkcleanslate --zk 127.0.0.1:2181 2>&1) && success=1 || success=0
+
+# Only 
+if [ $(git rev-parse HEAD) != $(git rev-parse "$GITREPO/$GITBRANCH") ]; then
+  git branch "$BACKUPBRANCH"
+  output=$(git reset --hard "$GITREPO/$GITBRANCH" 2>&1) && success=1 || success=0
+  if [ $success != 1 ]; then
+      echo "Problem updating copy:"
+      echo "$output"
+      exit 1
+  fi
+fi
+
+echo "Updated"
+git status -v
+
+echo "Install dependencies"
+# because upgrading to SCIONLab 2019-01 will fail if installed, remove it:
+sudo apt-get remove -y parallel
+bash -c 'yes | GO_INSTALL=true ./env/deps' || exit 1
+
+echo "Starting build."
+output=$(./scion.sh clean 2>&1) && success=1 || success=0
 if [ $success != 1 ]; then
-    echo "Zookeeper cleanslate failed:"
+    echo "SCION clean failed:"
     echo "$output"
     # exit 1
 fi
-output=$(./scion.sh run 2>&1) && success=1 || success=0
+output=$(./scion.sh build 2>&1) && success=1 || success=0
 if [ $success != 1 ]; then
-    echo "SCION run failed:"
+    echo "SCION build failed:"
     echo "$output"
     # exit 1
 fi
-
-
-# all done
-echo "Done."
-exit 0
