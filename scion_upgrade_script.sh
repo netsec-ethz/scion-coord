@@ -3,7 +3,7 @@
 set -e
 
 # version of the systemd files:
-SERVICE_CURRENT_VERSION="0.7"
+SERVICE_CURRENT_VERSION="0.8"
 
 # version less or equal. E.g. verleq 1.9 2.0.8  == true (1.9 <= 2.0.8)
 verleq() {
@@ -89,8 +89,10 @@ if [ $dirtybuild -eq 1 ]; then
 fi
 MOTD1
                 sudo chmod 755 /etc/update-motd.d/99-scionlab-upgrade
-            fi
-        fi
+                # reload logind (inexpensive) as it seems that some user VMs still remove /run/shm when logout:
+                sudo systemctl reload-or-restart systemd-logind.service
+            fi # if [ -d "/vagrant" ]
+        fi # if [ $need_to_reload -eq 1 ]
         # don't attempt to stop the scionupgrade service as this script is a child of it and will also be killed !
         # even with KillMode=none in the service file, restarting the service here would be really delicate, as it
         # could basically hang forever if the service files don't update the version number correctly, and we would

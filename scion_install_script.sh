@@ -239,6 +239,7 @@ fi
 if [[ $keep_user_context = true ]]
 then
   sudo sh -c 'echo RemoveIPC=no >> /etc/systemd/logind.conf'
+  sudo systemctl reload-or-restart systemd-logind.service
 fi
 
 if  [[ ( ! -z ${upgrade_script+x} ) ]]
