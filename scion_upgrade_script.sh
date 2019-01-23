@@ -177,12 +177,7 @@ else
     echo -n "This architecture: $ARCH. "
     case "$ARCH" in
         "armhf")
-            # current ARM patch:
-            echo "Patching for ARM 32"
-            curl https://gist.githubusercontent.com/juagargi/f007a3a80058895d81a72651af32cb44/raw/421d8bfecdd225a3b17a18ec1c1e1bf86c436b35/arm-scionlab-update2.patch | patch -p1
-            git branch -D scionlab_autoupdate_patched 2>/dev/null|| true
-            git add .
-            git commit -m "SCIONLab autoupdate patch for ARM"
+            echo "ARM architecture supported without patches"
             ;;
         *)
             echo "No need to patch."

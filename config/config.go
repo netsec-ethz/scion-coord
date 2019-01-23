@@ -89,7 +89,7 @@ var (
 	IMGBuilderSecretToken     = goconf.AppConf.String("img_builder.secret_token")
 	IMGBuilderBuildDelay, _   = goconf.AppConf.Int64("img_builder.build_delay")
 
-	NextVersionPythonPath = goconf.AppConf.String("nextversion.python_path")
+	TestingCoordinatorBranch = goconf.AppConf.String("testing_coordinator.branch")
 )
 
 func init() {
@@ -155,25 +155,6 @@ func init() {
 			os.Exit(1)
 		}
 	}
-
-	if NextVersionPythonPath != "" {
-		NextVersionPythonPath, err = filepath.Abs(NextVersionPythonPath)
-		if err != nil {
-			fmt.Println("'nextversion.python_path': ", err)
-			os.Exit(1)
-		}
-		dirInfo, err := os.Stat(NextVersionPythonPath)
-		if err != nil {
-			fmt.Println("'nextversion.python_path': ", err)
-			os.Exit(1)
-		}
-		if !dirInfo.IsDir() {
-			fmt.Printf("Value for 'nextversion.python_path' is not a directory")
-			os.Exit(1)
-		}
-	}
-
-	fmt.Println(NextVersionPythonPath)
 }
 
 func MaxASes(isAdmin bool) int {

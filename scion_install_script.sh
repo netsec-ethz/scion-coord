@@ -134,7 +134,16 @@ fi
 
 bash -c 'yes | GO_INSTALL=true ./env/deps'
 
-sudo cp docker/zoo.cfg /etc/zookeeper/conf/zoo.cfg
+sudo bash -c 'cat > /etc/zookeeper/conf/zoo.cfg << ZOOCFG
+tickTime=100
+initLimit=10
+syncLimit=5
+dataDir=/var/lib/zookeeper
+dataLogDir=/run/shm/host-zk
+clientPort=2181
+maxClientCnxns=0
+autopurge.purgeInterval=1
+ZOOCFG'
 
 # Add cron script which removes old zk logs
 sudo bash -c 'cat > /etc/cron.daily/zookeeper << CRON1
@@ -158,8 +167,13 @@ then
 else
     echo "Gen directory is NOT specified! Generating local (Tiny) topology!"
     ./scion.sh topology -c topology/Tiny.topo
+    rm -f gen/zk-dc.yml
 fi
 
+# Ensure gen-cache directory exists (some services fail to start otherwise (bug))
+mkdir -p gen-cache
+
+mkdir -p sub
 cd sub
 git clone git@github.com:netsec-ethz/scion-viz
 cd scion-viz/python/web
