@@ -13,7 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 set -e
+
+export LC_ALL=C
 
 GITREPO="origin"
 GITBRANCH="scionlab"
@@ -93,20 +96,19 @@ if [ $(git rev-parse HEAD) != $(git rev-parse "$GITREPO/$GITBRANCH") ]; then
   fi
 fi
 
-if [ $(git status --untracked-files=no --short | wc -l) != 0 ]; then
-    echo "Local copy of repository modified:"
-    git status --untracked-files=no
-    echo "Aborting."
-    exit 1
-fi
-
-
 if [ "$MAKECHANGES" != 1 ]; then
     echo "Read only. Quitting now"
     exit 0
 fi
 echo "All checks OK."
 ########################################################## MODIFYING THE AS HERE ###############
+output=$(git stash) && success=1 || success=0
+if [ $success != 1 ]; then
+    echo "SCION stash failed:"
+    echo "$output"
+    exit 1
+fi
+
 output=$(./scion.sh stop 2>&1) && success=1 || success=0
 if [ $success != 1 ]; then
     echo "SCION stop failed:"
@@ -131,13 +133,23 @@ if [ $(git rev-parse HEAD) != $(git rev-parse "$GITREPO/$GITBRANCH") ]; then
   fi
 fi
 
+output=$(git stash pop) && success=1 || success=0
+if [ $success != 1 ]; then
+    echo "SCION stash failed:"
+    echo "$output"
+fi
+
 echo "Updated"
-git status -v
 
 echo "Install dependencies"
 # because upgrading to SCIONLab 2019-01 will fail if installed, remove it:
-sudo apt-get remove -y parallel
-bash -c 'yes | GO_INSTALL=true ./env/deps' || exit 1
+sudo apt-get remove -y parallel >/dev/null
+output=$(yes | ./env/deps 2>&1) && success=1 || success=0
+if [ $success != 1 ]; then
+    echo "SCION deps failed:"
+    echo "$output"
+    exit 1
+fi
 
 echo "Starting build."
 output=$(./scion.sh clean 2>&1) && success=1 || success=0
@@ -150,5 +162,6 @@ output=$(./scion.sh build 2>&1) && success=1 || success=0
 if [ $success != 1 ]; then
     echo "SCION build failed:"
     echo "$output"
-    # exit 1
+    exit 1
 fi
+echo "done."
