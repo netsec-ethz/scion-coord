@@ -2,28 +2,35 @@
 
 set -e
 
-# version of the systemd files:
-SERVICE_CURRENT_VERSION="0.8"
+# version of the systemd files. These are: scionupgrade.{sh,service,timer}
+# if you change the version here, you should also change it on the three files mentioned above
+SERVICE_CURRENT_VERSION="0.9"
 
 # version less or equal. E.g. verleq 1.9 2.0.8  == true (1.9 <= 2.0.8)
 verleq() {
     [ ! -z "$1" ] && [ ! -z "$2" ] && [ "$1" = `echo -e "$1\n$2" | sort -V | head -n1` ]
 }
-
 check_system_files() {
     # check service files:
     need_to_reload=0
     declare -a FILES_TO_CHECK=("/etc/systemd/system/scionupgrade.service"
-                               "/etc/systemd/system/scionupgrade.timer")
-    for f in "${FILES_TO_CHECK[@]}"; do
+                               "/etc/systemd/system/scionupgrade.timer"
+                               "/usr/bin/scionupgrade.sh")
+    declare -a PERMISSIONS=(644 644 755)
+    for i in ${!FILES_TO_CHECK[@]}; do
+        f=${FILES_TO_CHECK[$i]}
+        perm=${PERMISSIONS[$i]}
         VERS=$(grep "^# SCION upgrade version" "$f" | sed -n 's/^# SCION upgrade version \([0-9\.]*\).*$/\1/p')
         if ! verleq "$SERVICE_CURRENT_VERSION" "$VERS"; then
             # need to upgrade. (1) get the file with wget. (2) copy the file (3) reload systemd things
             bf=$(basename $f)
             tmpfile=$(mktemp)
+            # remove the file (created with umask u+rw by mktemp)
+            rm -f "$tmpfile"
             wget "https://raw.githubusercontent.com/netsec-ethz/scion-coord/master/vagrant/$bf" -O "$tmpfile"
             sed -i "s/_USER_/$USER/g" "$tmpfile"
             sudo cp "$tmpfile" "$f"
+            sudo chmod "$perm" "$f"
             need_to_reload=1
         fi
         echo "check_system_files $f : is $VERS < $SERVICE_CURRENT_VERSION ? $need_to_reload"
@@ -119,15 +126,18 @@ export LC_ALL=C
 ACCOUNT_ID=$1
 ACCOUNT_SECRET=$2
 IA=$3
+MANUAL=$4
 
 DEFAULT_BRANCH_NAME="scionlab"
 REMOTE_REPO="origin"
 SCION_COORD_URL="https://www.scionlab.org"
 
-echo "Invoking update script with $ACCOUNT_ID $ACCOUNT_SECRET $IA"
+echo "Invoking update script with $*"
 
-# systemd files upgrade:
-check_system_files
+if [ -z "$MANUAL"]; then
+    # systemd files upgrade:
+    check_system_files
+fi
 
 if [ -f "$SC/gen/coord_url" ]; then
     SCION_COORD_URL=$(cat "$SC/gen/coord_url")
@@ -190,12 +200,12 @@ else
     ~/.local/bin/supervisorctl -c supervisor/supervisord.conf shutdown || true
     MEMTOTAL=$(grep MemTotal /proc/meminfo  | awk '{print $2}')
     echo "Available memory is: $MEMTOTAL"
-    # if less than 1920Mb
-    [[ $MEMTOTAL -lt 1966080 ]] && swapadded=1 || swapadded=0
+    # if less than 4Gb
+    [[ $MEMTOTAL -lt 4194304 ]] && swapadded=1 || swapadded=0
     if [ $swapadded -eq 1 ]; then
         echo "Not enough memory, adding swap space..."
-        dd if=/dev/zero of=/tmp/swap bs=1M count=1920
-        mkswap /tmp/swap
+        sudo fallocate -l 4G /tmp/swap
+        sudo mkswap /tmp/swap
         sudo swapon /tmp/swap
         echo "Swap space added."
     else
@@ -213,10 +223,10 @@ else
     mkdir -p gen-cache/
     bash -c 'yes | GO_INSTALL=true ./env/deps' || echo "ERROR: Dependencies failed. Starting SCION might fail!"
     echo "Rebuilding SCION..."
-    ./scion.sh build && rm -f "scionupgrade.auto.inprogress" || true
+    ./scion.sh build && rm -f "scionupgrade.auto.inprogress" || { echo "Build failed!"; exit 1; }
     if [ $swapadded -eq 1 ]; then
         echo "Removing swap space..."
-        sudo swapoff /tmp/swap || true
+        sudo swapoff /tmp/swap && sudo rm -f /tmp/swap || true
         echo "Swap space removed."
     fi
     # get a new gen folder:
