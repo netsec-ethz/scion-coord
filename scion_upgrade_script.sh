@@ -25,8 +25,6 @@ check_system_files() {
             # need to upgrade. (1) get the file with wget. (2) copy the file (3) reload systemd things
             bf=$(basename $f)
             tmpfile=$(mktemp)
-            # remove the file (created with umask u+rw by mktemp)
-            rm -f "$tmpfile"
             wget "https://raw.githubusercontent.com/netsec-ethz/scion-coord/master/vagrant/$bf" -O "$tmpfile"
             sed -i "s/_USER_/$USER/g" "$tmpfile"
             sudo cp "$tmpfile" "$f"
@@ -123,18 +121,25 @@ is_id_standardized() {
 shopt -s nullglob
 
 export LC_ALL=C
-ACCOUNT_ID=$1
-ACCOUNT_SECRET=$2
-IA=$3
-MANUAL=$4
-
 DEFAULT_BRANCH_NAME="scionlab"
 REMOTE_REPO="origin"
 SCION_COORD_URL="https://www.scionlab.org"
 
-echo "Invoking update script with $*"
+if [ "$#" -gt 1 ]; then
+    ACCOUNT_ID=$1
+    ACCOUNT_SECRET=$2
+    IA=$3
+    unset MANUAL
+else
+    ACCOUNT_ID=$(cat "$SC/gen/account_id")
+    ACCOUNT_SECRET=$(cat "$SC/gen/account_secret")
+    IA=$(cat "$SC/gen/ia")
+    [ "$1" == "-m" ] && MANUAL=1 || unset MANUAL
+fi
 
-if [ -z "$MANUAL"]; then
+echo "Invoking update script with $ACCOUNT_ID $ACCOUNT_SECRET $IA MANUAL=$MANUAL"
+
+if [ -z "$MANUAL" ]; then
     # systemd files upgrade:
     check_system_files
 fi
@@ -245,8 +250,8 @@ fi
 if [ -d "./sub/scion-viz" ]; then
     pushd "./sub/scion-viz" >/dev/null
     git stash >/dev/null || true
-    pull_result=$(git pull --ff-only)
-    if [[ $pull_result != *"up-to-date"* ]]; then
+    pull_result=$(git pull --ff-only) || true
+    if [[ ! -z $pull_result && $pull_result != *"up-to-date"* ]]; then
         sudo systemctl restart scion-viz
     fi
     popd >/dev/null
