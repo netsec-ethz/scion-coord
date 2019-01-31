@@ -159,9 +159,6 @@ echo "Update branch is: ${UPDATE_BRANCH}"
 
 cd $SC
 
-echo "Emptying cache..."
-rm -f gen-cache/*
-
 git_username=$(git config user.name || true)
 if [ -z "$git_username" ]
 then
@@ -225,7 +222,6 @@ else
     popd >/dev/null
     # because upgrading to SCIONLab 2019-01 will fail if installed, remove it:
     sudo apt-get remove -y parallel
-    mkdir -p gen-cache/
     bash -c 'yes | GO_INSTALL=true ./env/deps' || echo "ERROR: Dependencies failed. Starting SCION might fail!"
     echo "Rebuilding SCION..."
     ./scion.sh build && rm -f "scionupgrade.auto.inprogress" || { echo "Build failed!"; exit 1; }
@@ -243,6 +239,11 @@ else
     ./tools/zkcleanslate || true
     # announce we are done with the upgrade
     printf "SCIONLab has been upgraded. You can now run any command involving scion.sh\n\n" | wall
+
+    echo "Emptying gen-cache..."
+    rm -f gen-cache/*
+    mkdir -p gen-cache/
+
     echo "Starting SCION again..."
     ./scion.sh start nobuild || true
 fi
