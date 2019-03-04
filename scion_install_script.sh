@@ -169,6 +169,16 @@ else
     ./scion.sh topology -c topology/Tiny.topo
     rm -f gen/zk-dc.yml
 fi
+# ensure we have the default certificate needed by QUIC
+if [ ! -e "gen-certs/tls.pem" -o ! -e "gen-certs/tls.key" ]; then
+    local old=$(umask)
+    echo "Generating TLS cert"
+    mkdir -p "gen-certs"
+    umask 0177
+    openssl genrsa -out "gen-certs/tls.key" 2048
+    umask "$old"
+    openssl req -new -x509 -key "gen-certs/tls.key" -out "gen-certs/tls.pem" -days 3650 -subj /CN=scion_def_srv
+fi
 
 # Ensure gen-cache directory exists (some services fail to start otherwise (bug))
 mkdir -p gen-cache
