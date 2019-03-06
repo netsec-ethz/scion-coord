@@ -171,7 +171,7 @@ else
 fi
 # ensure we have the default certificate needed by QUIC
 if [ ! -e "gen-certs/tls.pem" -o ! -e "gen-certs/tls.key" ]; then
-    local old=$(umask)
+    old=$(umask)
     echo "Generating TLS cert"
     mkdir -p "gen-certs"
     umask 0177
