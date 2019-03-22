@@ -187,8 +187,7 @@ then
     cp -r "$gen_dir" .
 else
     echo "Gen directory is NOT specified! Generating local (Tiny) topology!"
-    ./scion.sh topology -c topology/Tiny.topo
-    rm -f gen/zk-dc.yml
+    ./scion.sh topology nodocker -c topology/Tiny.topo
 fi
 # ensure we have the default certificate needed by QUIC
 if [ ! -e "gen-certs/tls.pem" -o ! -e "gen-certs/tls.key" ]; then
