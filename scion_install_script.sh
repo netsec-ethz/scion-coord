@@ -132,7 +132,28 @@ then
     echo "Finished applying patches"
 fi
 
+MEMTOTAL=$(grep MemTotal /proc/meminfo  | awk '{print $2}')
+echo "Available memory is: $MEMTOTAL"
+# if less than 4Gb
+[[ $MEMTOTAL -lt 4194304 ]] && swapadded=1 || swapadded=0
+if [ $swapadded -eq 1 ]; then
+    echo "Not enough memory, adding swap space..."
+    sudo fallocate -l 4G /tmp/swap
+    sudo mkswap /tmp/swap
+    sudo swapon /tmp/swap
+    echo "Swap space added."
+else
+    echo "No swap space needed."
+fi
+echo "Building dependencies ..."
 bash -c 'yes | GO_INSTALL=true ./env/deps'
+echo "Building SCION ..."
+./scion.sh build
+if [ $swapadded -eq 1 ]; then
+    echo "Removing swap space..."
+    sudo swapoff /tmp/swap && sudo rm -f /tmp/swap || true
+    echo "Swap space removed."
+fi
 
 sudo bash -c 'cat > /etc/zookeeper/conf/zoo.cfg << ZOOCFG
 tickTime=100
