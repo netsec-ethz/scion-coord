@@ -322,9 +322,43 @@ func (s *SCIONLabASController) ConfigureSCIONLabAS(w http.ResponseWriter, r *htt
 		return
 	}
 
+	// update RAINS zonefile
+	isd := asInfo.RemoteIA.I
+	as := asInfo.LocalAS.ASID
+	ip := asInfo.IP
+	name := fmt.Sprintf("%d-%s", isd, as.FileFmt())
+	val := fmt.Sprintf("%d-%s,[%s]", isd, as.String(), ip)
+	err = updateZonefile(name, val)
+	if err != nil {
+		log.Printf("Could not publish AS to RAINS server: %v", err)
+	}
+
 	message := "Your SCIONLab AS will be activated within a few minutes. " +
 		"You will receive an email confirmation as soon as the process is complete."
 	fmt.Fprintln(w, message)
+}
+
+func updateZonefile(name, value string) error {
+	temp, err := ioutil.ReadFile(config.Zonefile)
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command("zoneupdate", "-zf", config.Zonefile, "-n", name, "-v", value)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		// restore original
+		ioutil.WriteFile(config.Zonefile, temp, 0600)
+		return errors.New(string(out))
+	}
+
+	// publish new file
+	cmd = exec.Command("zonepub", config.RainConf, "--zonefilePath", config.Zonefile)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		return errors.New(string(out))
+	}
+
+	return nil
 }
 
 // Parses the JSON payload of the request and checks if it is valid

@@ -84,6 +84,10 @@ heartbeat.period = 60
 # Number of heartbeat periods that can be missed before status is set to inactive
 heartbeat.limit = 10
 
+# RAINS (paths relative to scion directory)
+zonefile = /rains/zonefiles/node.snet.txt
+rains_conf = /rains/conf/publishernode.snet.conf
+
 # General settings
 # Standard port for border routers
 br_bind_start_port = 50000

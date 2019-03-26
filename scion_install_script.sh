@@ -20,9 +20,11 @@ where:
     -c                  do not destroy user context on logout
     -u UPGR_SCRIPT      script used for upgrading scion, (will be copied to 
                         path ${UPGRADE_SCRIPT_LOCATION})
+    -r RAINS_SRV        configures a RAINS server for name resolution at the
+                        provided address
     -t TIMER_UPG_SERV   name of sysd timer and system name for upgrades"
 
-while getopts ":p:g:v:s:z:ha:cu:t:" opt; do
+while getopts ":p:g:v:s:z:ha:cu:r:t:" opt; do
   case $opt in
     p)
       patch_dir=$OPTARG
@@ -52,6 +54,9 @@ while getopts ":p:g:v:s:z:ha:cu:t:" opt; do
       ;;
     u)
       upgrade_script=$OPTARG
+      ;;
+    r)
+      rains_config=$OPTARG
       ;;
     t)
       upgrade_timer=${OPTARG}.timer
@@ -260,6 +265,14 @@ then
     sudo cp ${upgrade_script} ${UPGRADE_SCRIPT_LOCATION}
 else
     echo "SCION upgrade script not specified."
+fi
+
+if  [[ ( -n ${rains_config+x} ) ]]
+then
+    echo "Writing RAINS configuration file"
+    echo "${rains_config}" > "$SC/gen/rains.cfg"
+else
+    echo "RAINS configuration not specified."
 fi
 
 if  [[ ( ! -z ${upgrade_service+x} ) && -r ${upgrade_service} \

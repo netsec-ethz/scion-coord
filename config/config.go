@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -90,6 +91,10 @@ var (
 	IMGBuilderBuildDelay, _   = goconf.AppConf.Int64("img_builder.build_delay")
 
 	TestingCoordinatorBranch = goconf.AppConf.String("testing_coordinator.branch")
+
+	// RAINS
+	Zonefile = goconf.AppConf.String("zonefile")
+	RainConf = goconf.AppConf.String("rains_conf")
 )
 
 func init() {
@@ -155,6 +160,9 @@ func init() {
 			os.Exit(1)
 		}
 	}
+
+	Zonefile = path.Join(os.Getenv("SC"), Zonefile)
+	RainConf = path.Join(os.Getenv("SC"), RainConf)
 }
 
 func MaxASes(isAdmin bool) int {
