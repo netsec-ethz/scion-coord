@@ -85,8 +85,8 @@ heartbeat.period = 60
 heartbeat.limit = 10
 
 # RAINS (paths relative to scion directory)
-zonefile = /rains/zonefiles/node.snet.txt
-rains_conf = /rains/conf/publishernode.snet.conf
+zonefile = /rains/zonefiles/zone.txt
+rains_conf = /rains/conf/publisherzone.conf
 
 # General settings
 # Standard port for border routers
