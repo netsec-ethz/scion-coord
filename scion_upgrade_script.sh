@@ -1,6 +1,41 @@
 #!/bin/bash
 
 set -e
+shopt -s nullglob
+
+export LC_ALL=C
+
+# the first and only thing we do is install the packaging system and remove the old upgrade mechanism
+sudo apt-get install -y apt-transport-https
+echo "deb [trusted=yes] https://packages.netsec.inf.ethz.ch/debian all main" | sudo tee /etc/apt/sources.list
+echo -e "`sudo  crontab -l`""\n`date -d '07:00 UTC' '+%M %H'` * * * apt-get update; apt-get upgrade scionlab" |sudo crontab
+if [ -d "$SC" ]; then
+    pushd "$SC"
+    ./scion.sh stop || true
+    popd
+fi
+sudo apt-get update
+sudo apt-get upgrade scionlab  # this installs also scionlab-config
+
+sudo systemctl disable scion.service
+sudo systemctl stop scion.service
+sudo rm /etc/systemd/system/scion.service
+
+sudo systemctl disable scionupgrade.timer
+sudo systemctl disable scionupgrade.timer
+sudo rm /etc/systemd/system/scionupgrade.timer
+sudo rm /etc/systemd/system/scionupgrade.service
+
+sudo rm /usr/bin/scionupgrade.sh
+sudo systemctl stop scionupgrade.timer
+# and this will also kill this very process, so it's the last thing we do:
+sudo systemctl stop scionupgrade.service
+
+exit 0
+
+
+
+
 
 # version of the systemd files. These are: scionupgrade.{sh,service,timer}
 # if you change the version here, you should also change it on the three files mentioned above
@@ -118,10 +153,6 @@ install_scionlab_config() {
 }
 
 
-
-shopt -s nullglob
-
-export LC_ALL=C
 
 if [ "$1" != "-m" ]; then
     # systemd files upgrade:
