@@ -14,8 +14,13 @@ if [ -d "$SC" ]; then
     ./scion.sh stop || true
     popd
 fi
+# copy the config to /etc/scion
+if [ -d "$SC/gen" ]; then
+    mkdir -p /etc/scion
+    sudo cp -r "$SC/gen" /etc/scion/
+fi
 sudo apt-get update
-sudo apt-get upgrade scionlab  # this installs also scionlab-config
+sudo apt-get install scionlab  # this installs also scionlab-config
 
 sudo systemctl disable scion.service
 sudo systemctl stop scion.service
