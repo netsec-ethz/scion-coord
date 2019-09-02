@@ -8,7 +8,7 @@ export LC_ALL=C
 # the first and only thing we do is install the packaging system and remove the old upgrade mechanism
 sudo apt-get install -y apt-transport-https
 echo "deb [trusted=yes] https://packages.netsec.inf.ethz.ch/debian all main" | sudo tee /etc/apt/sources.list
-echo -e "`sudo  crontab -l`""\n`date -d '07:00 UTC' '+%M %H'` * * * apt-get update; apt-get upgrade scionlab" |sudo crontab
+echo -e "`sudo  crontab -l`""\n`date -d '07:00 UTC' '+%M %H'` * * * apt-get update; apt-get upgrade -y scionlab" |sudo crontab
 if [ -d "$SC" ]; then
     pushd "$SC"
     ./scion.sh stop || true
@@ -20,7 +20,7 @@ if [ -d "$SC/gen" ]; then
     sudo cp -r "$SC/gen" /etc/scion/
 fi
 sudo apt-get update
-sudo apt-get install scionlab  # this installs also scionlab-config
+sudo apt-get install scionlab  # this also installs and runs scionlab-config
 
 sudo systemctl disable scion.service
 sudo systemctl stop scion.service
