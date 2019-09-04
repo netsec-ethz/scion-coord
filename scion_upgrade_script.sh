@@ -27,7 +27,7 @@ sudo systemctl stop scion.service
 sudo rm /etc/systemd/system/scion.service
 
 sudo systemctl disable scionupgrade.timer
-sudo systemctl disable scionupgrade.timer
+sudo systemctl disable scionupgrade.service
 sudo rm /etc/systemd/system/scionupgrade.timer
 sudo rm /etc/systemd/system/scionupgrade.service
 
