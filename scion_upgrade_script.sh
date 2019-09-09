@@ -4,7 +4,7 @@ set -e
 
 # version of the systemd files. These are: scionupgrade.{sh,service,timer}
 # if you change the version here, you should also change it on the three files mentioned above
-SERVICE_CURRENT_VERSION="0.9"
+SERVICE_CURRENT_VERSION="0.10"
 
 # version less or equal. E.g. verleq 1.9 2.0.8  == true (1.9 <= 2.0.8)
 verleq() {
@@ -35,7 +35,9 @@ check_system_files() {
     done
     if [ $need_to_reload -eq 1 ]; then
         if [ -d "/vagrant" ]; then # iff this is a VM
-            echo "VM detected, checking time synchronization mechanism ..."
+            echo "VM detected, installing APT daemon"
+            sudo apt-get install -y aptdaemon
+            echo "Checking time synchronization mechanism ..."
             [[ $(ps aux | grep ntpd | grep -v grep | wc -l) == 1 ]] && ntp_running=1 || ntp_running=0
             [[ $(grep -e 'start-stop-daemon\s*--start\s*--quiet\s*--oknodo\s*--exec\s*\/usr\/sbin\/VBoxService\s*--\s*--disable-timesync$' /etc/init.d/virtualbox-guest-utils |wc -l) == 1 ]] && host_synced=0 || host_synced=1
             if [ $host_synced != 0 ]; then
@@ -127,7 +129,6 @@ if [ "$1" != "-m" ]; then
 else
     echo "Skipping check_system_files, because -m (manual) is given"
 fi
-
 
 cd $SC
 
