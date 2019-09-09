@@ -1,9 +1,14 @@
 #!/bin/bash
 
+set -x
 set -e
 shopt -s nullglob
 
 export LC_ALL=C
+
+
+echo "SC is $SC"
+
 
 # the first and only thing we do is install the packaging system and remove the old upgrade mechanism
 sudo apt-get install -y apt-transport-https
@@ -15,12 +20,20 @@ if [ -d "$SC" ]; then
     popd
 fi
 # copy the config to /etc/scion
-if [ -d "$SC/gen" ]; then
-    mkdir -p /etc/scion
-    sudo cp -r "$SC/gen" /etc/scion/
+if [ -f "$SC/gen/scionlab-config.json" ]; then
+    sudo mkdir -p /etc/scion/gen
+    sudo cp "$SC/gen/scionlab-config.json" "/etc/scion/gen/"
 fi
+
+# TODO(juagargi): remove this and chown the dirs in the postinst
+sudo rm -rf /run/shm/dispatcher
+sudo rm -rf /run/shm/sciond
+
+
 sudo apt-get update
-sudo apt-get install scionlab  # this also installs and runs scionlab-config
+sudo apt-get install -y scionlab  # this also installs and runs scionlab-config
+
+exit 0
 
 sudo systemctl disable scion.service
 sudo systemctl stop scion.service
@@ -33,6 +46,7 @@ sudo rm /etc/systemd/system/scionupgrade.service
 
 sudo rm /usr/bin/scionupgrade.sh
 sudo systemctl stop scionupgrade.timer
+sudo systemctl daemon-reload
 # and this will also kill this very process, so it's the last thing we do:
 sudo systemctl stop scionupgrade.service
 
