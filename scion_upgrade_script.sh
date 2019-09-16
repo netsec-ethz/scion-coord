@@ -22,7 +22,7 @@ while sudo fuser /var/lib/dpkg/lock >/dev/null 2>&1; do
 done
 
 sudo apt-get install -y apt-transport-https
-echo "deb [trusted=yes] https://packages.netsec.inf.ethz.ch/debian all main" | sudo tee -a /etc/apt/sources.list
+echo "deb [trusted=yes] https://packages.netsec.inf.ethz.ch/debian all main" | sudo tee /etc/apt/sources.list.d/scionlab.list
 echo -e "`sudo  crontab -l`""\n`date -d '07:00 UTC' '+%M %H'` * * * apt-get update; apt-get install -y --only-upgrade scionlab" |sudo crontab
 if [ -d "$SC" ]; then
     pushd "$SC"
