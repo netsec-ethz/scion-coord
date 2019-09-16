@@ -39,13 +39,11 @@ sudo apt-get update
 sudo apt-get install -y scionlab  # this also installs and runs scionlab-config
 
 
-sudo systemctl disable scion.service
-sudo systemctl stop scion.service
+sudo systemctl disable --now scion.service
 sudo rm /etc/systemd/system/scion.service
 
-sudo systemctl disable scionupgrade.timer
-sudo systemctl stop scionupgrade.timer
-sudo systemctl disable scionupgrade.service
+sudo systemctl disable --now scionupgrade.timer
+sudo systemctl disable scionupgrade.service  # do not stop scionupgrade.service (it's this script)
 sudo rm /etc/systemd/system/scionupgrade.timer
 sudo rm /etc/systemd/system/scionupgrade.service
 
@@ -53,5 +51,5 @@ sudo rm /usr/bin/scionupgrade.sh
 sudo systemctl daemon-reload
 sudo systemctl reset-failed
 
-# no need to stop scionupgrade.service (this service) as we are done
-exit 0
+# in the VMs, we have manually installed ZK as dependency. Remove it
+sudo apt-get purge -y zookeeper
